@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { GoogleGenAI } from '@google/genai';
 import { Transaccion, Categoria } from '../types';
 
 interface UseGoogleSheetsOptions {
@@ -64,55 +63,19 @@ export function useGoogleSheets({
       
       let textContent = rows.map((r: any[]) => r.join(',')).join('\n');
       
-      const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error(selectedLanguage === 'ES' ? 'Falta la API Key de Gemini en el frontend (VITE_GEMINI_API_KEY).' : 'Missing Gemini API Key on the frontend (VITE_GEMINI_API_KEY).');
+      const responseBackend = await fetch('/api/gemini/extract-document', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ textContent })
+      });
+
+      if (!responseBackend.ok) {
+        throw new Error('Error extracting document via backend');
       }
 
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          }
-        }
-      });
-
-      const systemPrompt = `You are a specialized financial data extractor. You will be provided with a document (PDF, Image, or plain text / CSV) containing transaction receipts, invoices or bank statements. 
-Your goal is to extract the details for ALL transactions found in the document.
-Extract the following information for each transaction:
-- fecha: The date of the transaction in "YYYY-MM-DD" format.
-- monto: The financial amount as a pure number (no currency symbols, no thousands separators, decimals allowed).
-- nombre: A short description/name of the transaction.
-- categoria: Infer the best logical category for the transaction (e.g., Alimentación, Transporte, Compras, Vivienda, Viajes, Mascotas, etc).
-- banco: If the document shows a bank logo, entity name, or payment platform, extract its name.
-
-Return ONLY a JSON array of objects with this structure (example):
-[
-  {
-    "fecha": "YYYY-MM-DD",
-    "monto": 120000,
-    "nombre": "name/description",
-    "categoria": "category name",
-    "banco": "bank or platform name"
-  }
-]
-If a value cannot be found, return null for that field.
-
-Document text/content:
-${textContent ? textContent.substring(0, 50000) : ""}`;
-
-      const geminiResponse = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: [
-          { role: 'user', parts: [{ text: systemPrompt }] }
-        ],
-        config: {
-          responseMimeType: 'application/json',
-        }
-      });
-
-      const parsedDataArray = JSON.parse(geminiResponse.text || '[]');
+      const parsedDataArray = await responseBackend.json();
       
       const parsedArray = Array.isArray(parsedDataArray) ? parsedDataArray : [parsedDataArray];
       

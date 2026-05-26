@@ -1,7 +1,16 @@
+/// <reference types="vite/client" />
+
 import { initializeApp } from 'firebase/app';
-import { getAuth, setPersistence, inMemoryPersistence, browserLocalPersistence, indexedDBLocalPersistence, GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
+import { getAuth, setPersistence, inMemoryPersistence, browserLocalPersistence, indexedDBLocalPersistence, GoogleAuthProvider, signInWithPopup, signInWithRedirect, User } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+};
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
@@ -17,6 +26,11 @@ setPersistence(auth, indexedDBLocalPersistence).catch(() => {
 let cachedAccessToken: string | null = null;
 let cachedScopes: string[] = [];
 
+export const setCachedAccessToken = (token: string, scopes: string[]) => {
+  cachedAccessToken = token;
+  cachedScopes = [...scopes];
+};
+
 export const getGoogleAccessToken = async (scopes: string[] = []): Promise<string> => {
   if (cachedAccessToken && scopes.every(s => cachedScopes.includes(s))) {
     return cachedAccessToken;
@@ -27,6 +41,13 @@ export const getGoogleAccessToken = async (scopes: string[] = []): Promise<strin
     provider.addScope(scope);
     if (!cachedScopes.includes(scope)) cachedScopes.push(scope);
   });
+
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  if (isSafari) {
+    sessionStorage.setItem('pending_sheets_scopes', JSON.stringify(scopes));
+    await signInWithRedirect(auth, provider);
+    return new Promise<string>(() => {});
+  }
 
   const result = await signInWithPopup(auth, provider);
   const credential = GoogleAuthProvider.credentialFromResult(result);

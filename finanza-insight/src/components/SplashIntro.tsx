@@ -207,48 +207,6 @@ export const SplashIntro: React.FC<SplashIntroProps> = ({ onComplete, isMuted, o
     setIsVerifying(true);
     setStatusMsg({ type: 'info', text: 'Validando credenciales seguras...' });
 
-    // 1. Password verification logic using our local secure registered map
-    const registeredMapStr = localStorage.getItem('finanza_registered_users') || '{}';
-    let registeredMap: any = {};
-    try {
-      registeredMap = JSON.parse(registeredMapStr);
-    } catch (err) {}
-
-    const key = emailToUse.toLowerCase().trim();
-
-    if (authMode === 'login') {
-      const foundUser = registeredMap[key];
-      if (foundUser) {
-        if (foundUser.contraseña && foundUser.contraseña !== regPassword) {
-          setIsVerifying(false);
-          setStatusMsg({ type: 'error', text: 'La contraseña o PIN ingresado es incorrecto. Inténtalo de nuevo.' });
-          return;
-        }
-      } else {
-        // Create user automatically with this password if it's their first time entering
-        const tempProf = {
-          nombre: nameToUse,
-          correo: emailToUse,
-          celular: phoneToUse,
-          contraseña: regPassword,
-          productos: []
-        };
-        registeredMap[key] = tempProf;
-        localStorage.setItem('finanza_registered_users', JSON.stringify(registeredMap));
-      }
-    } else {
-      // Subscribing
-      const tempProf = {
-        nombre: nameToUse,
-        correo: emailToUse,
-        celular: phoneToUse,
-        contraseña: regPassword,
-        productos: []
-      };
-      registeredMap[key] = tempProf;
-      localStorage.setItem('finanza_registered_users', JSON.stringify(registeredMap));
-    }
-
     try {
       const { signInAnonymously } = await import('firebase/auth');
       // Authenticate with Firebase first, getting a real UID with quick timeout
@@ -305,7 +263,6 @@ export const SplashIntro: React.FC<SplashIntroProps> = ({ onComplete, isMuted, o
         productos: []
       };
       localStorage.setItem('finanza_user_profile_v6_temp', JSON.stringify(fallbackProf));
-      localStorage.setItem('findream_simulate_auth', 'true');
       setIsVerifying(false);
       setStatusMsg({ type: 'success', text: '¡Ingreso exitoso! (Perfil guardado localmente)' });
       setTimeout(() => {
@@ -372,7 +329,6 @@ export const SplashIntro: React.FC<SplashIntroProps> = ({ onComplete, isMuted, o
         productos: []
       };
       localStorage.setItem('finanza_user_profile_v6_temp', JSON.stringify(fallbackProf));
-      localStorage.setItem('findream_simulate_auth', 'true');
       setStatusMsg({ 
         type: 'success', 
         text: `¡Listo! Ingresaste como ${name} (Perfil local guardado)` 
@@ -628,7 +584,6 @@ export const SplashIntro: React.FC<SplashIntroProps> = ({ onComplete, isMuted, o
       }
 
       localStorage.setItem('finanza_user_profile_v6_temp', JSON.stringify(prof));
-      localStorage.setItem('findream_simulate_auth', 'true');
       setIsBiometricScanning(false);
       
       if (webAuthnSucceeded) {

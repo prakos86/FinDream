@@ -137,7 +137,7 @@ Tipos de acciones soportadas (puede venir con payload parcial que el UI completa
       const contents = [...(history || []), { role: "user", parts: [{ text: cleanMessage }] }];
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         contents,
         config: {
           systemInstruction: sysInstruction,
@@ -241,7 +241,7 @@ Reglas para la propuesta en formato JSON:
 
       const ai = getAIClient();
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         contents: isEn ? "Analyze these constraints and propose the dream metadata." : "Analiza los datos fiscales y genera la recomendación para el sueño.",
         config: {
           systemInstruction: systemPrompt,
@@ -319,7 +319,7 @@ La respuesta DEBE ser un objeto JSON con la clave "products" que contiene un arr
 
       const ai = getAIClient();
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         contents: isEn ? `Based on: "${cleanQuery}" specify the recommended financial products.` : `Basado en: "${cleanQuery}", genera las recomendaciones de productos financieros.`,
         config: {
           systemInstruction: systemPrompt,
@@ -402,7 +402,7 @@ ${textContent ? textContent.substring(0, 50000) : ""}`;
 
       const ai = getAIClient();
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         contents: [
           { role: "user", parts }
         ],
@@ -442,7 +442,7 @@ Example Output:
 
       const ai = getAIClient();
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         contents: "Classive this transaction details into a category.",
         config: {
           systemInstruction: systemPrompt,

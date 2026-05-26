@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react'; 
-import { auth } from './firebase';
+import { auth, setCachedAccessToken } from './firebase';
 import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged } from 'firebase/auth';
 import { 
   TrendingUp, 
@@ -841,6 +841,23 @@ export default function App() {
           console.log('Login redirect exitoso:', result.user.email);
           setIsAppLocked(false);
           setShowSplash(false);
+
+          const pendingScopes = sessionStorage.getItem('pending_sheets_scopes');
+          if (pendingScopes) {
+            const credential = GoogleAuthProvider.credentialFromResult(result);
+            if (credential?.accessToken) {
+              const scopes = JSON.parse(pendingScopes);
+              setCachedAccessToken(credential.accessToken, scopes);
+              sessionStorage.removeItem('pending_sheets_scopes');
+              
+              // Trigger sheets import
+              setTimeout(() => {
+                if (importFromSheetsRef.current) {
+                  importFromSheetsRef.current();
+                }
+              }, 300);
+            }
+          }
         }
       })
       .catch((error) => {
@@ -1145,7 +1162,6 @@ export default function App() {
   // Auth Guide helper states
   const [showAuthGuide, setShowAuthGuide] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [simulatedAuthMode, setSimulatedAuthMode] = useState(() => localStorage.getItem('findream_simulate_auth') === 'true');
 
 
   // Dynamic Notch Alert / Dynamic Island Active Notification
@@ -1280,6 +1296,8 @@ export default function App() {
     }
   };
 
+  const importFromSheetsRef = useRef<(() => Promise<void>) | null>(null);
+
   // --- CONTROLES DE MANTENER PRESIONADO (LONG PRESS) PARA EL BOTÓN + ---
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isHoldingRef = useRef<boolean>(false);
@@ -1385,6 +1403,10 @@ export default function App() {
       saveTransacciones([...newTxList, ...transacciones]);
     }
   });
+
+  useEffect(() => {
+    importFromSheetsRef.current = importFromSheets;
+  }, [importFromSheets]);
 
   // Filter algorithms for current period
   const filterTransactions = (items: Transaccion[]): Transaccion[] => {
@@ -3902,7 +3924,7 @@ export default function App() {
       {/* Main Core Viewport Wrapper - Native feeling on mobile, clean preview on desktop screens */}
       <div className="w-full max-w-md h-[100dvh] md:min-h-0 md:h-[840px] md:max-h-[92vh] bg-[#f4f5f9] md:rounded-[40px] overflow-hidden shadow-2xl relative md:border md:border-slate-800/60 flex flex-col">
         
-        {isLocalMode === true && !simulatedAuthMode && (
+        {isLocalMode === true && (
           <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 relative z-50 shadow-sm">
             <div className="flex items-start gap-2">
               <span className="text-yellow-600 mt-0.5">⚠️</span>
@@ -4075,45 +4097,6 @@ export default function App() {
                   <p className="text-[10px] text-slate-400 text-center leading-normal">
                     ¿Problemas con el modo privado y la pantalla de carga?
                   </p>
-                  
-                  <button
-                    onClick={async () => {
-                      try {
-                        const { signInAnonymously } = await import('firebase/auth');
-                        await signInAnonymously(auth).catch(() => {});
-                        
-                        // Fake a profile to enable the rest of the app without full Google Auth
-                        const fallbackProf = {
-                          nombre: 'Prakash Dowlani',
-                          correo: 'prakos@gmail.com',
-                          celular: '3001234567',
-                          productos: []
-                        };
-                        const existingReal = localStorage.getItem('finanza_user_profile_v2');
-                        if (existingReal) {
-                          try {
-                            const parsed = JSON.parse(existingReal);
-                            if (parsed && parsed.productos) {
-                              fallbackProf.productos = parsed.productos;
-                            }
-                          } catch(e) {}
-                        }
-                        
-                        localStorage.setItem('finanza_user_profile_v6_temp', JSON.stringify(fallbackProf));
-                        localStorage.setItem('finanza_user_profile_v2', JSON.stringify(fallbackProf));
-                        localStorage.setItem('findream_simulate_auth', 'true');
-                        setSimulatedAuthMode(true);
-                        setShowAuthGuide(false);
-                        alert("¡Sesión Simulada (Perfil Local) Activada Exitosamente!");
-                        window.location.reload();
-                      } catch (e) {
-                         alert("Error de sesión simulada.");
-                      }
-                    }}
-                    className="w-full py-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white rounded-lg text-[11px] font-bold transition-colors cursor-pointer shadow-md"
-                  >
-                    Simular Sesión Segura (Recomendado)
-                  </button>
 
                   <button
                     onClick={async () => {
@@ -4124,7 +4107,7 @@ export default function App() {
                         alert("Error al intentar redirección: " + String(e));
                       }
                     }}
-                    className="w-full py-1.5 bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-white rounded-lg text-[10px] font-semibold transition-colors cursor-pointer"
+                    className="w-full py-1.5 bg-slate-800 hover:bg-slate-755 text-slate-400 hover:text-white rounded-lg text-[10px] font-semibold transition-colors cursor-pointer"
                   >
                     Intentar redirección de Google
                   </button>

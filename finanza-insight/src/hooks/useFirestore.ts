@@ -180,8 +180,7 @@ export const useFirestore = (
         });
         if (!showSplash) syncWithFirestore(auth.currentUser || null);
       } catch (e) {
-        console.warn("Auth block detected, running unauthenticated bypass", e);
-        if (!showSplash) syncWithFirestore(null);
+        console.error("Auth initialization failed:", e);
       }
     };
     initAuthSync();
