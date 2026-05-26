@@ -61,11 +61,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import { Categoria, TipoMovimiento, Transaccion, FiltroTiempo, Sueno, UserProfile, ProductoFinanciero, ChatMessage } from './types';
 import { useFirestore } from './hooks/useFirestore';
+import { useGoogleSheets } from './hooks/useGoogleSheets';
+import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { DreamComplianceChart } from './components/DreamComplianceChart';
 import { ChatPanel } from './components/ChatPanel';
 import { TransactionForm } from './components/TransactionForm';
 import { SplashIntro } from './components/SplashIntro';
 import { FinDreamLogo } from './components/FinDreamLogo';
+import { ProfileModal } from './components/ProfileModal';
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const TRANSLATIONS = {
@@ -740,7 +743,6 @@ export default function App() {
   const [isSearchingCustomProducts, setIsSearchingCustomProducts] = useState(false);
   const [customProductError, setCustomProductError] = useState<string | null>(null);
   const [customProductRecommendations, setCustomProductRecommendations] = useState<any[]>([]);
-  const [isListeningCustomProduct, setIsListeningCustomProduct] = useState(false);
   const [customProductQuery, setCustomProductQuery] = useState('');
   const [recommendationMode, setRecommendationMode] = useState<'ai' | 'explore' | 'manual'>('ai');
 
@@ -938,46 +940,7 @@ export default function App() {
     }
   };
 
-  const startCustomProductSpeechRecognition = () => {
-    playTone('voice', isMuted);
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setCustomProductError(selectedLanguage === 'ES' ? "Tu navegador no soporta reconocimiento de voz en tiempo real." : "Speech recognition not supported in this browser.");
-      return;
-    }
 
-    const rec = new SpeechRecognition();
-    rec.lang = selectedLanguage === 'ES' ? 'es-ES' : 'en-US';
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-
-    rec.onstart = () => {
-      setIsListeningCustomProduct(true);
-      setCustomProductError(null);
-    };
-
-    rec.onerror = (e: any) => {
-      console.error(e);
-      setIsListeningCustomProduct(false);
-      setCustomProductError(selectedLanguage === 'ES' ? "No se pudo detectar entrada de audio." : "Could not capture voice audio.");
-    };
-
-    rec.onend = () => {
-      setIsListeningCustomProduct(false);
-    };
-
-    rec.onresult = (event: any) => {
-      const text = event.results[0][0].transcript;
-      setCustomProductQuery(text);
-      triggerDynamicIsland(
-        selectedLanguage === 'ES' ? "Texto Dictado" : "Voice Typed",
-        text.length > 25 ? text.substring(0, 25) + '...' : text,
-        true
-      );
-    };
-
-    rec.start();
-  };
 
   const handleLinkRecommendedProduct = (rec: RecommendedProduct) => {
     let tipo: any = 'Tarjeta de Crédito';
@@ -1189,10 +1152,7 @@ export default function App() {
   const [notchAlert, setNotchAlert] = useState<{ text: string; subtext: string; isPositive: boolean } | null>(null);
 
   // Speech Recognition hook states
-  const [isListening, setIsListening] = useState(false);
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
-  const [isImportingSheets, setIsImportingSheets] = useState(false);
-  const [recognitionError, setRecognitionError] = useState<string | null>(null);
 
   const { isSyncing, lastSyncedTime, pushToFirestore, isLocalMode } = useFirestore(
     showSplash,
@@ -1209,97 +1169,6 @@ export default function App() {
 
 
 
-  const handleGoogleSheetsImport = async () => {
-    try {
-      setIsImportingSheets(true);
-      triggerDynamicIsland("Conectando", selectedLanguage === 'ES' ? "Abriendo Google Sheets..." : "Opening Google Sheets...", true);
-      const { getGoogleAccessToken } = await import('./firebase');
-      const token = await getGoogleAccessToken(['https://www.googleapis.com/auth/spreadsheets.readonly']);
-      
-      const spreadsheetId = window.prompt(selectedLanguage === 'ES' ? "Pega el enlace o ID de tu Google Sheet:" : "Paste the link or ID of your Google Sheet:");
-      if (!spreadsheetId) {
-         setIsImportingSheets(false);
-         triggerDynamicIsland("Cancelado", selectedLanguage === 'ES' ? "Operación cancelada" : "Operation canceled", false);
-         return;
-      }
-      
-      let realId = spreadsheetId;
-      if (spreadsheetId.includes('/d/')) {
-         realId = spreadsheetId.split('/d/')[1].split('/')[0];
-      }
-      
-      triggerDynamicIsland("Leyendo", selectedLanguage === 'ES' ? "Analizando hoja con IA..." : "Analyzing sheet with AI...", true);
-      const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${realId}/values/A1:Z500`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      if (!response.ok) {
-         throw new Error('Error reading from Google Sheets');
-      }
-      const result = await response.json();
-      const rows = result.values || [];
-      
-      let textContent = rows.map((r: any[]) => r.join(',')).join('\n');
-      
-      const res = await fetch('/api/gemini/extract-document', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mimeType: 'text/csv', textContent })
-      });
-      const parsedDataArray = await res.json();
-      
-      const parsedArray = Array.isArray(parsedDataArray) ? parsedDataArray : [parsedDataArray];
-      
-      const newTxList = parsedArray.map(parsedData => {
-        let cat = 'Otros';
-        if (parsedData.categoria) {
-          let matchedCat = categorias.find(c => c.nombre.toLowerCase() === parsedData.categoria.toLowerCase());
-          if (!matchedCat) {
-            matchedCat = categorias.find(c => parsedData.categoria.toLowerCase().includes(c.nombre.toLowerCase()) || 
-                                             c.nombre.toLowerCase().includes(parsedData.categoria.toLowerCase()));
-          }
-          if (matchedCat) cat = matchedCat.nombre;
-        }
-        
-        let forma = getMergedPaymentMethods()[0];
-        if (parsedData.banco) {
-          const pms = getMergedPaymentMethods();
-          let matchedPm = pms.find(pm => pm.toLowerCase().includes(parsedData.banco.toLowerCase()) || parsedData.banco.toLowerCase().includes(pm.toLowerCase()));
-          if (matchedPm) forma = matchedPm;
-        }
-        
-        const tx: Transaccion = {
-          id: Math.random().toString(36).substring(2, 9),
-          tipo: 'Gasto',
-          monto: Number(parsedData.monto) || 0,
-          categoria: cat,
-          fecha: parsedData.fecha || formatLocalYYYYMMDD(new Date()),
-          descripcion: parsedData.nombre || `Gasto en ${cat}`,
-          formaPago: forma
-        };
-        return tx;
-      });
-      
-      setIsAddingOpen(false);
-      
-      requestConfirmation(
-        selectedLanguage === 'ES' ? "Confirmar importación" : "Confirm import",
-        selectedLanguage === 'ES' 
-          ? `Se encontraron ${newTxList.length} movimientos por un total de $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. ¿Deseas agregarlos?` 
-          : `Found ${newTxList.length} transactions totaling $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. Do you want to add them?`,
-        () => {
-          saveTransacciones([...newTxList, ...transacciones]);
-          triggerDynamicIsland("Completado", selectedLanguage === 'ES' ? `Se agregaron ${newTxList.length} movimientos.` : `${newTxList.length} transactions added.`, true);
-          playTone('success', isMuted);
-        }
-      );
-    } catch(e) {
-      console.error(e);
-      triggerDynamicIsland("Error", selectedLanguage === 'ES' ? "No se pudo leer de Google Sheets" : "Could not read from Google Sheets", false);
-    } finally {
-      setIsImportingSheets(false);
-    }
-  };
   const [hoveredSlice, setHoveredSlice] = useState<string | null>(null);
   const [hideBalances, setHideBalances] = useState<boolean>(() => {
     try {
@@ -1484,6 +1353,38 @@ export default function App() {
       setNotchAlert(null);
     }, 4500);
   };
+
+  const {
+    isListening: isListeningCustomProduct,
+    startListening: startCustomProductSpeechRecognition,
+    recognitionError: speechError,
+  } = useSpeechRecognition({
+    selectedLanguage,
+    onTranscriptChange: (text) => setCustomProductQuery(text),
+    triggerDynamicIsland,
+    playTone,
+    isMuted,
+  });
+
+  useEffect(() => {
+    if (speechError) {
+      setCustomProductError(speechError);
+    }
+  }, [speechError]);
+
+  const { importFromSheets, isImportingSheets } = useGoogleSheets({
+    categorias,
+    getMergedPaymentMethods,
+    selectedLanguage,
+    triggerDynamicIsland,
+    requestConfirmation,
+    setIsAddingOpen,
+    isMuted,
+    playTone,
+    onImportSuccess: (newTxList) => {
+      saveTransacciones([...newTxList, ...transacciones]);
+    }
+  });
 
   // Filter algorithms for current period
   const filterTransactions = (items: Transaccion[]): Transaccion[] => {
@@ -3776,7 +3677,7 @@ export default function App() {
                       disabled={isImportingSheets}
                       onClick={() => {
                         handleTap();
-                        handleGoogleSheetsImport();
+                        importFromSheets();
                       }}
                       className="col-span-2 p-5 rounded-2xl border border-blue-100 bg-blue-50/20 hover:bg-blue-50 flex flex-row items-center justify-center gap-4 text-center cursor-pointer transition-all active:scale-95 duration-200 mt-[-10px]"
                     >
@@ -4235,548 +4136,28 @@ export default function App() {
       </AnimatePresence>
 
       {/* --- MI CUENTA MODAL & COLOMBIAN BANK PRODUCTS --- */}
-      <AnimatePresence>
-        {isCuentaOpen && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              id="cuenta-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsCuentaOpen(false)}
-              className="fixed inset-0 bg-black/70 z-[40] backdrop-blur-[3px]"
-            />
-
-            {/* Core Modal Sheet */}
-            <motion.div
-              id="cuenta-modal-sheet"
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="fixed bottom-0 inset-x-0 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-md bg-white rounded-t-[30px] z-[50] p-6 shadow-2xl flex flex-col border-t border-slate-100 max-h-[92%] overflow-y-auto no-scrollbar"
-            >
-              <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-4 flex-shrink-0" />
-
-              <div className="flex justify-between items-center mb-4 flex-shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 flex items-center justify-center bg-teal-50 rounded-lg p-0.5 border border-teal-100 flex-shrink-0 overflow-hidden">
-                    <FinDreamLogo size="sm" variant="icon-only" animated={false} className="scale-75" />
-                  </div>
-                  <h3 className="text-[17px] font-black text-slate-900 tracking-tight uppercase">Mi Cuenta Findream</h3>
-                </div>
-                <button
-                  id="btn-cuenta-close"
-                  onClick={() => setIsCuentaOpen(false)}
-                  className="p-1.5 bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Profile setup fields */}
-              <div className="space-y-5 text-left flex-1">
-                <div className="bg-teal-50/50 rounded-2xl p-4 border border-teal-100/50">
-                  <span className="text-[10px] font-black text-teal-800 tracking-widest uppercase mb-2.5 block">Datos Básicos</span>
-                  <div className="space-y-3">
-                    {/* Name */}
-                    <div>
-                      <label className="text-[10px] font-extrabold uppercase text-slate-600 block mb-1">Nombre Completo</label>
-                      <input
-                        type="text"
-                        value={userProfile.nombre}
-                        onChange={(e) => saveUserProfileData({ ...userProfile, nombre: e.target.value })}
-                        className="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        placeholder="Ej: Prakos"
-                      />
-                    </div>
-
-                    {/* Email */}
-                    <div>
-                      <label className="text-[10px] font-extrabold uppercase text-slate-600 block mb-1">Correo Electrónico</label>
-                      <input
-                        type="email"
-                        value={userProfile.correo}
-                        onChange={(e) => saveUserProfileData({ ...userProfile, correo: e.target.value })}
-                        className="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        placeholder="Ej: Prakos@gmail.com"
-                      />
-                    </div>
-
-                    {/* Phone */}
-                    <div>
-                      <label className="text-[10px] font-extrabold uppercase text-slate-600 block mb-1">Celular / Teléfono</label>
-                      <input
-                        type="text"
-                        value={userProfile.celular || ''}
-                        onChange={(e) => saveUserProfileData({ ...userProfile, celular: e.target.value })}
-                        className="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        placeholder="Ej: +57 321 456 7890"
-                      />
-                    </div>
-
-                    </div>
-                  </div>
-
-                {/* --- SECCIÓN DE ENCLAVE SEGURO Y BIOMETRÍA --- */}
-                <div id="biometrics-settings-card" className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left space-y-3">
-                  <div className="flex items-start gap-2.5">
-                    <div className="p-2 bg-teal-50 text-teal-700 rounded-xl border border-teal-100 flex-shrink-0">
-                      <Fingerprint className="w-5 h-5 animate-pulse" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-black text-slate-800 tracking-wider uppercase">Enclave Seguro & FaceID</span>
-                        {isBiometricRegistered ? (
-                          <span className="bg-emerald-100 text-emerald-800 text-[8.5px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tight">Activo</span>
-                        ) : (
-                          <span className="bg-slate-200 text-slate-600 text-[8.5px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tight">Inactivo</span>
-                        )}
-                      </div>
-                      <p className="text-[10.5px] text-slate-500 font-bold leading-relaxed mt-0.5">
-                        Accede instantáneamente con la huella digital o reconocimiento facial de tu dispositivo móvil.
-                      </p>
-                    </div>
-                  </div>
-
-                  {biometricEnrollMsg.text && (
-                    <div className={`p-2.5 rounded-xl text-[10.5px] font-bold ${
-                      biometricEnrollMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' :
-                      biometricEnrollMsg.type === 'error' ? 'bg-rose-50 text-rose-800 border border-rose-100' :
-                      'bg-teal-50 text-teal-805 border border-teal-100'
-                    }`}>
-                      {biometricEnrollMsg.text}
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-100/75">
-                    <span className="text-[10.5px] font-extrabold text-slate-600">Autenticación Biométrica Real</span>
-                    
-                    {isEnrollingBiometrics ? (
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-600" />
-                        <span>Verificando...</span>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (isBiometricRegistered) {
-                            setIsEnrollingBiometrics(true);
-                            setTimeout(() => {
-                              localStorage.removeItem('findream_biometric_registered');
-                              setIsBiometricRegistered(false);
-                              setBiometricEnrollMsg({ type: 'success', text: 'Autenticación biométrica desactivada con éxito.' });
-                              setIsEnrollingBiometrics(false);
-                              setTimeout(() => setBiometricEnrollMsg({ type: '', text: '' }), 4000);
-                            }, 800);
-                            return;
-                          }
-
-                          setIsEnrollingBiometrics(true);
-                          setBiometricEnrollMsg({ type: 'info', text: 'Iniciando registro de sensor biométrico del hardware...' });
-
-                          const isIframe = window.self !== window.top;
-                          let actSuccess = false;
-
-                          // Attempt actual native WebAuthn enrollment
-                          if (window.PublicKeyCredential && !isIframe) {
-                            try {
-                              const challenge = window.crypto.getRandomValues(new Uint8Array(16));
-                              const userId = window.crypto.getRandomValues(new Uint8Array(16));
-                              const options: any = {
-                                publicKey: {
-                                  challenge: challenge,
-                                  rp: { name: "FinDream App", id: window.location.hostname },
-                                  user: {
-                                    id: userId,
-                                    name: userProfile.correo || "prakos@gmail.com",
-                                    displayName: userProfile.nombre || "Prakos FinDream"
-                                  },
-                                  pubKeyCredParams: [
-                                    { type: "public-key", alg: -7 },   // ES256
-                                    { type: "public-key", alg: -257 }  // RS256
-                                  ],
-                                  authenticatorSelection: {
-                                    authenticatorAttachment: "platform",
-                                    userVerification: "required"
-                                  },
-                                  timeout: 6000
-                                }
-                              };
-                              const credential = await navigator.credentials.create(options);
-                              if (credential) {
-                                actSuccess = true;
-                              }
-                            } catch (err: any) {
-                              console.warn("Native hardware biometric setup returned fallback: ", err.message);
-                            }
-                          }
-
-                          setTimeout(() => {
-                            if (actSuccess) {
-                              localStorage.setItem('findream_biometric_registered', 'true');
-                              setIsBiometricRegistered(true);
-                              setBiometricEnrollMsg({ type: 'success', text: '¡FaceID / TouchID activado con éxito en el Enclave Seguro!' });
-                            } else {
-                              // High fidelity fallback enrollment in sandbox environment
-                              localStorage.setItem('findream_biometric_registered', 'true');
-                              setIsBiometricRegistered(true);
-                              setBiometricEnrollMsg({ type: 'success', text: '¡Llavero Seguro Vinculado! FaceID / TouchID activado para este dispositivo.' });
-                            }
-                            setIsEnrollingBiometrics(false);
-
-                            // Beep sound
-                            try {
-                              const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-                              if (AudioContext) {
-                                const ctx = new AudioContext();
-                                const osc = ctx.createOscillator();
-                                const gain = ctx.createGain();
-                                osc.type = 'sine';
-                                osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-                                gain.gain.setValueAtTime(0.04, ctx.currentTime);
-                                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-                                osc.connect(gain);
-                                gain.connect(ctx.destination);
-                                osc.start();
-                                osc.stop(ctx.currentTime + 0.15);
-                              }
-                            } catch (e) {}
-
-                            setTimeout(() => {
-                              setBiometricEnrollMsg({ type: '', text: '' });
-                            }, 5000);
-                          }, 1200);
-                        }}
-                        className={`py-1.5 px-3.5 rounded-xl font-black text-[10px] uppercase tracking-wider transition ${
-                          isBiometricRegistered 
-                            ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-100' 
-                            : 'bg-teal-600 hover:bg-teal-700 text-white shadow-md shadow-teal-100/50'
-                        }`}
-                      >
-                        {isBiometricRegistered ? 'Desactivar' : 'Activar'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* --- SOPORTE TÉCNICO VINCULADO AL CHAT CON IA --- */}
-                <div id="soporte-ia-card" className="bg-gradient-to-tr from-slate-50 to-indigo-50/50 rounded-2xl p-4 border border-indigo-100 shadow-2xs space-y-3 text-left">
-                  <div className="flex items-center gap-2 animate-pulse-slow">
-                    <div className="p-2 bg-indigo-50 text-indigo-750 rounded-xl">
-                      <MessageSquare className="w-4 h-4 text-indigo-600 animate-pulse" />
-                    </div>
-                    <div>
-                      <span className="text-[9px] font-black text-indigo-800 tracking-widest uppercase block">Soporte Técnico Especializado</span>
-                      <h4 className="text-xs font-black text-slate-900 mt-0.5">Asistente de Soporte con IA Findream</h4>
-                    </div>
-                  </div>
-
-                  <p className="text-[10.5px] text-slate-600 font-bold leading-normal">
-                    {selectedLanguage === 'ES'
-                      ? "¿Tienes dudas sobre el app, problemas con el registro de tus portafolios, o necesitas ideas de ahorro? Chatea directamente con nuestro Asistente de Soporte con IA."
-                      : "Have system questions, technical issues managing your accounts, savings targets or portfolio registries? Instant chat with our dedicated Support System Assistant."}
-                  </p>
-
-                  <div className="pt-0.5">
-                    <button
-                      type="button"
-                      id="btn-soport-chat-ia"
-                      onClick={() => {
-                        handleTap();
-                        setIsCuentaOpen(false);
-                        setActiveTab('insights');
-                        
-                        const queryText = selectedLanguage === 'ES'
-                          ? "Hola, necesito soporte y ayuda personalizada para configurar mi cuenta Findream."
-                          : "Hello, I need some customized helper and support configuring my Findream settings.";
-                        
-                        setActiveTab('suenos');
-                      }}
-                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-750 text-white font-black text-[10.5px] uppercase tracking-wider rounded-xl cursor-pointer transition active:scale-97 flex items-center justify-center gap-1.5 shadow-sm hover:shadow-indigo-200"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-200" />
-                      <span>{selectedLanguage === 'ES' ? 'Chatear con Soporte IA' : 'Chat with AI Support'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Colombia fintech products registry */}
-                <div className="bg-white rounded-2xl border border-slate-150 p-4 space-y-4 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex flex-col text-left">
-                      <span className="text-[10px] font-black text-slate-800 tracking-wider uppercase">
-                        {selectedLanguage === 'ES' ? 'Mis Bancos y Portafolio' : 'My Banks and Portfolio'}
-                      </span>
-                      <span className="text-[8.5px] font-semibold text-slate-400 mt-0.5">
-                        {selectedLanguage === 'ES' ? 'Vincúlalos para que aparezcan en tu selector de pagos' : 'Link them to display in your payment selectors'}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { handleTap(); setShowAddProductSettings(!showAddProductSettings); }}
-                      className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center ${
-                        showAddProductSettings
-                          ? 'bg-rose-50 border-rose-200 text-rose-600'
-                          : 'bg-teal-50 border-teal-200 text-teal-700'
-                      }`}
-                    >
-                      {showAddProductSettings ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-
-                  {/* Add financial product mini-form */}
-                  {showAddProductSettings && (
-                    <form className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/50 space-y-3" onSubmit={(e) => {
-                      e.preventDefault();
-                      const bankSel = (document.getElementById('new-product-bank') as HTMLSelectElement)?.value || COLOMBIAN_BANKS[0];
-                      const typeSel = (document.getElementById('new-product-type') as HTMLSelectElement)?.value || PRODUCT_TAB_DEBTS_ONLY[0];
-                      const franchiseSel = (document.getElementById('new-product-franchise') as HTMLSelectElement)?.value || COLOMBIAN_FRANCHISES[0];
-                      const aliasVal = (document.getElementById('new-product-alias') as HTMLInputElement)?.value?.trim();
-                      const totalVal = parseFloat((document.getElementById('new-product-total') as HTMLInputElement)?.value) || 0;
-                      const usedVal = parseFloat((document.getElementById('new-product-used') as HTMLInputElement)?.value) || 0;
-                      
-                      const newProd: ProductoFinanciero = {
-                        id: `prod-${Date.now()}`,
-                        banco: bankSel,
-                        tipo: typeSel,
-                        alias: aliasVal || undefined,
-                        montoTotal: totalVal > 0 ? totalVal : undefined,
-                        montoUtilizado: totalVal > 0 && usedVal >= 0 ? usedVal : undefined,
-                        franquicia: (franchiseSel && franchiseSel !== 'Ninguna / No Aplica') ? franchiseSel : undefined
-                      };
-
-                      const updatedProds = [...(userProfile.productos || []), newProd];
-                      saveUserProfileData({ ...userProfile, productos: updatedProds });
-                      playTone('success', isMuted);
-                      triggerDynamicIsland(
-                        selectedLanguage === 'ES' ? "Producto Registrado" : "Product Registered", 
-                        `${bankSel} • ${typeSel}`, 
-                        true
-                      );
-                      
-                      // Clear inputs
-                      const aliasEl = document.getElementById('new-product-alias') as HTMLInputElement;
-                      if (aliasEl) aliasEl.value = '';
-                      const totalEl = document.getElementById('new-product-total') as HTMLInputElement;
-                      if (totalEl) totalEl.value = '';
-                      const usedEl = document.getElementById('new-product-used') as HTMLInputElement;
-                      if (usedEl) usedEl.value = '';
-                      const franchiseEl = document.getElementById('new-product-franchise') as HTMLSelectElement;
-                      if (franchiseEl) franchiseEl.value = COLOMBIAN_FRANCHISES[0];
-                    }}>
-                    <span className="text-[9.5px] font-extrabold uppercase text-[#00796B] tracking-wider block">
-                      {selectedLanguage === 'ES' ? 'Registrar Nuevo Producto' : 'Register New Product'}
-                    </span>
-                    
-                    {/* Select bank dropdown */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[9px] font-black text-slate-500 uppercase block mb-0.5">
-                          {selectedLanguage === 'ES' ? 'Entidad Financiera' : 'Financial Institution'}
-                        </label>
-                        <select
-                          id="new-product-bank"
-                          className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2 text-[11px] font-extrabold text-slate-800 focus:outline-none"
-                        >
-                          {COLOMBIAN_BANKS.map((b) => (
-                            <option key={b} value={b}>{b}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[9px] font-black text-slate-500 uppercase block mb-0.5">
-                          {selectedLanguage === 'ES' ? 'Tipo de Producto' : 'Product Type'}
-                        </label>
-                        <select
-                          id="new-product-type"
-                          className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2 text-[11px] font-extrabold text-slate-800 focus:outline-none"
-                        >
-                          {PRODUCT_TAB_DEBTS_ONLY.map((p) => (
-                            <option key={p} value={p}>{translateProduct(p, selectedLanguage)}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Franchise Select Dropdown */}
-                    <div>
-                      <label className="text-[9px] font-black text-slate-500 uppercase block mb-0.5">
-                        {selectedLanguage === 'ES' ? 'Franquicia (Tarjeta) - Opcional' : 'Franchise (Card) - Optional'}
-                      </label>
-                      <select
-                        id="new-product-franchise"
-                        className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2 text-[11px] font-extrabold text-slate-800 focus:outline-none"
-                      >
-                        {COLOMBIAN_FRANCHISES.map((f) => (
-                          <option key={f} value={f}>{translateFranchise(f, selectedLanguage)}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Numeric Input Fields for total and used amounts */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[9px] font-black text-slate-500 uppercase block mb-0.5">Cupo / Monto Total</label>
-                        <input
-                          type="number"
-                          id="new-product-total"
-                          placeholder="Ej: 5000000"
-                          className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2 text-[11px] font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[9px] font-black text-slate-500 uppercase block mb-0.5">Monto Utilizado / Pagado</label>
-                        <input
-                          type="number"
-                          id="new-product-used"
-                          placeholder="Ej: 500000"
-                          className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2 text-[11px] font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Optional Alias input */}
-                    <div>
-                      <label className="text-[9px] font-black text-slate-500 uppercase block mb-0.5">
-                        {selectedLanguage === 'ES' ? 'Alias (Ej: Principal, Compras) - Opcional' : 'Alias (e.g. Main, Shopping) - Optional'}
-                      </label>
-                      <input
-                        type="text"
-                        id="new-product-alias"
-                        placeholder={selectedLanguage === 'ES' ? 'Ej: Tarjeta de Nómina' : 'e.g. Salary Card'}
-                        className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2 text-[11px] font-black text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full py-2 bg-[#00897B] text-white hover:bg-[#00796B] font-black text-[10px] uppercase tracking-wider rounded-lg shadow-sm transition active:scale-98 cursor-pointer text-center"
-                    >
-                      {selectedLanguage === 'ES' ? '+ Guardar Producto Financiero' : '+ Save Financial Product'}
-                    </button>
-                  </form>
-                  )}
-
-                  {/* List of current products */}
-                  <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                    <span className="text-[9.5px] font-extrabold uppercase text-slate-500 tracking-wider block">Portafolio Actual</span>
-                    {(!userProfile.productos || userProfile.productos.length === 0) ? (
-                      <div className="p-3 text-center bg-slate-50 rounded-xl text-[10.5px] text-slate-400 font-medium">
-                        Aún no tienes portafolios financieros registrados. Agrega uno arriba para vincular tus formas de pago.
-                      </div>
-                    ) : (
-                      <div className="space-y-2.5">
-                        {userProfile.productos.map((prod) => (
-                           <div key={prod.id} className="p-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-150 transition-colors flex flex-col space-y-2 text-left">
-                            <div className="flex justify-between items-center w-full">
-                              <div className="flex items-center gap-2">
-                                <CreditCard className="w-3.5 h-3.5 text-teal-600 animate-pulse flex-shrink-0" />
-                                <div className="text-left">
-                                  <span className="text-xs font-bold text-slate-800 block leading-tight text-left">
-                                    {prod.banco}{" "}
-                                    <span className="font-extrabold text-teal-800 text-[9px] bg-teal-50 px-1.5 rounded-full border border-teal-100/50">
-                                      {translateProduct(prod.tipo, selectedLanguage)}
-                                    </span>
-                                    {prod.franquicia && (
-                                      <span className="font-extrabold text-blue-800 text-[9px] bg-blue-50 px-1.5 rounded-full border border-blue-200/50 ml-1">
-                                        {translateFranchise(prod.franquicia, selectedLanguage)}
-                                      </span>
-                                    )}
-                                  </span>
-                                  {prod.alias && (
-                                    <span className="text-[9px] text-[#00796B] font-black mt-0.5 block italic text-left">
-                                      "{prod.alias}"
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const filtered = (userProfile.productos || []).filter(p => p.id !== prod.id);
-                                  saveUserProfileData({ ...userProfile, productos: filtered });
-                                  playTone('delete', isMuted);
-                                  triggerDynamicIsland("Portafolio Removido", `${prod.banco} Eliminado`, false);
-                                }}
-                                className="p-1 px-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                                title="Eliminar Portafolio"
-                              >
-                                <Trash className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-
-                            {/* Mini bar showing limit vs debt inside the modal */}
-                            {prod.montoTotal && prod.montoTotal > 0 ? (
-                              <div className="pt-1.5 border-t border-slate-200/50 w-full space-y-1">
-                                <div className="flex justify-between items-baseline text-[9px]">
-                                  <span className="text-slate-500 font-bold">
-                                    ${getProductUtilizado(prod).toLocaleString('es-ES', { minimumFractionDigits: 0 })} / <span className="text-[#00796B]">${prod.montoTotal.toLocaleString('es-ES', { minimumFractionDigits: 0 })}</span>
-                                  </span>
-                                  <span className="font-black text-[#00796B]">
-                                    {Math.min(Math.round((getProductUtilizado(prod) / prod.montoTotal) * 100), 100)}%
-                                  </span>
-                                </div>
-                                <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden relative">
-                                  <div
-                                    className="h-full bg-teal-600 rounded-full"
-                                    style={{ width: `${Math.min((getProductUtilizado(prod) / prod.montoTotal) * 100, 100)}%` }}
-                                  />
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="pt-2 flex-shrink-0 space-y-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setIsCuentaOpen(false)}
-                    className="w-full py-3.5 bg-gradient-to-r from-teal-700 to-indigo-800 text-white font-black text-xs uppercase tracking-wider rounded-xl hover:opacity-95 shadow-md active:scale-98 transition flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <Check className="w-4 h-4" />
-                    <span>Listo, Finalizar</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const conf = window.confirm(selectedLanguage === 'ES' ? '¿Estás seguro de que deseas cerrar sesión?' : 'Are you sure you want to sign out?');
-                      if (!conf) return;
-                      
-                      // Sign out from firebase
-                      try {
-                        const { auth } = await import('./firebase');
-                        await auth.signOut();
-                      } catch (e) {
-                        console.error(e);
-                      }
-
-                      // Clear user profile values and return to splash intro
-                      localStorage.removeItem('finanza_user_profile_v2');
-                      localStorage.removeItem('finanza_user_profile_v6_temp');
-                      setIsCuentaOpen(false);
-                      setShowSplash(true);
-                      triggerDynamicIsland("Sesión Cerrada", "Vuelve pronto a Findream", false);
-                    }}
-                    className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-black uppercase tracking-wider rounded-xl active:scale-98 transition cursor-pointer flex items-center justify-center gap-1.5 border border-rose-100 shadow-xs"
-                  >
-                    <LogOut className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
-                    <span>{selectedLanguage === 'ES' ? 'Cerrar Sesión' : 'Sign Out'}</span>
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      <ProfileModal
+        isCuentaOpen={isCuentaOpen}
+        setIsCuentaOpen={setIsCuentaOpen}
+        userProfile={userProfile}
+        saveUserProfileData={saveUserProfileData}
+        isBiometricRegistered={isBiometricRegistered}
+        setIsBiometricRegistered={setIsBiometricRegistered}
+        isEnrollingBiometrics={isEnrollingBiometrics}
+        setIsEnrollingBiometrics={setIsEnrollingBiometrics}
+        biometricEnrollMsg={biometricEnrollMsg}
+        setBiometricEnrollMsg={setBiometricEnrollMsg}
+        selectedLanguage={selectedLanguage}
+        handleTap={handleTap}
+        showAddProductSettings={showAddProductSettings}
+        setShowAddProductSettings={setShowAddProductSettings}
+        isMuted={isMuted}
+        playTone={playTone}
+        triggerDynamicIsland={triggerDynamicIsland}
+        getProductUtilizado={getProductUtilizado}
+        setActiveTab={setActiveTab}
+        setShowSplash={setShowSplash}
+      />
 
       <AnimatePresence>
         {showSplash && (
