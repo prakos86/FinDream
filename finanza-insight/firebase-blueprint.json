@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with contact info.",
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string", "description": "User's display name" },
+        "correo": { "type": "string", "description": "User's registered email" },
+        "celular": { "type": "string", "description": "User's mobile number" }
+      },
+      "required": ["nombre", "correo"]
+    },
+    "Transaccion": {
+      "title": "Transaccion",
+      "description": "A financial transaction (income or expense).",
+      "type": "object",
+      "properties": {
+        "tipo": { "type": "string", "enum": ["Ingreso", "Gasto"] },
+        "monto": { "type": "number", "description": "Monto de la transaccion" },
+        "categoria": { "type": "string" },
+        "fecha": { "type": "string" },
+        "descripcion": { "type": "string" },
+        "formaPago": { "type": "string" }
+      },
+      "required": ["tipo", "monto", "fecha", "descripcion"]
+    },
+    "Sueno": {
+      "title": "Sueno",
+      "description": "A savings goal / dream details.",
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string" },
+        "meta": { "type": "number" },
+        "ahorroManual": { "type": "number" },
+        "usarReal": { "type": "boolean" }
+      },
+      "required": ["nombre", "meta", "ahorroManual", "usarReal"]
+    },
+    "ProductoFinanciero": {
+      "title": "ProductoFinanciero",
+      "description": "A registered financial portfolio product.",
+      "type": "object",
+      "properties": {
+        "banco": { "type": "string" },
+        "tipo": { "type": "string" },
+        "alias": { "type": "string" },
+        "montoTotal": { "type": "number" },
+        "montoUtilizado": { "type": "number" }
+      },
+      "required": ["banco", "tipo"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A support/advice chat history message.",
+      "type": "object",
+      "properties": {
+        "sender": { "type": "string", "enum": ["user", "model"] },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["sender", "text", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User contact details."
+    },
+    "/users/{userId}/transacciones/{transaccionId}": {
+      "schema": "Transaccion",
+      "description": "User's individual financial logs."
+    },
+    "/users/{userId}/suenos/{suenoId}": {
+      "schema": "Sueno",
+      "description": "User's financial dreams and savings targets."
+    },
+    "/users/{userId}/productos/{productoId}": {
+      "schema": "ProductoFinanciero",
+      "description": "User's registered Colombian account portfolios."
+    },
+    "/users/{userId}/chatMessages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "User's history with AI help desk and assistant."
+    }
+  }
+}

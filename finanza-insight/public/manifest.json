@@ -1,0 +1,25 @@
+{
+  "short_name": "FinDream",
+  "name": "FinDream - Finanzas para tus sueños",
+  "description": "Tu asesor financiero personal inteligente con IA y control de metas de ahorro offline y seguro.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#008B81",
+  "categories": ["finance", "utilities"],
+  "icons": [
+    {
+      "src": "/icon-192.png?v=4",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png?v=4",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}
