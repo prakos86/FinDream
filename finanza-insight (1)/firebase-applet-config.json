@@ -1,8 +1,8 @@
 {
-  "apiKey": "mock-api-key",
-  "authDomain": "mock-auth-domain.firebaseapp.com",
-  "projectId": "mock-project-id",
-  "storageBucket": "mock-project-id.appspot.com",
-  "messagingSenderId": "123456789",
-  "appId": "1:123456789:web:abcdef"
+  "apiKey": "AIzaSyACDLgZAKVeijhjKpdh5G48RVUDbUCmrWA",
+  "authDomain": "project-08353d86-fe8c-46ce-957.firebaseapp.com",
+  "projectId": "project-08353d86-fe8c-46ce-957",
+  "storageBucket": "project-08353d86-fe8c-46ce-957.firebasestorage.app",
+  "messagingSenderId": "210952224825",
+  "appId": "1:210952224825:web:3a3aa42f77736c170b0de8"
 }
