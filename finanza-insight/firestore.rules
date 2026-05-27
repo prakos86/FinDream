@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Catch-all default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && (
+        request.auth.uid == userId ||
+        request.auth.token.firebase.sign_in_provider == "anonymous" ||
+        (request.auth.token.email != null && request.auth.token.email.toLowerCase() == userId.toLowerCase())
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Users Collection (Accommodates both alphanumeric UIDs and email addresses containing special characters)
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      match /{allPaths=**} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+  }
+}
