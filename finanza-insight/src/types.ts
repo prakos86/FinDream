@@ -65,5 +65,6 @@ export interface ChatMessage {
   sender: 'user' | 'model';
   text: string;
   timestamp: string; // ISO string
+  attachedFileName?: string;
 }
 

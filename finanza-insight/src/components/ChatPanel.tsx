@@ -25,6 +25,8 @@ interface ChatPanelProps {
   t: (key: any) => string;
   extractPdfText: (file: File, password?: string) => Promise<string>;
   askPdfPassword: (file: File) => Promise<string>;
+  chatMessages: ChatMessage[];
+  setChatMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -44,11 +46,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   isMuted,
   t,
   extractPdfText,
-  askPdfPassword
+  askPdfPassword,
+  chatMessages,
+  setChatMessages
 }) => {
   const [chatInput, setChatInput] = useState('');
   const [isAIProcessing, setIsAIProcessing] = useState(false);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isListeningChat, setIsListeningChat] = useState(false);
   const [isImmersiveVoiceMode, setIsImmersiveVoiceMode] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -122,19 +125,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const handleSendChatMessage = async (msgText: string) => {
     if (!msgText.trim() || isAIProcessing) return;
     
-    const fullMessage = attachedFileText
-      ? `${msgText}\n\n[Documento: "${attachedFileName}"]\n${attachedFileText.substring(0, 40000)}`
+    const tempAttachedFileText = attachedFileText;
+    const tempAttachedFileName = attachedFileName;
+
+    const fullMessage = tempAttachedFileText
+      ? `${msgText}\n\n[Documento: "${tempAttachedFileName}"]\n${tempAttachedFileText.substring(0, 40000)}`
       : msgText;
 
     const userMsg: ChatMessage = {
       id: `chat-${Date.now()}`,
       sender: 'user',
       text: msgText,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      ...(tempAttachedFileName && { attachedFileName: tempAttachedFileName })
     };
     
     setChatMessages(prev => [...prev, userMsg]);
     setChatInput('');
+    setAttachedFileText(null);
+    setAttachedFileName(null);
     setIsAIProcessing(true);
     playTone('tap', isMuted);
 
@@ -464,6 +473,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             return (
               <div key={msg.id} className={`flex flex-col max-w-[85%] ${isUser ? 'self-end items-end' : 'self-start items-start'}`}>
                 <div className={`rounded-2xl p-3 text-xs leading-relaxed ${isUser ? 'bg-[#00897B] text-white shadow-xs rounded-tr-none font-medium' : 'bg-white text-slate-800 shadow-3xs border border-slate-100/50 rounded-tl-none font-medium'}`}>
+                  {isUser && msg.attachedFileName && (
+                    <div className="flex items-center gap-1.5 bg-white/15 border border-white/20 rounded-xl px-2.5 py-1.5 mb-1.5 text-[11px] font-bold text-white max-w-full">
+                      <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="truncate flex-1 font-semibold">{msg.attachedFileName}</span>
+                    </div>
+                  )}
                   <div className="whitespace-pre-wrap">
                     {isUser ? msg.text : renderMarkdownMsg(msg.text)}
                   </div>

@@ -810,6 +810,9 @@ export default function App() {
   const [selectedCountry, setSelectedCountry] = useState<'CO' | 'CL'>('CO');
   const [selectedLanguage, setSelectedLanguage] = useState<'ES' | 'EN'>('ES');
 
+  // AI Chat Messages state (preserved across tabs)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+
   // PDF password states
   const [pdfPasswordModalOpen, setPdfPasswordModalOpen] = useState(false);
   const [pdfPasswordInput, setPdfPasswordInput] = useState('');
@@ -3450,6 +3453,8 @@ export default function App() {
                 t={t}
                 extractPdfText={extractPdfText}
                 askPdfPassword={askPdfPassword}
+                chatMessages={chatMessages}
+                setChatMessages={setChatMessages}
               />
             ) : (
               /* --- B) INSIGHTS VIEW (Moved from Sueño tab) --- */
