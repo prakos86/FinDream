@@ -845,8 +845,8 @@ export default function App() {
   });
 
   // Enforce country configuration only for admin
-  const MULTIPAIS_HABILITADO = userProfile.correo?.toLowerCase().trim() === 'prakos@gmail.com';
-  const effectiveCountry = MULTIPAIS_HABILITADO ? selectedCountry : 'CO';
+  const MULTIPAIS_HABILITADO = true;
+  const effectiveCountry = selectedCountry;
   
   const activeBanks = effectiveCountry === 'CL' ? CHILEAN_BANKS : COLOMBIAN_BANKS;
   const activeProducts = effectiveCountry === 'CL' ? PRODUCT_TAB_DEBTS_ONLY_CL : PRODUCT_TAB_DEBTS_ONLY_CO;
@@ -1370,6 +1370,31 @@ export default function App() {
       } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
         textContent = await file.text();
         mimeType = 'text/csv';
+      } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        try {
+          textContent = await extractPdfText(file);
+          mimeType = 'text/plain';
+        } catch (err: any) {
+          if (err?.name === 'PasswordException') {
+            try {
+              const password = await askPdfPassword(file);
+              textContent = await extractPdfText(file, password);
+              mimeType = 'text/plain';
+            } catch (wrongPassErr: any) {
+              if (wrongPassErr?.name === 'PasswordException') {
+                triggerDynamicIsland('Error',
+                  selectedLanguage === 'ES'
+                    ? 'Contrase\u00f1a incorrecta. El PDF no pudo abrirse.'
+                    : 'Wrong password. Could not open the PDF.',
+                  false);
+                return;
+              }
+              throw wrongPassErr;
+            }
+          } else {
+            throw err;
+          }
+        }
       } else {
         const buffer = await file.arrayBuffer();
         const bytes = new Uint8Array(buffer);
@@ -2021,7 +2046,7 @@ export default function App() {
             <FinDreamLogo size="sm" variant="icon-only" animated={false} />
           </div>
           <div>
-            <h1 className="text-[17px] font-black tracking-tight text-slate-900 leading-tight">
+            <h1 className="text-[17px] font-black tracking-tight text-slate-900 leading-tight flex items-center gap-1.5">
               {activeTab === 'finance' 
                 ? t('tab_resumen') 
                 : activeTab === 'cloud' 
@@ -2029,12 +2054,8 @@ export default function App() {
                   : activeTab === 'productos' 
                     ? t('tab_productos') 
                     : t('tab_insights')}
+              <span>{effectiveCountry === 'CO' ? '🇨🇴' : '🇨🇱'}</span>
             </h1>
-            {MULTIPAIS_HABILITADO && (
-              <span className={`inline-block mt-0.5 text-[8.5px] font-black px-1.5 py-0.2 rounded-md border ${effectiveCountry === 'CO' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                Ecosistema {effectiveCountry === 'CO' ? 'Colombia 🇨🇴' : 'Chile 🇨🇱'}
-              </span>
-            )}
           </div>
         </div>
 
