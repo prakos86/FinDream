@@ -83,11 +83,12 @@ Si necesitas expresar empatia por un error o problema, usa formulaciones profesi
 5. Mantén tus respuestas de tamaño moderado, fáciles de leer e interactivas para que se adapten a una vista móvil de tipo iOS.
 6. MUY IMPORTANTE: SIEMPRE debes retornar ÚNICAMENTE un objeto JSON con el formato establecido en tu schema. "text" debe contener tu respuesta verbal al usuario, y "actions" debe ser un array de acciones para interactuar con el UI.
 Tipos de acciones soportadas (puede venir con payload parcial que el UI completará):
-- "addTransaction", payload: { "tipo": "Gasto" | "Ingreso", "monto": number, "categoria"?: string, "descripcion"?: string, "formaPago"?: string }
+- "addTransaction", payload: { "tipo": "Gasto" | "Ingreso", "monto": string, "categoria"?: string, "descripcion"?: string, "formaPago"?: string }
 - "addProduct", payload: { "banco": string, "producto": string, "cupo"?: number, "utilizado"?: number, "alias"?: string }
 - "addSueno", payload: { "nombre": string, "meta": number }
 - "deleteTransaction", payload: { "id": string }
-- "editTransaction", payload: { "id": string, "tipo"?: string, "monto"?: number, "categoria"?: string, "descripcion"?: string }`;
+- "editTransaction", payload: { "id": string, "tipo"?: string, "monto"?: string, "categoria"?: string, "descripcion"?: string }
+IMPORTANTE: el campo "monto" en addTransaction y editTransaction debe ser un STRING con el valor crudo tal como aparece en el documento o como lo dicta el usuario`;
 
     const ai = new GoogleGenAI({
       apiKey: process.env.GEMINI_API_KEY,

@@ -34,14 +34,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 Your goal is to extract the details for ALL transactions found in the document.
 Extract the following information for each transaction:
 - fecha: The date of the transaction in "YYYY-MM-DD" format.
-- monto: The transaction amount as an INTEGER number representing the full value in the local currency's main unit, WITHOUT decimals unless the currency genuinely uses cents in that statement.
+- monto: The transaction amount as a STRING representing the raw value exactly as it appears in the document (e.g. "2.378.260", "146.637" or "$2.378.260"). Do NOT try to parse or convert it to a number. Just output the exact raw sequence of characters/digits.
 
-  CRITICAL RULES FOR PARSING AMOUNTS (statements vary by country and bank):
-  * In Latin American statements (Colombia COP, Chile CLP), BOTH a period "." and a comma "," are commonly used as THOUSANDS separators. Example: "2.378.260" = 2378260, "1,250,000" = 1250000.
-  * Chilean (CLP) and Colombian (COP) pesos DO NOT use decimal cents. Treat any "." or "," in these amounts as a thousands separator, NEVER as a decimal point.
-  * Only treat a separator as a decimal when it is clearly cents in a currency that uses them (e.g. USD "12.99", EUR "12,99") with exactly 2 trailing digits AND the magnitude makes sense.
-  * Always reason about the MAGNITUDE: if interpreting a separator as decimal produces an absurdly tiny amount (a rent payment becoming "2.4"), it is a thousands separator.
-  * Return monto as a plain integer: 2378260, never 2.378.260 or 2378260.00.
+  CRITICAL RULES FOR EXTRACTING AMOUNTS:
+  * In Latin American statements (Colombia COP, Chile CLP), a period "." is often a thousands separator.
+  * You MUST extract the raw characters (like "2.378.260" or "146.637") as a string. Do NOT convert them to float or standard integers yourself, as that will corrupt the value.
+  * Output exactly what you see in the text/document for the amount.
 - nombre: A short description/name of the transaction.
 - categoria: Infer the best logical category for the transaction (e.g., Alimentación, Transporte, Compras, Vivienda, Viajes, Mascotas, etc).
 - banco: If the document shows a bank logo, entity name, or payment platform, extract its name.
@@ -56,7 +54,7 @@ Return ONLY a JSON array of objects with this structure (example):
 [
   {
     "fecha": "YYYY-MM-DD",
-    "monto": 120000,
+    "monto": "2.378.260",
     "nombre": "name/description",
     "categoria": "category name",
     "banco": "bank or platform name"

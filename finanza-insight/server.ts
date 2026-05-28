@@ -128,9 +128,10 @@ Reglas de respuesta:
 5. Mantén tus respuestas de tamaño moderado, fáciles de leer e interactivas para que se adapten a una vista móvil de tipo iOS.
 6. MUY IMPORTANTE: SIEMPRE debes retornar ÚNICAMENTE un objeto JSON con el formato establecido en tu schema. "text" debe contener tu respuesta verbal al usuario, y "actions" debe ser un array de acciones para interactuar con el UI.
 Tipos de acciones soportadas (puede venir con payload parcial que el UI completará):
-- "addTransaction", payload: { "tipo": "Gasto" | "Ingreso", "monto": number, "categoria"?: string, "descripcion"?: string, "formaPago"?: string }
+- "addTransaction", payload: { "tipo": "Gasto" | "Ingreso", "monto": string, "categoria"?: string, "descripcion"?: string, "formaPago"?: string }
 - "addProduct", payload: { "banco": string, "producto": string, "cupo"?: number, "utilizado"?: number, "alias"?: string }
-- "addSueno", payload: { "nombre": string, "meta": number }`;
+- "addSueno", payload: { "nombre": string, "meta": number }
+IMPORTANTE: el campo "monto" en addTransaction debe ser un STRING con el valor crudo tal como aparece en el documento o como lo dicta el usuario`;
 
       const ai = getAIClient();
       
@@ -378,14 +379,12 @@ La respuesta DEBE ser un objeto JSON con la clave "products" que contiene un arr
 Your goal is to extract the details for ALL transactions found in the document.
 Extract the following information for each transaction:
 - fecha: The date of the transaction in "YYYY-MM-DD" format.
-- monto: The transaction amount as an INTEGER number representing the full value in the local currency's main unit, WITHOUT decimals unless the currency genuinely uses cents in that statement.
+- monto: The transaction amount as a STRING representing the raw value exactly as it appears in the document (e.g. "2.378.260", "146.637" or "$2.378.260"). Do NOT try to parse or convert it to a number. Just output the exact raw sequence of characters/digits.
 
-  CRITICAL RULES FOR PARSING AMOUNTS (statements vary by country and bank):
-  * In Latin American statements (Colombia COP, Chile CLP), a PERIOD "." and a COMMA "," are commonly used as THOUSANDS separators. Example: "2.378.260" = 2378260 (two million plus), "1,250,000" = 1250000.
-  * Chilean pesos (CLP) and Colombian pesos (COP) DO NOT use decimal cents in everyday amounts. Treat any "." or "," in these amounts as a thousands separator, NEVER as a decimal point.
-  * Only treat a separator as a decimal when it is clearly cents in a currency that uses them (e.g. USD "12.99", EUR "12,99") AND there are exactly 2 digits after it AND the magnitude makes sense as cents.
-  * Always reason about the MAGNITUDE: a single coffee is not "2" pesos and a rent payment is not "2.4" pesos. If interpreting a separator as decimal produces an absurdly tiny amount, it is a thousands separator.
-  * Return monto as a plain integer with no separators and no symbols. Example: 2378260, not 2.378.260 or 2378260.00.
+  CRITICAL RULES FOR EXTRACTING AMOUNTS:
+  * In Latin American statements (Colombia COP, Chile CLP), a period "." is often a thousands separator.
+  * You MUST extract the raw characters (like "2.378.260" or "146.637") as a string. Do NOT convert them to float or standard integers yourself, as that will corrupt the value.
+  * Output exactly what you see in the text/document for the amount.
 - nombre: A short description/name of the transaction.
 - categoria: Infer the best logical category for the transaction (e.g., Alimentación, Transporte, Compras, Vivienda, Viajes, Mascotas, etc).
 - banco: If the document shows a bank logo, entity name, or payment platform, extract its name.
@@ -400,7 +399,7 @@ Return ONLY a JSON array of objects with this structure (example):
 [
   {
     "fecha": "YYYY-MM-DD",
-    "monto": 120000,
+    "monto": "2.378.260",
     "nombre": "name/description",
     "categoria": "category name",
     "banco": "bank or platform name"
