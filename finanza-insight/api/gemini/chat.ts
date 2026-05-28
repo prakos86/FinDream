@@ -111,28 +111,33 @@ Tipos de acciones soportadas (puede venir con payload parcial que el UI completa
     let responseText = response.text || "{}";
     try {
       const parsed = JSON.parse(responseText);
-      let valid = true;
-      let errorMessage = "";
+      let countAdded = 0;
+      let countOmitted = 0;
       if (parsed.actions && Array.isArray(parsed.actions)) {
+        const filteredActions: any[] = [];
         for (const action of parsed.actions) {
           if (action.type === "addTransaction" && action.payload) {
             const monto = action.payload.monto;
             if (monto === undefined || isNaN(monto) || monto <= 0 || monto > 999999999) {
-              valid = false;
-              errorMessage = "El monto especificado para la transacción es inválido. Debe ser un número mayor a 0 y no superar los 999,999,999.";
-              break;
+              countOmitted++;
+              continue;
             }
+            countAdded++;
           }
+          filteredActions.push(action);
         }
-      }
-      if (!valid) {
-        return res.json({ text: JSON.stringify({ text: errorMessage, actions: [] }) });
+        parsed.actions = filteredActions;
+        if (countOmitted > 0) {
+          const omissionMsg = `\n\n(Se procesaron con éxito y agregaron ${countAdded} transacciones; ${countOmitted} fueron omitidas por tener un monto inválido).`;
+          parsed.text = (parsed.text || "") + omissionMsg;
+        }
+        responseText = JSON.stringify(parsed);
       }
     } catch (e) {
       console.warn("Parse verification error", e);
     }
 
-    return res.json({ text: response.text });
+    return res.json({ text: responseText });
   } catch (error: any) {
     console.error("Gemini AI Insights Error:", error);
     return res.status(500).json({ error: error.message || "Failed to process chat response from Gemini" });

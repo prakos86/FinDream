@@ -378,10 +378,23 @@ La respuesta DEBE ser un objeto JSON con la clave "products" que contiene un arr
 Your goal is to extract the details for ALL transactions found in the document.
 Extract the following information for each transaction:
 - fecha: The date of the transaction in "YYYY-MM-DD" format.
-- monto: The financial amount as a pure number (no currency symbols, no thousands separators, decimals allowed).
+- monto: The transaction amount as an INTEGER number representing the full value in the local currency's main unit, WITHOUT decimals unless the currency genuinely uses cents in that statement.
+
+  CRITICAL RULES FOR PARSING AMOUNTS (statements vary by country and bank):
+  * In Latin American statements (Colombia COP, Chile CLP), a PERIOD "." and a COMMA "," are commonly used as THOUSANDS separators. Example: "2.378.260" = 2378260 (two million plus), "1,250,000" = 1250000.
+  * Chilean pesos (CLP) and Colombian pesos (COP) DO NOT use decimal cents in everyday amounts. Treat any "." or "," in these amounts as a thousands separator, NEVER as a decimal point.
+  * Only treat a separator as a decimal when it is clearly cents in a currency that uses them (e.g. USD "12.99", EUR "12,99") AND there are exactly 2 digits after it AND the magnitude makes sense as cents.
+  * Always reason about the MAGNITUDE: a single coffee is not "2" pesos and a rent payment is not "2.4" pesos. If interpreting a separator as decimal produces an absurdly tiny amount, it is a thousands separator.
+  * Return monto as a plain integer with no separators and no symbols. Example: 2378260, not 2.378.260 or 2378260.00.
 - nombre: A short description/name of the transaction.
 - categoria: Infer the best logical category for the transaction (e.g., Alimentación, Transporte, Compras, Vivienda, Viajes, Mascotas, etc).
 - banco: If the document shows a bank logo, entity name, or payment platform, extract its name.
+
+When the document is a CREDIT CARD or BANK STATEMENT:
+* Extract individual purchase/charge line items as transactions (with their date, description and amount).
+* DO NOT extract as expenses: payments to the card ("Pago tarjeta", "Pago recibido", negative amounts), credits/refunds (abonos), available balance, total limit, minimum payment, accumulated points, or summary totals.
+* Ignore lines marked "Sin Movimientos".
+* Use the individual operation date ("Fecha Operación") for each transaction's fecha, not the statement date.
 
 Return ONLY a JSON array of objects with this structure (example):
 [
