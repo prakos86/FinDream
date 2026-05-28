@@ -81,6 +81,30 @@ export const extractPdfText = async (file: File, password?: string): Promise<str
   }
   return fullText;
 };
+
+export const normalizarMonto = (valor: any): number => {
+  if (typeof valor === "number") return Math.round(valor);
+  if (typeof valor !== "string") return NaN;
+  let raw = valor.trim();
+  // Parentesis o signo menos = negativo (abonos/pagos)
+  const esNegativo = /^\(.*\)$/.test(raw) || raw.includes("-");
+  let s = raw.replace(/[^0-9.,]/g, ""); // quita $, COP, espacios, ()
+  if (s.includes(".") && s.includes(",")) {
+    if (s.lastIndexOf(",") > s.lastIndexOf(".")) {
+      s = s.replace(/\./g, "").replace(",", ".");
+    } else { s = s.replace(/,/g, ""); }
+  } else if (s.includes(".")) {
+    const parts = s.split(".");
+    if (parts[parts.length - 1].length === 3) s = s.replace(/\./g, "");
+  } else if (s.includes(",")) {
+    const parts = s.split(",");
+    if (parts[parts.length - 1].length === 3) s = s.replace(/,/g, "");
+    else s = s.replace(",", ".");
+  }
+  let n = Math.round(parseFloat(s));
+  if (esNegativo) n = -Math.abs(n);
+  return n;
+};
 import { Categoria, TipoMovimiento, Transaccion, FiltroTiempo, Sueno, UserProfile, ProductoFinanciero, ChatMessage } from './types';
 import { useFirestore } from './hooks/useFirestore';
 import { useGoogleSheets } from './hooks/useGoogleSheets';
@@ -386,12 +410,22 @@ const PRODUCT_TAB_DEBTS_ONLY_CL = [
 
 const CHILEAN_BANKS = [
   'BancoEstado',
+  'Banco de Chile',
   'Santander Chile',
   'BCI',
   'Scotiabank Chile',
-  'Banco de Chile',
+  'Banco Itau Chile',
   'Banco Falabella',
-  'Itau',
+  'Banco Security',
+  'Banco BICE',
+  'Banco Internacional',
+  'Banco Consorcio',
+  'Banco Ripley',
+  'HSBC Bank Chile',
+  'BTG Pactual Chile',
+  'Tanner Banco Digital',
+  'Scotiabank Azul',
+  // No bancarios / digitales
   'Tenpo',
   'Mach',
   'Caja Los Andes'
@@ -906,6 +940,28 @@ export default function App() {
   const [editPortafolioNombre, setEditPortafolioNombre] = useState('');
   const [editPortafolioValor, setEditPortafolioValor] = useState('');
   const [editPortafolioPlataforma, setEditPortafolioPlataforma] = useState('');
+
+  const [editingProducto, setEditingProducto] = useState<any | null>(null);
+
+  const startEditingProducto = (p: any) => {
+    setEditingProducto(p);
+    setShowAddProductTab(true);
+  };
+
+  const handleSaveEditedProducto = () => {
+    if (!editingProducto) return;
+    const updated = (userProfile.productos || []).map(p =>
+      p.id === editingProducto.id ? { ...editingProducto } : p
+    );
+    saveUserProfileData({ ...userProfile, productos: updated });
+    setEditingProducto(null);
+    setShowAddProductTab(false);
+    triggerDynamicIsland(
+      selectedLanguage === "ES" ? "Producto Actualizado" : "Product Updated",
+      `${editingProducto.banco}`,
+      true
+    );
+  };
 
   // Security Locking / Confirm Identity on start
   const [isAppLocked, setIsAppLocked] = useState(() => {
@@ -1440,7 +1496,7 @@ export default function App() {
         const tx: Transaccion = {
           id: Math.random().toString(36).substring(2, 9),
           tipo: 'Gasto', // Safest logic for uploaded receipts
-          monto: Number(data.monto) || 0,
+          monto: normalizarMonto(data.monto) || 0,
           categoria: cat,
           fecha: data.fecha || formatLocalYYYYMMDD(new Date()),
           descripcion: data.nombre || `Gasto en ${cat}`,
@@ -2755,47 +2811,75 @@ export default function App() {
 
                       {/* Add Product Form - Darkened colors and high contrast to avoid pale styling */}
                       {showAddProductTab && (
-                        <form className="bg-white rounded-2xl border border-slate-350 p-4 space-y-4 shadow-sm" onSubmit={(e) => {
-                          e.preventDefault();
-                          const bankSel = (document.getElementById('prod-tab-bank-select') as HTMLSelectElement)?.value || activeBanks[0];
-                          const typeSel = (document.getElementById('prod-tab-type-select') as HTMLSelectElement)?.value || activeProducts[0];
-                          const franchiseSel = (document.getElementById('prod-tab-franchise-select') as HTMLSelectElement)?.value || activeFranchises[0];
-                          const aliasVal = (document.getElementById('prod-tab-alias-input') as HTMLInputElement)?.value?.trim();
-                          const totalVal = parseFloat((document.getElementById('prod-tab-total-input') as HTMLInputElement)?.value) || 0;
-                          const usedVal = parseFloat((document.getElementById('prod-tab-used-input') as HTMLInputElement)?.value) || 0;
+                        <form
+                          key={editingProducto ? `edit-${editingProducto.id}` : 'new-prod'}
+                          className="bg-white rounded-2xl border border-slate-350 p-4 space-y-4 shadow-sm"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const bankSel = (document.getElementById('prod-tab-bank-select') as HTMLSelectElement)?.value || activeBanks[0];
+                            const typeSel = (document.getElementById('prod-tab-type-select') as HTMLSelectElement)?.value || activeProducts[0];
+                            const franchiseSel = (document.getElementById('prod-tab-franchise-select') as HTMLSelectElement)?.value || activeFranchises[0];
+                            const aliasVal = (document.getElementById('prod-tab-alias-input') as HTMLInputElement)?.value?.trim();
+                            const totalVal = parseFloat((document.getElementById('prod-tab-total-input') as HTMLInputElement)?.value) || 0;
+                            const usedVal = parseFloat((document.getElementById('prod-tab-used-input') as HTMLInputElement)?.value) || 0;
 
-                          const newProd: ProductoFinanciero = {
-                            id: `prod-tab-${Date.now()}`,
-                            banco: bankSel,
-                            tipo: typeSel,
-                            alias: aliasVal || undefined,
-                            montoTotal: totalVal > 0 ? totalVal : undefined,
-                            montoUtilizado: totalVal > 0 && usedVal >= 0 ? usedVal : undefined,
-                            franquicia: (franchiseSel && franchiseSel !== 'Ninguna / No Aplica') ? franchiseSel : undefined
-                          };
+                            if (editingProducto) {
+                              const updatedProd = {
+                                ...editingProducto,
+                                banco: bankSel,
+                                tipo: typeSel,
+                                alias: aliasVal || undefined,
+                                montoTotal: totalVal > 0 ? totalVal : undefined,
+                                montoUtilizado: totalVal > 0 && usedVal >= 0 ? usedVal : undefined,
+                                franquicia: (franchiseSel && franchiseSel !== 'Ninguna / No Aplica' && franchiseSel !== 'None / Not Applicable') ? franchiseSel : undefined
+                              };
+                              const updatedProds = (userProfile.productos || []).map(p => p.id === editingProducto.id ? updatedProd : p);
+                              saveUserProfileData({ ...userProfile, productos: updatedProds });
+                              setEditingProducto(null);
+                              setShowAddProductTab(false);
+                              playTone('success', isMuted);
+                              triggerDynamicIsland(
+                                selectedLanguage === 'ES' ? "Producto Actualizado" : "Product Updated", 
+                                `${bankSel}`, 
+                                true
+                              );
+                            } else {
+                              const newProd: ProductoFinanciero = {
+                                id: `prod-tab-${Date.now()}`,
+                                banco: bankSel,
+                                tipo: typeSel,
+                                alias: aliasVal || undefined,
+                                montoTotal: totalVal > 0 ? totalVal : undefined,
+                                montoUtilizado: totalVal > 0 && usedVal >= 0 ? usedVal : undefined,
+                                franquicia: (franchiseSel && franchiseSel !== 'Ninguna / No Aplica' && franchiseSel !== 'None / Not Applicable') ? franchiseSel : undefined
+                              };
 
-                          const updatedProds = [...(userProfile.productos || []), newProd];
-                          saveUserProfileData({ ...userProfile, productos: updatedProds });
-                          playTone('success', isMuted);
-                          triggerDynamicIsland(
-                            selectedLanguage === 'ES' ? "Portafolio Agregado" : "Portfolio Added", 
-                            `${bankSel} • ${typeSel}`, 
-                            true
-                          );
+                              const updatedProds = [...(userProfile.productos || []), newProd];
+                              saveUserProfileData({ ...userProfile, productos: updatedProds });
+                              playTone('success', isMuted);
+                              triggerDynamicIsland(
+                                selectedLanguage === 'ES' ? "Portafolio Agregado" : "Portfolio Added", 
+                                `${bankSel} • ${typeSel}`, 
+                                true
+                              );
+                            }
 
-                          // Reset controls
-                          const aliasEl = document.getElementById('prod-tab-alias-input') as HTMLInputElement;
-                          if (aliasEl) aliasEl.value = '';
-                          const totalEl = document.getElementById('prod-tab-total-input') as HTMLInputElement;
-                          if (totalEl) totalEl.value = '';
-                          const usedEl = document.getElementById('prod-tab-used-input') as HTMLInputElement;
-                          if (usedEl) usedEl.value = '';
-                          const franchiseEl = document.getElementById('prod-tab-franchise-select') as HTMLSelectElement;
-                          if (franchiseEl) franchiseEl.value = activeFranchises[0];
-                        }}>
+                            // Reset controls
+                            const aliasEl = document.getElementById('prod-tab-alias-input') as HTMLInputElement;
+                            if (aliasEl) aliasEl.value = '';
+                            const totalEl = document.getElementById('prod-tab-total-input') as HTMLInputElement;
+                            if (totalEl) totalEl.value = '';
+                            const usedEl = document.getElementById('prod-tab-used-input') as HTMLInputElement;
+                            if (usedEl) usedEl.value = '';
+                            const franchiseEl = document.getElementById('prod-tab-franchise-select') as HTMLSelectElement;
+                            if (franchiseEl) franchiseEl.value = activeFranchises[0];
+                          }}>
                         <div className="bg-slate-100/90 p-4 rounded-xl border border-slate-350 space-y-3 text-left">
                           <span className="text-[10px] font-black uppercase text-[#004D40] tracking-wider block">
-                            {t('registrar_producto')}
+                            {editingProducto 
+                              ? (selectedLanguage === 'ES' ? 'Editar Producto' : 'Edit Product')
+                              : t('registrar_producto')
+                            }
                           </span>
                           
                           <div className="grid grid-cols-2 gap-2">
@@ -2804,6 +2888,7 @@ export default function App() {
                               <label className="text-[9.5px] font-black text-slate-800 uppercase block mb-0.5">{t('banco_co')}</label>
                               <select
                                 id="prod-tab-bank-select"
+                                defaultValue={editingProducto?.banco || activeBanks[0]}
                                 className="w-full bg-white border border-slate-400 rounded-lg py-1.5 px-2 text-[11px] font-black text-slate-950 focus:outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600 transition"
                               >
                                 {activeBanks.map((b) => (
@@ -2817,6 +2902,7 @@ export default function App() {
                               <label className="text-[9.5px] font-black text-slate-800 uppercase block mb-0.5">{t('tipo_producto')}</label>
                               <select
                                 id="prod-tab-type-select"
+                                defaultValue={editingProducto?.tipo || activeProducts[0]}
                                 className="w-full bg-white border border-slate-400 rounded-lg py-1.5 px-2 text-[11px] font-black text-slate-950 focus:outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600 transition"
                               >
                                 {activeProducts.map((p) => (
@@ -2834,6 +2920,7 @@ export default function App() {
                               </label>
                               <select
                                 id="prod-tab-franchise-select"
+                                defaultValue={editingProducto?.franquicia || activeFranchises[0]}
                                 className="w-full bg-white border border-slate-400 rounded-lg py-1.5 px-2 text-[11px] font-black text-slate-950 focus:outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600 transition"
                               >
                                 {activeFranchises.map((f) => (
@@ -2854,6 +2941,7 @@ export default function App() {
                               <input
                                 type="number"
                                 id="prod-tab-total-input"
+                                defaultValue={editingProducto?.montoTotal || ''}
                                 placeholder="Ej: 10000000"
                                 className="w-full bg-white border border-slate-400 rounded-lg py-1.5 px-2 text-[11px] font-black text-slate-950 placeholder:text-slate-500 focus:outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600 transition"
                               />
@@ -2865,6 +2953,7 @@ export default function App() {
                               <input
                                 type="number"
                                 id="prod-tab-used-input"
+                                defaultValue={editingProducto?.montoUtilizado !== undefined ? editingProducto.montoUtilizado : ''}
                                 placeholder="Ej: 1000000"
                                 className="w-full bg-white border border-slate-400 rounded-lg py-1.5 px-2 text-[11px] font-black text-slate-950 placeholder:text-slate-500 focus:outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600 transition"
                               />
@@ -2877,7 +2966,8 @@ export default function App() {
                             <input
                               type="text"
                               id="prod-tab-alias-input"
-                               placeholder={selectedLanguage === 'ES' ? 'Ej: Cuenta de Nómina, Tarjeta Principal' : 'i.e. Salary Account, Main Card'}
+                              defaultValue={editingProducto?.alias || ''}
+                              placeholder={selectedLanguage === 'ES' ? 'Ej: Cuenta de Nómina, Tarjeta Principal' : 'i.e. Salary Account, Main Card'}
                               className="w-full bg-white border border-slate-400 rounded-lg py-1.5 px-2 text-[11px] font-black text-slate-950 placeholder:text-slate-400 focus:outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600 transition"
                             />
                           </div>
@@ -2886,7 +2976,10 @@ export default function App() {
                             type="submit"
                             className="w-full py-2 bg-[#00897B] hover:bg-[#00796B] text-white font-black text-xs uppercase tracking-wider rounded-lg shadow-md transition active:scale-98 cursor-pointer text-center mt-1"
                           >
-                            + {t('guardar_producto')}
+                            {editingProducto 
+                              ? (selectedLanguage === 'ES' ? 'Guardar Cambios' : 'Save Changes')
+                              : `+ ${t('guardar_producto')}`
+                            }
                           </button>
                         </div>
                         </form>
@@ -2934,23 +3027,33 @@ export default function App() {
                                         )}
                                       </div>
                                     </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const filtered = (userProfile.productos || []).filter(p => p.id !== prod.id);
-                                        saveUserProfileData({ ...userProfile, productos: filtered });
-                                        playTone('delete', isMuted);
-                                        triggerDynamicIsland(
-                                          selectedLanguage === 'ES' ? "Portafolio Eliminado" : "Portfolio Removed", 
-                                          `${prod.banco} Eliminado`, 
-                                          false
-                                        );
-                                      }}
-                                      className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-all cursor-pointer border border-transparent hover:border-rose-100"
-                                      title="Eliminar Portafolio"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
+                                    <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
+                                      <button
+                                        type="button"
+                                        onClick={() => { handleTap(); startEditingProducto(prod); }}
+                                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 transition cursor-pointer border-r border-slate-200"
+                                        title={selectedLanguage === "ES" ? "Editar Producto" : "Edit Product"}
+                                      >
+                                        <MoreHorizontal className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const filtered = (userProfile.productos || []).filter(p => p.id !== prod.id);
+                                          saveUserProfileData({ ...userProfile, productos: filtered });
+                                          playTone("delete", isMuted);
+                                          triggerDynamicIsland(
+                                            selectedLanguage === "ES" ? "Producto Eliminado" : "Product Removed",
+                                            `${prod.banco} Eliminado`,
+                                            false
+                                          );
+                                        }}
+                                        className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
+                                        title={selectedLanguage === "ES" ? "Eliminar Producto" : "Delete Product"}
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                   </div>
 
                                   {/* Progress bar visual for Total vs Used */}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, Send, Mic, Sparkles, Loader2, Volume2, VolumeX, ShieldCheck, Paperclip } from 'lucide-react';
+import { Bot, Send, Mic, Sparkles, Loader2, Volume2, VolumeX, ShieldCheck, Paperclip, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChatMessage, UserProfile, Transaccion, Sueno } from '../types';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -60,6 +60,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [attachedFileName, setAttachedFileName] = useState<string | null>(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const attachInputRef = useRef<HTMLInputElement>(null);
+
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const copiarMensaje = (id: string, texto: string) => {
+    navigator.clipboard.writeText(texto);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1500);
+  };
 
   useEffect(() => {
     if (chatMessages.length === 0) {
@@ -129,7 +136,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const tempAttachedFileName = attachedFileName;
 
     const fullMessage = tempAttachedFileText
-      ? `${msgText}\n\n[Documento: "${tempAttachedFileName}"]\n${tempAttachedFileText.substring(0, 40000)}`
+      ? `${msgText}\n\n[Documento adjunto: "${tempAttachedFileName}"]\n${tempAttachedFileText.substring(0, 40000)}`
       : msgText;
 
     const userMsg: ChatMessage = {
@@ -479,13 +486,28 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       <span className="truncate flex-1 font-semibold">{msg.attachedFileName}</span>
                     </div>
                   )}
-                  <div className="whitespace-pre-wrap">
+                  <div className="whitespace-pre-wrap select-text">
                     {isUser ? msg.text : renderMarkdownMsg(msg.text)}
                   </div>
                 </div>
-                <span className="text-[8px] text-slate-400 font-bold mt-1 px-1">
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                <div className="flex items-center gap-2 mt-1 px-1">
+                  <span className="text-[8px] text-slate-400 font-bold">
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {!isUser && (
+                    <button
+                      onClick={() => copiarMensaje(msg.id, msg.text)}
+                      className="text-slate-400 hover:text-teal-600 transition-colors cursor-pointer flex items-center justify-center p-0.5"
+                      title="Copiar mensaje"
+                    >
+                      {copiedId === msg.id ? (
+                        <Check className="w-3 h-3 text-teal-600 animate-bounce" />
+                      ) : (
+                        <Copy className="w-3 h-3 text-slate-400 hover:text-teal-600" />
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}

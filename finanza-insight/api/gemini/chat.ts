@@ -41,7 +41,7 @@ También actúas como Soporte Técnico de la aplicación Findream, guiando al us
 Tienes acceso al plan de finanzas y los registros del usuario, Y puedes emitir "acciones" para controlar la aplicación.
 
 Si el usuario te pide registrar o cambiar una transacción, un producto financiero, o un sueño, PUEDES hacerlo generando un objeto JSON con las "actions". Si te dictan un audio como "Agrega un gasto de 50 en comida", debes responder afirmativamente y emitir la acción "addTransaction".
-Si el usuario adjunta un documento (el mensaje contendrá "[Documento adjunto:...]") y te pide agregar transacciones, debes extraer TODAS las transacciones que cumplan con el criterio del usuario y emitir una acción "addTransaction" por cada una en el array "actions". Por ejemplo, si pide solo los últimos 15 días, filtra por fecha antes de emitir las acciones. NUNCA digas que no puedes leer el documento, el contenido ya viene incluido en el mensaje.
+Si el usuario adjunta un documento (el mensaje contendrá "[Documento adjunto:...]") y te pide agregar transacciones, debes extraer TODAS las transacciones que cumplan con el criterio del usuario y emitir una acción "addTransaction" por cada una en el array "actions". Por ejemplo, si pide solo los últimos 15 días, filtra por fecha antes de emitir las acciones. NUNCA digas que no puedes leer el documento, el contenido ya viene incluido en el mensaje. DEBES OBLIGATORIAMENTE extraer TODAS las transacciones que cumplan con el criterio del usuario y emitir una accion addTransaction por cada una. NO te limites a explicar el documento: tu objetivo es EJECUTAR las acciones.
 
 REGLAS CRÍTICAS PARA INTERPRETAR MONTOS (los estados de cuenta varían según país y banco):
 - El monto debe ser un número ENTERO que represente el valor completo en la moneda local, SIN decimales salvo que la moneda realmente use centavos.
@@ -127,15 +127,40 @@ Tipos de acciones soportadas (puede venir con payload parcial que el UI completa
       const parsed = JSON.parse(responseText);
       let countAdded = 0;
       let countOmitted = 0;
+      const normalizarMonto = (valor: any): number => {
+        if (typeof valor === "number") return Math.round(valor);
+        if (typeof valor !== "string") return NaN;
+        let raw = valor.trim();
+        // Parentesis o signo menos = negativo (abonos/pagos)
+        const esNegativo = /^\(.*\)$/.test(raw) || raw.includes("-");
+        let s = raw.replace(/[^0-9.,]/g, ""); // quita $, COP, espacios, ()
+        if (s.includes(".") && s.includes(",")) {
+          if (s.lastIndexOf(",") > s.lastIndexOf(".")) {
+            s = s.replace(/\./g, "").replace(",", ".");
+          } else { s = s.replace(/,/g, ""); }
+        } else if (s.includes(".")) {
+          const parts = s.split(".");
+          if (parts[parts.length - 1].length === 3) s = s.replace(/\./g, "");
+        } else if (s.includes(",")) {
+          const parts = s.split(",");
+          if (parts[parts.length - 1].length === 3) s = s.replace(/,/g, "");
+          else s = s.replace(",", ".");
+        }
+        let n = Math.round(parseFloat(s));
+        if (esNegativo) n = -Math.abs(n);
+        return n;
+      };
+
       if (parsed.actions && Array.isArray(parsed.actions)) {
         const filteredActions: any[] = [];
         for (const action of parsed.actions) {
           if (action.type === "addTransaction" && action.payload) {
-            const monto = action.payload.monto;
-            if (monto === undefined || isNaN(monto) || monto <= 0 || monto > 999999999) {
+            const monto = normalizarMonto(action.payload.monto);
+            if (monto === undefined || isNaN(monto) || monto <= 0 || monto > 999999999999) {
               countOmitted++;
               continue;
             }
+            action.payload.monto = monto;
             countAdded++;
           }
           filteredActions.push(action);
