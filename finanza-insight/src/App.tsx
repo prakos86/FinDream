@@ -83,25 +83,46 @@ export const extractPdfText = async (file: File, password?: string): Promise<str
 };
 
 export const normalizarMonto = (valor: any): number => {
-  if (typeof valor === "number") return Math.round(valor);
-  if (typeof valor !== "string") return NaN;
+  if (valor === null || valor === undefined) return NaN;
+  if (typeof valor === "number") {
+    if (!isFinite(valor)) return NaN;
+    return Math.round(valor);
+  }
+  if (typeof valor !== "string") {
+    valor = String(valor);
+  }
   let raw = valor.trim();
-  // Parentesis o signo menos = negativo (abonos/pagos)
-  const esNegativo = /^\(.*\)$/.test(raw) || raw.includes("-");
-  let s = raw.replace(/[^0-9.,]/g, ""); // quita $, COP, espacios, ()
+  if (!raw) return NaN;
+  const esNegativo = /^\(.*\)$/.test(raw) || /^-/.test(raw);
+  // quita TODO menos digitos, punto y coma
+  let s = raw.replace(/[^0-9.,]/g, "");
+  if (!s) return NaN;
   if (s.includes(".") && s.includes(",")) {
     if (s.lastIndexOf(",") > s.lastIndexOf(".")) {
       s = s.replace(/\./g, "").replace(",", ".");
-    } else { s = s.replace(/,/g, ""); }
+    } else {
+      s = s.replace(/,/g, "");
+    }
   } else if (s.includes(".")) {
     const parts = s.split(".");
-    if (parts[parts.length - 1].length === 3) s = s.replace(/\./g, "");
+    // Si hay mas de un punto -> todos son miles
+    if (parts.length > 2) s = s.replace(/\./g, "");
+    // Si el ultimo grupo tiene 3 digitos exactos -> separador de miles
+    else if (parts[parts.length - 1].length === 3) s = s.replace(/\./g, "");
   } else if (s.includes(",")) {
     const parts = s.split(",");
-    if (parts[parts.length - 1].length === 3) s = s.replace(/,/g, "");
+    if (parts.length > 2) s = s.replace(/,/g, "");
+    else if (parts[parts.length - 1].length === 3) s = s.replace(/,/g, "");
     else s = s.replace(",", ".");
   }
-  let n = Math.round(parseFloat(s));
+  let n = parseFloat(s);
+  if (isNaN(n)) {
+    // ultimo recurso: extraer solo digitos
+    const soloDigitos = raw.replace(/\D/g, "");
+    if (soloDigitos) n = parseInt(soloDigitos, 10);
+  }
+  if (isNaN(n)) return NaN;
+  n = Math.round(n);
   if (esNegativo) n = -Math.abs(n);
   return n;
 };

@@ -50,6 +50,7 @@ REGLAS CRÍTICAS PARA INTERPRETAR MONTOS (los estados de cuenta varían según p
 - Solo trata un separador como decimal si claramente son centavos en una moneda que los usa (USD "12.99", EUR "12,99") con exactamente 2 dígitos finales Y la magnitud tiene sentido.
 - Razona siempre sobre la MAGNITUD: si interpretar un separador como decimal produce un monto absurdamente pequeño (un arriendo convertido en "2.4"), es un separador de miles.
 - Emite el monto como entero puro: 2378260, nunca 2.378.260 ni 2378260.00.
+- IMPORTANTE: el campo "monto" en cada addTransaction debe ser un NUMERO (no string), entero, ya parseado. Por ejemplo: 2378260 (correcto), no "2.378.260", no "$2.378.260", no "2378260.00", no "dos millones". Si tienes duda sobre un monto, omitelo en lugar de inventarlo o mandarlo con formato extrano.
 
 CUANDO EL DOCUMENTO ES UN ESTADO DE CUENTA DE TARJETA O BANCO:
 - Extrae cada compra/cargo individual como una transacción (con su fecha, descripción y monto).
@@ -71,7 +72,11 @@ A continuación se detallan los datos del perfil actual del usuario para que per
 - Últimas 8 transacciones registradas: ${JSON.stringify((context?.transacciones || []).slice(0, 8))}
 
 Reglas de respuesta:
-1. Responde en el idioma en que te escribieron. Si el país es "Chile", ADAPTA tu tono, léxico y expresiones a un español chileno natural y coloquial (ej. usando modismos como "cachai", "al tiro", "lucas" donde aplique de forma profesional y amigable). Si es Colombia u otro, mantén el tono actual correspondiente. NUNCA uses palabras vulgares, ofensivas o groserías bajo ninguna circunstancia, independientemente del país o idioma.
+1. TONO PROFESIONAL: responde siempre en un espanol claro, amable y profesional, como un asesor financiero serio. Adapta el vocabulario al pais del usuario (si es Chile, usa expresiones chilenas profesionales como "al tiro" o "lucas" SOLO cuando ayudan a la naturalidad, sin abusar). PROHIBIDO USAR:
+- Interjecciones coloquiales o vulgares: "uta", "ufff", "pucha", "que mala pata", "que lata", "que cacho", "huevon", "wea", "guevon", "carajo", "joder", "uy", "chuta", "chucha", "puta" (en cualquier forma o variante).
+- Groserias, vulgaridades o palabras ofensivas en cualquier idioma, modismo o contexto.
+- Lenguaje infantil o emojis excesivos.
+Si necesitas expresar empatia por un error o problema, usa formulaciones profesionales como: "Lamento que esto haya ocurrido", "Entiendo tu preocupacion", "Veamos como resolverlo". El tono siempre debe ser el de un asesor financiero confiable y respetuoso, NUNCA el de un amigo del barrio.
 2. Usa viñetas claras, párrafos breves y negritas para resaltar puntos de acción o consejos de presupuesto.
 3. Sé realista con las proyecciones y optimización de gastos.
 4. Ofrece ideas usando los productos del país del usuario (Si es Colombia: Bancolombia, Nequi, Daviplata, etc. Si es Chile: BancoEstado, Cuenta RUT, MACH, Tenpo, Santander, CMR Falabella, etc.).
@@ -128,25 +133,46 @@ Tipos de acciones soportadas (puede venir con payload parcial que el UI completa
       let countAdded = 0;
       let countOmitted = 0;
       const normalizarMonto = (valor: any): number => {
-        if (typeof valor === "number") return Math.round(valor);
-        if (typeof valor !== "string") return NaN;
+        if (valor === null || valor === undefined) return NaN;
+        if (typeof valor === "number") {
+          if (!isFinite(valor)) return NaN;
+          return Math.round(valor);
+        }
+        if (typeof valor !== "string") {
+          valor = String(valor);
+        }
         let raw = valor.trim();
-        // Parentesis o signo menos = negativo (abonos/pagos)
-        const esNegativo = /^\(.*\)$/.test(raw) || raw.includes("-");
-        let s = raw.replace(/[^0-9.,]/g, ""); // quita $, COP, espacios, ()
+        if (!raw) return NaN;
+        const esNegativo = /^\(.*\)$/.test(raw) || /^-/.test(raw);
+        // quita TODO menos digitos, punto y coma
+        let s = raw.replace(/[^0-9.,]/g, "");
+        if (!s) return NaN;
         if (s.includes(".") && s.includes(",")) {
           if (s.lastIndexOf(",") > s.lastIndexOf(".")) {
             s = s.replace(/\./g, "").replace(",", ".");
-          } else { s = s.replace(/,/g, ""); }
+          } else {
+            s = s.replace(/,/g, "");
+          }
         } else if (s.includes(".")) {
           const parts = s.split(".");
-          if (parts[parts.length - 1].length === 3) s = s.replace(/\./g, "");
+          // Si hay mas de un punto -> todos son miles
+          if (parts.length > 2) s = s.replace(/\./g, "");
+          // Si el ultimo grupo tiene 3 digitos exactos -> separador de miles
+          else if (parts[parts.length - 1].length === 3) s = s.replace(/\./g, "");
         } else if (s.includes(",")) {
           const parts = s.split(",");
-          if (parts[parts.length - 1].length === 3) s = s.replace(/,/g, "");
+          if (parts.length > 2) s = s.replace(/,/g, "");
+          else if (parts[parts.length - 1].length === 3) s = s.replace(/,/g, "");
           else s = s.replace(",", ".");
         }
-        let n = Math.round(parseFloat(s));
+        let n = parseFloat(s);
+        if (isNaN(n)) {
+          // ultimo recurso: extraer solo digitos
+          const soloDigitos = raw.replace(/\D/g, "");
+          if (soloDigitos) n = parseInt(soloDigitos, 10);
+        }
+        if (isNaN(n)) return NaN;
+        n = Math.round(n);
         if (esNegativo) n = -Math.abs(n);
         return n;
       };
@@ -155,15 +181,23 @@ Tipos de acciones soportadas (puede venir con payload parcial que el UI completa
         const filteredActions: any[] = [];
         for (const action of parsed.actions) {
           if (action.type === "addTransaction" && action.payload) {
-            const monto = normalizarMonto(action.payload.monto);
+            const montoOriginal = action.payload.monto;
+            const monto = normalizarMonto(montoOriginal);
             if (monto === undefined || isNaN(monto) || monto <= 0 || monto > 999999999999) {
+              console.warn("[chat.ts] Monto omitido:", JSON.stringify({
+                original: montoOriginal,
+                parseado: monto,
+                descripcion: action.payload.descripcion
+              }));
               countOmitted++;
               continue;
             }
             action.payload.monto = monto;
             countAdded++;
+            filteredActions.push(action);
+          } else {
+            filteredActions.push(action);
           }
-          filteredActions.push(action);
         }
         parsed.actions = filteredActions;
         if (countOmitted > 0) {
