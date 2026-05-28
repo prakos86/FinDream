@@ -1,0 +1,69 @@
+export interface Categoria {
+  nombre: string;
+  monto: number;
+  icon: string; // Lucide icon name
+  color: string; // Tailwind color class or hex
+}
+
+export type TipoMovimiento = 'Gasto' | 'Ingreso';
+
+export interface Transaccion {
+  id: string;
+  tipo: TipoMovimiento;
+  monto: number;
+  categoria?: string; // Solo para Gastos
+  fecha: string; // ISO String
+  descripcion: string;
+  formaPago?: string; // Forma de pago vinculada
+}
+
+export type FiltroTiempo = 'Día' | 'Semana' | 'Mes' | 'Año' | 'Histórico';
+
+export interface HistoricoAvance {
+  id: string;
+  fecha: string;
+  monto: number;
+}
+
+export interface Sueno {
+  id: string;
+  nombre: string;
+  meta: number;
+  ahorroManual: number;
+  ahorroAcumulado?: number;
+  historialAvances?: HistoricoAvance[];
+  usarReal: boolean;
+}
+
+export interface ProductoFinanciero {
+  id: string;
+  banco: string;
+  tipo: string;
+  alias?: string;
+  montoTotal?: number;      // Cupo total o monto total del producto/crédito
+  montoUtilizado?: number;  // Monto consumido o pagado hasta la fecha
+  franquicia?: string;     // Franquicia (Visa, Mastercard, etc.) - opcional
+}
+
+export interface ActivoPortafolio {
+  id: string;
+  nombre: string;
+  valor: number;
+  plataforma: string;
+}
+
+export interface UserProfile {
+  nombre: string;
+  correo: string;
+  celular: string;
+  productos: ProductoFinanciero[];
+  portafolios?: ActivoPortafolio[];
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: 'user' | 'model';
+  text: string;
+  timestamp: string; // ISO string
+}
+
