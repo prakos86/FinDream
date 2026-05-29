@@ -166,12 +166,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         currencySymbol: selectedCountry === 'ES' ? '€' : '$',
         profile: userProfile,
         suenos: suenos.map(s => ({
+          id: s.id,
           nombre: s.nombre,
           meta: s.meta,
           esActivo: s.id === activeSuenoId
         })),
+        productos: (userProfile.productos || []).map(p => ({
+          id: p.id,
+          banco: p.banco,
+          producto: p.tipo,
+          alias: p.alias,
+          cupo: p.montoTotal,
+          utilizado: p.montoUtilizado
+        })),
         financials: { totalActivos, totalPasivos },
-        transacciones: transacciones.map(t => ({
+        transacciones: transacciones.slice(0, 30).map(t => ({
           id: t.id,
           tipo: t.tipo,
           monto: t.monto,
@@ -232,6 +241,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         }
         let raw = valor.trim();
         if (!raw) return NaN;
+        const lowercase = raw.toLowerCase();
+
+        // Detect multipliers: MM (millones), M (millon/millones/million/millions), K/mil (thousands)
+        let multiplier = 1;
+        if (lowercase.includes('mill') || lowercase.includes('mm') || (lowercase.includes('m') && !lowercase.includes('mil'))) {
+          multiplier = 1000000;
+        } else if (lowercase.includes('k') || lowercase.includes('mil')) {
+          multiplier = 1000;
+        }
+
         const esNegativo = /^\(.*\)$/.test(raw) || /^-/.test(raw);
         let s = raw.replace(/[^0-9.,]/g, "");
         if (!s) return NaN;
@@ -243,20 +262,32 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           }
         } else if (s.includes(".")) {
           const parts = s.split(".");
-          if (parts.length > 2) s = s.replace(/\./g, "");
-          else if (parts[parts.length - 1].length === 3) s = s.replace(/\./g, "");
+          if (multiplier > 1) {
+            // keep dot as decimal separator
+          } else if (parts.length > 2) {
+            s = s.replace(/\./g, "");
+          } else if (parts[parts.length - 1].length === 3) {
+            s = s.replace(/\./g, "");
+          }
         } else if (s.includes(",")) {
           const parts = s.split(",");
-          if (parts.length > 2) s = s.replace(/,/g, "");
-          else if (parts[parts.length - 1].length === 3) s = s.replace(/,/g, "");
-          else s = s.replace(",", ".");
+          if (multiplier > 1) {
+            s = s.replace(",", ".");
+          } else if (parts.length > 2) {
+            s = s.replace(/,/g, "");
+          } else if (parts[parts.length - 1].length === 3) {
+            s = s.replace(/,/g, "");
+          } else {
+            s = s.replace(",", ".");
+          }
         }
         let n = parseFloat(s);
         if (isNaN(n)) {
-          let digitOnly = raw.replace(/[^0-9]/g, "");
-          n = parseInt(digitOnly, 10);
+          const soloDigitos = raw.replace(/\D/g, "");
+          if (soloDigitos) n = parseInt(soloDigitos, 10);
         }
-        return esNegativo ? -Math.round(n) : Math.round(n);
+        if (isNaN(n)) return NaN;
+        return esNegativo ? -Math.round(n * multiplier) : Math.round(n * multiplier);
       };
 
       let currentTxList = [...transacciones];
@@ -334,6 +365,55 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           triggerDynamicIsland(
             selectedLanguage === 'ES' ? 'Transaccion actualizada' : 'Transaction updated',
             `${p.descripcion || p.categoria || ''}`, true
+          );
+        } else if (action.type === 'deleteProduct' && action.payload?.id) {
+          const idToDelete = action.payload.id;
+          const found = (currentProfile.productos || []).find(prod => prod.id === idToDelete);
+          currentProfile.productos = (currentProfile.productos || []).filter(p => p.id !== idToDelete);
+          profileChanged = true;
+          triggerDynamicIsland(
+            selectedLanguage === 'ES' ? 'Producto eliminado' : 'Product deleted',
+            found ? `${found.banco} - ${found.tipo}` : '', true
+          );
+        } else if (action.type === 'editProduct' && action.payload?.id) {
+          const p = action.payload;
+          currentProfile.productos = (currentProfile.productos || []).map(prod =>
+            prod.id === p.id ? {
+              ...prod,
+              banco: p.banco !== undefined ? p.banco : prod.banco,
+              tipo: p.producto !== undefined ? p.producto : prod.tipo,
+              alias: p.alias !== undefined ? p.alias : prod.alias,
+              montoTotal: p.cupo !== undefined ? p.cupo : prod.montoTotal,
+              montoUtilizado: p.utilizado !== undefined ? p.utilizado : prod.montoUtilizado
+            } : prod
+          );
+          profileChanged = true;
+          triggerDynamicIsland(
+            selectedLanguage === 'ES' ? 'Producto actualizado' : 'Product updated',
+            p.banco || p.alias || '', true
+          );
+        } else if (action.type === 'deleteSueno' && action.payload?.id) {
+          const idToDelete = action.payload.id;
+          const found = currentSuenos.find(s => s.id === idToDelete);
+          currentSuenos = currentSuenos.filter(s => s.id !== idToDelete);
+          suenosChanged = true;
+          triggerDynamicIsland(
+            selectedLanguage === 'ES' ? 'Sueño eliminado' : 'Dream deleted',
+            found ? found.nombre : '', true
+          );
+        } else if (action.type === 'editSueno' && action.payload?.id) {
+          const p = action.payload;
+          currentSuenos = currentSuenos.map(s =>
+            s.id === p.id ? {
+              ...s,
+              nombre: p.nombre !== undefined ? p.nombre : s.nombre,
+              meta: p.meta !== undefined ? p.meta : s.meta
+            } : s
+          );
+          suenosChanged = true;
+          triggerDynamicIsland(
+            selectedLanguage === 'ES' ? 'Sueño actualizado' : 'Dream updated',
+            p.nombre || '', true
           );
         }
       });

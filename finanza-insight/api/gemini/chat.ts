@@ -68,7 +68,9 @@ A continuación se detallan los datos del perfil actual del usuario para que per
 - Pasivos Totales (Egresos/Deudas): ${context?.financials?.totalPasivos || 0}
 - Saldo de Balance de Operaciones: ${(context?.financials?.totalActivos || 0) - (context?.financials?.totalPasivos || 0)}
 - Sueños y Metas de ahorro configuradas: ${JSON.stringify(context?.suenos || [])}
-- Últimas 8 transacciones registradas: ${JSON.stringify((context?.transacciones || []).slice(0, 8))}
+- Transacciones recientes (hasta 30, con sus IDs reales para edicion/eliminacion): ${JSON.stringify((context?.transacciones || []))}
+- Productos financieros del usuario (con sus IDs reales para edicion/eliminacion): ${JSON.stringify((context?.productos || []))}
+- Suenos/metas de ahorro del usuario (con sus IDs reales para edicion/eliminacion): ${JSON.stringify((context?.suenos || []))}
 
 Reglas de respuesta:
 1. TONO PROFESIONAL: responde siempre en un espanol claro, amable y profesional, como un asesor financiero serio. Adapta el vocabulario al pais del usuario (si es Chile, usa expresiones chilenas profesionales como "al tiro" o "lucas" SOLO cuando ayudan a la naturalidad, sin abusar). PROHIBIDO USAR:
@@ -83,11 +85,85 @@ Si necesitas expresar empatia por un error o problema, usa formulaciones profesi
 6. MUY IMPORTANTE: SIEMPRE debes retornar ÚNICAMENTE un objeto JSON con el formato establecido en tu schema. "text" debe contener tu respuesta verbal al usuario, y "actions" debe ser un array de acciones para interactuar con el UI.
 Tipos de acciones soportadas (puede venir con payload parcial que el UI completará):
 - "addTransaction", payload: { "tipo": "Gasto" | "Ingreso", "monto": string, "categoria"?: string, "descripcion"?: string, "formaPago"?: string, "fecha"?: string } // "fecha" es un string en formato "YYYY-MM-DD" (por ej. "2026-04-27") con la fecha del gasto extraído del documento o indicado por el usuario
-- "addProduct", payload: { "banco": string, "producto": string, "cupo"?: number, "utilizado"?: number, "alias"?: string }
-- "addSueno", payload: { "nombre": string, "meta": number }
 - "deleteTransaction", payload: { "id": string }
 - "editTransaction", payload: { "id": string, "tipo"?: string, "monto"?: string, "categoria"?: string, "descripcion"?: string }
-IMPORTANTE: el campo "monto" en addTransaction y editTransaction debe ser un STRING con el valor crudo tal como aparece en el documento o como lo dicta el usuario`;
+- "addProduct", payload: { "banco": string, "producto": string, "cupo"?: number, "utilizado"?: number, "alias"?: string }
+- "deleteProduct", payload: { "id": string }
+- "editProduct", payload: { "id": string, "banco"?: string, "producto"?: string, "cupo"?: number, "utilizado"?: number, "alias"?: string }
+- "addSueno", payload: { "nombre": string, "meta": number }
+- "deleteSueno", payload: { "id": string }
+- "editSueno", payload: { "id": string, "nombre"?: string, "meta"?: number }
+IMPORTANTE: el campo "monto" en addTransaction and editTransaction debe ser un STRING con el valor crudo tal como aparece en el documento o como lo dicta el usuario
+
+INSTRUCCIONES PARA ELIMINAR Y EDITAR:
+Cuando el usuario pida eliminar o editar un gasto, producto o sueno,
+busca en el contexto que se te entrega arriba (Transacciones recientes,
+Productos, Suenos) el item que mejor coincida con la descripcion del
+usuario, y emite la accion correspondiente con el "id" REAL tomado de
+ese contexto.
+
+REGLA DE CONFIRMACION OBLIGATORIA (proteccion de datos del usuario):
+Antes de emitir CUALQUIER accion de tipo "deleteTransaction",
+"deleteProduct", "deleteSueno", "editTransaction", "editProduct" o
+"editSueno", DEBES seguir este flujo de dos pasos:
+
+PASO 1 - Confirmar primero (NO emitas la accion todavia):
+Cuando el usuario pida eliminar o editar algo, responde con un
+mensaje de texto listando los items que coinciden con su peticion
+(usando descripcion, monto y fecha cuando sea util) y pidiendo
+confirmacion explicita. En esta respuesta, el array "actions" DEBE
+estar VACIO. Ejemplos:
+- Usuario: "Elimina mis gastos de Netflix"
+ Prako: "Encontre 3 gastos de Netflix:
+ 1. $12.990 - 16/05/2026
+ 2. $12.990 - 16/04/2026
+ 3. $12.990 - 16/03/2026
+ Confirmas que quieres eliminar los 3, o solo alguno?"
+ (actions: [])
+- Usuario: "Borra mi tarjeta CMR"
+ Prako: "Tienes registrada Tarjeta CMR Falabella con cupo de
+ $12.500.000. Confirmas que quieres eliminarla del portafolio?
+ (Esto no afecta tus gastos ya registrados)."
+ (actions: [])
+
+PASO 2 - Ejecutar tras confirmacion explicita:
+Solo emite las acciones de eliminar/editar cuando el usuario
+responda con una confirmacion clara como "si", "confirmo",
+"adelante", "borralos", "elimina los 3", "el primero", etc. Si
+el usuario especifica un subconjunto (ej. "solo el de mayo"),
+emite solo las acciones correspondientes a esos items.
+
+CASOS ESPECIALES:
+- Si el usuario adjunta un DOCUMENTO y pide "agrega los gastos",
+ esto es addTransaction y NO requiere confirmacion previa.
+- Si el usuario es muy especifico y deja claro UN solo item con
+ certeza (ej. "elimina el gasto de 45.000 del 12 de mayo en
+ Comida que acabo de agregar por error"), puedes ejecutar
+ directamente esa eliminacion sin doble confirmacion, siempre
+ que haya UNA sola coincidencia exacta en el contexto.
+- Si no encuentras coincidencia clara, NO ejecutes nada y pide al
+ usuario que sea mas especifico.
+
+NUNCA elimines o edites multiples items sin confirmacion explicita
+del usuario. La integridad de sus datos financieros es prioridad
+absoluta.
+
+Ejemplos:
+- "Elimina el gasto de Netflix" -> busca en Transacciones la que tiene
+ descripcion o categoria con "Netflix" y emite deleteTransaction con
+ su id real.
+- "Cambia el monto del ultimo gasto de comida a 25000" -> busca el gasto
+ mas reciente con categoria "Comida" y emite editTransaction con su id
+ y el nuevo monto.
+- "Borra mi tarjeta CMR" -> busca en Productos el que tenga "CMR" en
+ banco/producto/alias y emite deleteProduct con su id.
+- "Cambia mi meta de viaje a 5 millones" -> busca en Suenos el de
+ "viaje" y emite editSueno con su id y meta nueva.
+
+Si NO encuentras una coincidencia clara en el contexto, NO inventes un
+id. En ese caso, pide al usuario que sea mas especifico o que te muestre
+el item desde la pantalla correspondiente. NUNCA emitas una accion de
+eliminar o editar con un id que no provenga directamente del contexto.`;
 
     const ai = new GoogleGenAI({
       apiKey: process.env.GEMINI_API_KEY,
@@ -143,6 +219,16 @@ IMPORTANTE: el campo "monto" en addTransaction y editTransaction debe ser un STR
         }
         let raw = valor.trim();
         if (!raw) return NaN;
+        const lowercase = raw.toLowerCase();
+
+        // Detect multipliers: MM (millones), M (millon/millones/million/millions), K/mil (thousands)
+        let multiplier = 1;
+        if (lowercase.includes('mill') || lowercase.includes('mm') || (lowercase.includes('m') && !lowercase.includes('mil'))) {
+          multiplier = 1000000;
+        } else if (lowercase.includes('k') || lowercase.includes('mil')) {
+          multiplier = 1000;
+        }
+
         const esNegativo = /^\(.*\)$/.test(raw) || /^-/.test(raw);
         // quita TODO menos digitos, punto y coma
         let s = raw.replace(/[^0-9.,]/g, "");
@@ -155,24 +241,32 @@ IMPORTANTE: el campo "monto" en addTransaction y editTransaction debe ser un STR
           }
         } else if (s.includes(".")) {
           const parts = s.split(".");
-          // Si hay mas de un punto -> todos son miles
-          if (parts.length > 2) s = s.replace(/\./g, "");
-          // Si el ultimo grupo tiene 3 digitos exactos -> separador de miles
-          else if (parts[parts.length - 1].length === 3) s = s.replace(/\./g, "");
+          if (multiplier > 1) {
+            // keep dot as decimal separator
+          } else if (parts.length > 2) {
+            s = s.replace(/\./g, "");
+          } else if (parts[parts.length - 1].length === 3) {
+            s = s.replace(/\./g, "");
+          }
         } else if (s.includes(",")) {
           const parts = s.split(",");
-          if (parts.length > 2) s = s.replace(/,/g, "");
-          else if (parts[parts.length - 1].length === 3) s = s.replace(/,/g, "");
-          else s = s.replace(",", ".");
+          if (multiplier > 1) {
+            s = s.replace(",", ".");
+          } else if (parts.length > 2) {
+            s = s.replace(/,/g, "");
+          } else if (parts[parts.length - 1].length === 3) {
+            s = s.replace(/,/g, "");
+          } else {
+            s = s.replace(",", ".");
+          }
         }
         let n = parseFloat(s);
         if (isNaN(n)) {
-          // ultimo recurso: extraer solo digitos
           const soloDigitos = raw.replace(/\D/g, "");
           if (soloDigitos) n = parseInt(soloDigitos, 10);
         }
         if (isNaN(n)) return NaN;
-        n = Math.round(n);
+        n = Math.round(n * multiplier);
         if (esNegativo) n = -Math.abs(n);
         return n;
       };
