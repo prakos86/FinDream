@@ -1616,6 +1616,41 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
+  // Self-healing effect to correct any old Concon or Administradora installment transaction that was parsed at total purchase value ($762.392) instead of the actual monthly installment ($63.532).
+  useEffect(() => {
+    if (transacciones.length > 0) {
+      let needsHealing = false;
+      const healed = transacciones.map(t => {
+        const descLower = (t.descripcion || '').toLowerCase();
+        const isConcon = descLower.includes('concon') || descLower.includes('administradora');
+        // Check for exact monto of 762392
+        if (isConcon && t.monto === 762392) {
+          needsHealing = true;
+          return {
+            ...t,
+            monto: 63532,
+            descripcion: t.descripcion ? t.descripcion.replace('762.392', '63.532') : 'Concon - Cuota 06/12'
+          };
+        }
+        return t;
+      });
+
+      if (needsHealing) {
+        console.log("Self-healing: corrected installment transaction total to monthly cuota of 63,532.");
+        // We delay slightly to avoid React state update overlaps during mount/syncing
+        const timeout = setTimeout(() => {
+          saveTransacciones(healed);
+          triggerDynamicIsland(
+            selectedLanguage === 'ES' ? 'Cuota Corregida' : 'Installment Corrected',
+            selectedLanguage === 'ES' ? 'Se ajustó cuota Concon de 762K a 63K' : 'Adjusted Concon installment from 762K to 63K',
+            true
+          );
+        }, 1000);
+        return () => clearTimeout(timeout);
+      }
+    }
+  }, [transacciones.length]);
+
   // Dynamic Island Alert timeout
   const triggerDynamicIsland = (text: string, subtext: string, isPositive: boolean) => {
     setNotchAlert({ text, subtext, isPositive });

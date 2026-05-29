@@ -221,51 +221,98 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         window.speechSynthesis.speak(utterance);
       }
 
+      const normalizarMontoLocal = (valor: any): number => {
+        if (valor === null || valor === undefined) return NaN;
+        if (typeof valor === "number") {
+          if (!isFinite(valor)) return NaN;
+          return Math.round(valor);
+        }
+        if (typeof valor !== "string") {
+          valor = String(valor);
+        }
+        let raw = valor.trim();
+        if (!raw) return NaN;
+        const esNegativo = /^\(.*\)$/.test(raw) || /^-/.test(raw);
+        let s = raw.replace(/[^0-9.,]/g, "");
+        if (!s) return NaN;
+        if (s.includes(".") && s.includes(",")) {
+          if (s.lastIndexOf(",") > s.lastIndexOf(".")) {
+            s = s.replace(/\./g, "").replace(",", ".");
+          } else {
+            s = s.replace(/,/g, "");
+          }
+        } else if (s.includes(".")) {
+          const parts = s.split(".");
+          if (parts.length > 2) s = s.replace(/\./g, "");
+          else if (parts[parts.length - 1].length === 3) s = s.replace(/\./g, "");
+        } else if (s.includes(",")) {
+          const parts = s.split(",");
+          if (parts.length > 2) s = s.replace(/,/g, "");
+          else if (parts[parts.length - 1].length === 3) s = s.replace(/,/g, "");
+          else s = s.replace(",", ".");
+        }
+        let n = parseFloat(s);
+        if (isNaN(n)) {
+          let digitOnly = raw.replace(/[^0-9]/g, "");
+          n = parseInt(digitOnly, 10);
+        }
+        return esNegativo ? -Math.round(n) : Math.round(n);
+      };
+
+      let currentTxList = [...transacciones];
+      let currentProfile = { ...userProfile };
+      let currentSuenos = [...suenos];
+      let txChanged = false;
+      let profileChanged = false;
+      let suenosChanged = false;
+
       actions.forEach(action => {
         if (action.type === 'addTransaction' && action.payload) {
           const p = action.payload;
+          const numericMonto = normalizarMontoLocal(p.monto) || 0;
           const newT: Transaccion = {
             id: `trx-${Date.now()}-${Math.random()}`,
             tipo: p.tipo === 'Ingreso' ? 'Ingreso' : 'Gasto',
-            monto: p.monto || 0,
+            monto: numericMonto,
             categoria: p.categoria || (p.tipo === 'Ingreso' ? 'Salario' : 'Otros'),
             descripcion: p.descripcion || 'Acción desde Prako AI',
-            fecha: new Date().toISOString(),
+            fecha: p.fecha || new Date().toISOString(),
             formaPago: p.formaPago || 'Efectivo'
           };
-          saveTransacciones([newT, ...transacciones]);
-          triggerDynamicIsland("Operación Exitosa", `Gasto/Ingreso creado: $${p.monto}`, true);
+          currentTxList = [newT, ...currentTxList];
+          txChanged = true;
+          triggerDynamicIsland("Operación Exitosa", `Gasto/Ingreso creado: $${numericMonto.toLocaleString()}`, true);
         } else if (action.type === 'addProduct' && action.payload) {
           const p = action.payload;
           const newProd: UserProfile['productos'][0] = {
-            id: `prod-${Date.now()}`,
+            id: `prod-${Date.now()}-${Math.random()}`,
             banco: p.banco || 'Bancolombia',
             tipo: p.producto || 'Cuenta de Ahorros', 
             montoTotal: p.cupo,
             montoUtilizado: p.utilizado,
             alias: p.alias
           };
-          saveUserProfileData({
-            ...userProfile,
-            productos: [...(userProfile.productos || []), newProd]
-          });
+          currentProfile.productos = [...(currentProfile.productos || []), newProd];
+          profileChanged = true;
           triggerDynamicIsland("Producto Agregado", `${p.banco} - ${p.producto}`, true);
         } else if (action.type === 'addSueno' && action.payload) {
           const p = action.payload;
           const newSueno: Sueno = {
-            id: `sueno-${Date.now()}`,
+            id: `sueno-${Date.now()}-${Math.random()}`,
             nombre: p.nombre,
             meta: p.meta,
             ahorroManual: 0,
             usarReal: false
           };
-          setSuenos([...suenos, newSueno]);
+          currentSuenos = [...currentSuenos, newSueno];
+          suenosChanged = true;
           triggerDynamicIsland("Sueño Creado", `${p.nombre}`, true);
         } else if (action.type === 'deleteTransaction' && action.payload?.id) {
           const idToDelete = action.payload.id;
-          const found = transacciones.find(t => t.id === idToDelete);
+          const found = currentTxList.find(t => t.id === idToDelete);
           if (found) {
-            saveTransacciones(transacciones.filter(t => t.id !== idToDelete));
+            currentTxList = currentTxList.filter(t => t.id !== idToDelete);
+            txChanged = true;
             triggerDynamicIsland(
               selectedLanguage === 'ES' ? 'Transaccion eliminada' : 'Transaction deleted',
               `${found.descripcion || found.categoria} - $${found.monto.toLocaleString()}`,
@@ -274,22 +321,32 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           }
         } else if (action.type === 'editTransaction' && action.payload?.id) {
           const p = action.payload;
-          const updated = transacciones.map(t =>
+          currentTxList = currentTxList.map(t =>
             t.id === p.id ? {
               ...t,
               ...(p.tipo && { tipo: p.tipo }),
-              ...(p.monto && { monto: p.monto }),
+              ...(p.monto && { monto: normalizarMontoLocal(p.monto) || t.monto }),
               ...(p.categoria && { categoria: p.categoria }),
               ...(p.descripcion && { descripcion: p.descripcion }),
             } : t
           );
-          saveTransacciones(updated);
+          txChanged = true;
           triggerDynamicIsland(
             selectedLanguage === 'ES' ? 'Transaccion actualizada' : 'Transaction updated',
             `${p.descripcion || p.categoria || ''}`, true
           );
         }
       });
+
+      if (txChanged) {
+        saveTransacciones(currentTxList);
+      }
+      if (profileChanged) {
+        saveUserProfileData(currentProfile);
+      }
+      if (suenosChanged) {
+        setSuenos(currentSuenos);
+      }
       
     } catch (error) {
       console.error("Chat error:", error);
