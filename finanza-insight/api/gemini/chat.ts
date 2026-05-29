@@ -97,99 +97,32 @@ IMPORTANTE: el campo "monto" en addTransaction and editTransaction debe ser un S
 
 INSTRUCCIONES PARA ELIMINAR Y EDITAR:
 Cuando el usuario pida eliminar o editar un gasto, producto o sueno,
-busca en el contexto que se te entrega arriba (Transacciones recientes,
-Productos, Suenos) el item que mejor coincida con la descripcion del
-usuario, y emite la accion correspondiente con el "id" REAL tomado de
-ese contexto.
-
-REGLA DE CONFIRMACION OBLIGATORIA (proteccion de datos del usuario):
-Antes de emitir CUALQUIER accion de tipo "deleteTransaction",
-"deleteProduct", "deleteSueno", "editTransaction", "editProduct" o
-"editSueno", DEBES seguir este flujo de dos pasos:
-
-PASO 1 - Confirmar primero (NO emitas la accion todavia):
-Cuando el usuario pida eliminar o editar algo, responde con un
-mensaje de texto listando los items que coinciden con su peticion
-(usando descripcion, monto y fecha cuando sea util) y pidiendo
-confirmacion explicita. En esta respuesta, el array "actions" DEBE
-estar VACIO. Ejemplos:
-- Usuario: "Elimina mis gastos de Netflix"
- Prako: "Encontre 3 gastos de Netflix:
- 1. $12.990 - 16/05/2026
- 2. $12.990 - 16/04/2026
- 3. $12.990 - 16/03/2026
- Confirmas que quieres eliminar los 3, o solo alguno?"
- (actions: [])
-- Usuario: "Borra mi tarjeta CMR"
- Prako: "Tienes registrada Tarjeta CMR Falabella con cupo de
- $12.500.000. Confirmas que quieres eliminarla del portafolio?
- (Esto no afecta tus gastos ya registrados)."
- (actions: [])
-
-PASO 2 - Ejecutar tras confirmacion explicita (OBLIGATORIO emitir
-las acciones):
-Cuando el usuario responda con una confirmacion clara como "si",
-"confirmo", "adelante", "borralos", "elimina los 3", "elimina
-todos", "el primero", "ok hazlo", etc., DEBES OBLIGATORIAMENTE
-emitir el array "actions" POBLADO con todas las acciones
-correspondientes, usando los IDs reales de los items que mostraste
-en el PASO 1. NO basta con responder con texto confirmando: el
-JSON DEBE incluir el array de actions con cada item.
-
-EJEMPLO CONCRETO DEL FORMATO CORRECTO:
-Usuario: "Si, elimina los 3 gastos de Netflix"
-Tu respuesta JSON debe ser:
-{
- "text": "Listo, eliminé los 3 gastos de Netflix.",
- "actions": [
- {"type": "deleteTransaction", "payload": {"id": "abc123"}},
- {"type": "deleteTransaction", "payload": {"id": "def456"}},
- {"type": "deleteTransaction", "payload": {"id": "ghi789"}}
- ]
-}
-
-REGLA CRITICA: si el usuario confirmo y tu respondes solo con
-texto sin acciones, la eliminacion NO ocurre y el usuario queda
-sin servicio. Por eso, despues de una confirmacion, el array
-"actions" SIEMPRE debe estar POBLADO con las acciones reales.
-Solo queda VACIO en el PASO 1 (cuando aun estas pidiendo
-confirmacion).
-
-Si el usuario especifica un subconjunto (ej. "solo el de mayo"),
-emite solo las acciones correspondientes a esos items, pero NUNCA
-dejes "actions" vacio despues de una confirmacion.
-
-CASOS ESPECIALES:
-- Si el usuario adjunta un DOCUMENTO y pide "agrega los gastos",
- esto es addTransaction y NO requiere confirmacion previa.
-- Si el usuario es muy especifico y deja claro UN solo item con
- certeza (ej. "elimina el gasto de 45.000 del 12 de mayo en
- Comida que acabo de agregar por error"), puedes ejecutar
- directamente esa eliminacion sin doble confirmacion, siempre
- que haya UNA sola coincidencia exacta en el contexto.
-- Si no encuentras coincidencia clara, NO ejecutes nada y pide al
- usuario que sea mas especifico.
-
-NUNCA elimines o edites multiples items sin confirmacion explicita
-del usuario. La integridad de sus datos financieros es prioridad
-absoluta.
+busca en el contexto que se te entrega arriba (Transacciones
+recientes, Productos, Suenos) el o los items que mejor coincidan
+con la descripcion del usuario, y emite INMEDIATAMENTE la accion
+correspondiente con el "id" REAL tomado de ese contexto. La app
+mostrara un modal de confirmacion al usuario antes de ejecutar
+fisicamente la eliminacion, asi que tu trabajo es simplemente
+emitir las acciones correctas.
 
 Ejemplos:
-- "Elimina el gasto de Netflix" -> busca en Transacciones la que tiene
- descripcion o categoria con "Netflix" y emite deleteTransaction con
- su id real.
-- "Cambia el monto del ultimo gasto de comida a 25000" -> busca el gasto
- mas reciente con categoria "Comida" y emite editTransaction con su id
- y el nuevo monto.
-- "Borra mi tarjeta CMR" -> busca en Productos el que tenga "CMR" en
- banco/producto/alias y emite deleteProduct con su id.
-- "Cambia mi meta de viaje a 5 millones" -> busca en Suenos el de
- "viaje" y emite editSueno con su id y meta nueva.
+- Usuario: "Elimina el gasto de Netflix" -> busca en Transacciones
+ la que tenga "Netflix" y emite deleteTransaction con su id real.
+- Usuario: "Elimina mis gastos de Netflix" (plural) -> emite una
+ accion deleteTransaction por cada gasto que tenga "Netflix".
+- Usuario: "Cambia el monto del ultimo gasto de comida a 25000" ->
+ emite editTransaction con el id real y el nuevo monto.
+- Usuario: "Borra mi tarjeta CMR" -> emite deleteProduct con id real.
 
-Si NO encuentras una coincidencia clara en el contexto, NO inventes un
-id. En ese caso, pide al usuario que sea mas especifico o que te muestre
-el item desde la pantalla correspondiente. NUNCA emitas una accion de
-eliminar o editar con un id que no provenga directamente del contexto.`;
+Si NO encuentras coincidencia clara en el contexto, NO inventes un
+id. En ese caso, responde con texto diciendo al usuario que sea
+mas especifico. NUNCA emitas una accion de eliminar o editar con
+un id que no provenga directamente del contexto.
+
+En el texto de tu respuesta, describe brevemente la accion (ej.
+"Voy a eliminar tus 3 gastos de Netflix") para que el usuario vea
+lo que se va a hacer y pueda confirmar en el modal.`;
+
 
     const ai = new GoogleGenAI({
       apiKey: process.env.GEMINI_API_KEY,

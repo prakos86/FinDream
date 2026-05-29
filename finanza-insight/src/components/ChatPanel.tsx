@@ -51,6 +51,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   setChatMessages
 }) => {
   const [chatInput, setChatInput] = useState('');
+  const [pendingActions, setPendingActions] = useState<any[] | null>(null);
   const [isAIProcessing, setIsAIProcessing] = useState(false);
   const [isListeningChat, setIsListeningChat] = useState(false);
   const [isImmersiveVoiceMode, setIsImmersiveVoiceMode] = useState(false);
@@ -126,6 +127,167 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     } finally {
       setIsProcessingFile(false);
       if (e.target) e.target.value = '';
+    }
+  };
+
+  const executeDangerousActions = (actionsList: any[]) => {
+    if (!actionsList || actionsList.length === 0) return;
+
+    const normalizarMontoLocal = (valor: any): number => {
+      if (valor === null || valor === undefined) return NaN;
+      if (typeof valor === "number") {
+        if (!isFinite(valor)) return NaN;
+        return Math.round(valor);
+      }
+      if (typeof valor !== "string") {
+        valor = String(valor);
+      }
+      let raw = valor.trim();
+      if (!raw) return NaN;
+      const lowercase = raw.toLowerCase();
+
+      let multiplier = 1;
+      if (lowercase.includes('mill') || lowercase.includes('mm') || (lowercase.includes('m') && !lowercase.includes('mil'))) {
+        multiplier = 1000000;
+      } else if (lowercase.includes('k') || lowercase.includes('mil')) {
+        multiplier = 1000;
+      }
+
+      const esNegativo = /^\(.*\)$/.test(raw) || /^-/.test(raw);
+      let s = raw.replace(/[^0-9.,]/g, "");
+      if (!s) return NaN;
+      if (s.includes(".") && s.includes(",")) {
+        if (s.lastIndexOf(",") > s.lastIndexOf(".")) {
+          s = s.replace(/\./g, "").replace(",", ".");
+        } else {
+          s = s.replace(/,/g, "");
+        }
+      } else if (s.includes(".")) {
+        const parts = s.split(".");
+        if (multiplier > 1) {
+          // keep dot as decimal separator
+        } else if (parts.length > 2) {
+          s = s.replace(/\./g, "");
+        } else if (parts[parts.length - 1].length === 3) {
+          s = s.replace(/\./g, "");
+        }
+      } else if (s.includes(",")) {
+        const parts = s.split(",");
+        if (multiplier > 1) {
+          s = s.replace(",", ".");
+        } else if (parts.length > 2) {
+          s = s.replace(/,/g, "");
+        } else if (parts[parts.length - 1].length === 3) {
+          s = s.replace(/,/g, "");
+        } else {
+          s = s.replace(",", ".");
+        }
+      }
+      let n = parseFloat(s);
+      if (isNaN(n)) {
+        const soloDigitos = raw.replace(/\D/g, "");
+        if (soloDigitos) n = parseInt(soloDigitos, 10);
+      }
+      if (isNaN(n)) return NaN;
+      return esNegativo ? -Math.round(n * multiplier) : Math.round(n * multiplier);
+    };
+
+    let currentTxList = [...transacciones];
+    let currentProfile = { ...userProfile };
+    let currentSuenos = [...suenos];
+    let txChanged = false;
+    let profileChanged = false;
+    let suenosChanged = false;
+
+    actionsList.forEach(action => {
+      if (action.type === 'deleteTransaction' && action.payload?.id) {
+        const idToDelete = action.payload.id;
+        const found = currentTxList.find(t => t.id === idToDelete);
+        if (found) {
+          currentTxList = currentTxList.filter(t => t.id !== idToDelete);
+          txChanged = true;
+          triggerDynamicIsland(
+            selectedLanguage === 'ES' ? 'Transaccion eliminada' : 'Transaction deleted',
+            `${found.descripcion || found.categoria} - $${found.monto.toLocaleString()}`,
+            true
+          );
+        }
+      } else if (action.type === 'editTransaction' && action.payload?.id) {
+        const p = action.payload;
+        currentTxList = currentTxList.map(t =>
+          t.id === p.id ? {
+            ...t,
+            ...(p.tipo && { tipo: p.tipo }),
+            ...(p.monto && { monto: normalizarMontoLocal(p.monto) || t.monto }),
+            ...(p.categoria && { categoria: p.categoria }),
+            ...(p.descripcion && { descripcion: p.descripcion }),
+          } : t
+        );
+        txChanged = true;
+        triggerDynamicIsland(
+          selectedLanguage === 'ES' ? 'Transaccion actualizada' : 'Transaction updated',
+          `${p.descripcion || p.categoria || ''}`, true
+        );
+      } else if (action.type === 'deleteProduct' && action.payload?.id) {
+        const idToDelete = action.payload.id;
+        const found = (currentProfile.productos || []).find(prod => prod.id === idToDelete);
+        currentProfile.productos = (currentProfile.productos || []).filter(p => p.id !== idToDelete);
+        profileChanged = true;
+        triggerDynamicIsland(
+          selectedLanguage === 'ES' ? 'Producto eliminado' : 'Product deleted',
+          found ? `${found.banco} - ${found.tipo}` : '', true
+        );
+      } else if (action.type === 'editProduct' && action.payload?.id) {
+        const p = action.payload;
+        currentProfile.productos = (currentProfile.productos || []).map(prod =>
+          prod.id === p.id ? {
+            ...prod,
+            banco: p.banco !== undefined ? p.banco : prod.banco,
+            tipo: p.producto !== undefined ? p.producto : prod.tipo,
+            alias: p.alias !== undefined ? p.alias : prod.alias,
+            montoTotal: p.cupo !== undefined ? p.cupo : prod.montoTotal,
+            montoUtilizado: p.utilizado !== undefined ? p.utilizado : prod.montoUtilizado
+          } : prod
+        );
+        profileChanged = true;
+        triggerDynamicIsland(
+          selectedLanguage === 'ES' ? 'Producto actualizado' : 'Product updated',
+          p.banco || p.alias || '', true
+        );
+      } else if (action.type === 'deleteSueno' && action.payload?.id) {
+        const idToDelete = action.payload.id;
+        const found = currentSuenos.find(s => s.id === idToDelete);
+        currentSuenos = currentSuenos.filter(s => s.id !== idToDelete);
+        suenosChanged = true;
+        triggerDynamicIsland(
+          selectedLanguage === 'ES' ? 'Sueño eliminado' : 'Dream deleted',
+          found ? found.nombre : '', true
+        );
+      } else if (action.type === 'editSueno' && action.payload?.id) {
+        const p = action.payload;
+        currentSuenos = currentSuenos.map(s =>
+          s.id === p.id ? {
+            ...s,
+            nombre: p.nombre !== undefined ? p.nombre : s.nombre,
+            meta: p.meta !== undefined ? p.meta : s.meta
+          } : s
+        );
+        suenosChanged = true;
+        triggerDynamicIsland(
+          selectedLanguage === 'ES' ? 'Sueño actualizado' : 'Dream updated',
+          p.nombre || '', true
+        );
+      }
+    });
+
+    if (txChanged) {
+      saveTransacciones(currentTxList);
+    }
+    if (profileChanged) {
+      saveUserProfileData(currentProfile);
+    }
+    if (suenosChanged) {
+      setSuenos(currentSuenos);
     }
   };
 
@@ -290,6 +452,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         return esNegativo ? -Math.round(n * multiplier) : Math.round(n * multiplier);
       };
 
+      const destructiveTypes = [
+        "deleteTransaction", "editTransaction",
+        "deleteProduct", "editProduct",
+        "deleteSueno", "editSueno"
+      ];
+
+      const safeActions = (actions || []).filter(
+        (a: any) => !destructiveTypes.includes(a.type)
+      );
+      const dangerousActions = (actions || []).filter(
+        (a: any) => destructiveTypes.includes(a.type)
+      );
+
       let currentTxList = [...transacciones];
       let currentProfile = { ...userProfile };
       let currentSuenos = [...suenos];
@@ -297,7 +472,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       let profileChanged = false;
       let suenosChanged = false;
 
-      actions.forEach(action => {
+      safeActions.forEach(action => {
         if (action.type === 'addTransaction' && action.payload) {
           const p = action.payload;
           const numericMonto = normalizarMontoLocal(p.monto) || 0;
@@ -338,83 +513,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           currentSuenos = [...currentSuenos, newSueno];
           suenosChanged = true;
           triggerDynamicIsland("Sueño Creado", `${p.nombre}`, true);
-        } else if (action.type === 'deleteTransaction' && action.payload?.id) {
-          const idToDelete = action.payload.id;
-          const found = currentTxList.find(t => t.id === idToDelete);
-          if (found) {
-            currentTxList = currentTxList.filter(t => t.id !== idToDelete);
-            txChanged = true;
-            triggerDynamicIsland(
-              selectedLanguage === 'ES' ? 'Transaccion eliminada' : 'Transaction deleted',
-              `${found.descripcion || found.categoria} - $${found.monto.toLocaleString()}`,
-              true
-            );
-          }
-        } else if (action.type === 'editTransaction' && action.payload?.id) {
-          const p = action.payload;
-          currentTxList = currentTxList.map(t =>
-            t.id === p.id ? {
-              ...t,
-              ...(p.tipo && { tipo: p.tipo }),
-              ...(p.monto && { monto: normalizarMontoLocal(p.monto) || t.monto }),
-              ...(p.categoria && { categoria: p.categoria }),
-              ...(p.descripcion && { descripcion: p.descripcion }),
-            } : t
-          );
-          txChanged = true;
-          triggerDynamicIsland(
-            selectedLanguage === 'ES' ? 'Transaccion actualizada' : 'Transaction updated',
-            `${p.descripcion || p.categoria || ''}`, true
-          );
-        } else if (action.type === 'deleteProduct' && action.payload?.id) {
-          const idToDelete = action.payload.id;
-          const found = (currentProfile.productos || []).find(prod => prod.id === idToDelete);
-          currentProfile.productos = (currentProfile.productos || []).filter(p => p.id !== idToDelete);
-          profileChanged = true;
-          triggerDynamicIsland(
-            selectedLanguage === 'ES' ? 'Producto eliminado' : 'Product deleted',
-            found ? `${found.banco} - ${found.tipo}` : '', true
-          );
-        } else if (action.type === 'editProduct' && action.payload?.id) {
-          const p = action.payload;
-          currentProfile.productos = (currentProfile.productos || []).map(prod =>
-            prod.id === p.id ? {
-              ...prod,
-              banco: p.banco !== undefined ? p.banco : prod.banco,
-              tipo: p.producto !== undefined ? p.producto : prod.tipo,
-              alias: p.alias !== undefined ? p.alias : prod.alias,
-              montoTotal: p.cupo !== undefined ? p.cupo : prod.montoTotal,
-              montoUtilizado: p.utilizado !== undefined ? p.utilizado : prod.montoUtilizado
-            } : prod
-          );
-          profileChanged = true;
-          triggerDynamicIsland(
-            selectedLanguage === 'ES' ? 'Producto actualizado' : 'Product updated',
-            p.banco || p.alias || '', true
-          );
-        } else if (action.type === 'deleteSueno' && action.payload?.id) {
-          const idToDelete = action.payload.id;
-          const found = currentSuenos.find(s => s.id === idToDelete);
-          currentSuenos = currentSuenos.filter(s => s.id !== idToDelete);
-          suenosChanged = true;
-          triggerDynamicIsland(
-            selectedLanguage === 'ES' ? 'Sueño eliminado' : 'Dream deleted',
-            found ? found.nombre : '', true
-          );
-        } else if (action.type === 'editSueno' && action.payload?.id) {
-          const p = action.payload;
-          currentSuenos = currentSuenos.map(s =>
-            s.id === p.id ? {
-              ...s,
-              nombre: p.nombre !== undefined ? p.nombre : s.nombre,
-              meta: p.meta !== undefined ? p.meta : s.meta
-            } : s
-          );
-          suenosChanged = true;
-          triggerDynamicIsland(
-            selectedLanguage === 'ES' ? 'Sueño actualizado' : 'Dream updated',
-            p.nombre || '', true
-          );
         }
       });
 
@@ -426,6 +524,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       }
       if (suenosChanged) {
         setSuenos(currentSuenos);
+      }
+
+      if (dangerousActions.length > 0) {
+        setPendingActions(dangerousActions);
       }
       
     } catch (error) {
@@ -784,6 +886,71 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         </div>
       </div>
+
+      {pendingActions && pendingActions.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-2.5 text-rose-600 mb-3">
+              <ShieldCheck className="w-5 h-5 shrink-0 animate-bounce" />
+              <h3 className="text-sm font-bold text-slate-950 uppercase tracking-tight">
+                {selectedLanguage === 'ES' ? 'Confirmar Operación' : 'Confirm Operation'}
+              </h3>
+            </div>
+            <p className="text-xs font-semibold text-slate-500 mb-4 leading-relaxed">
+              {selectedLanguage === 'ES' 
+                ? 'Prako va a realizar cambios en tu portafolio financiero. ¿Confirmas esta operación?'
+                : 'Prako is going to make changes to your financial portfolio. Do you confirm this operation?'}
+            </p>
+            <ul className="text-xs text-slate-500 mb-5 max-h-32 overflow-y-auto space-y-2 border-y border-slate-100 py-3 bg-slate-50/50 px-2 rounded-lg no-scrollbar">
+              {pendingActions.map((a, i) => {
+                let name = "";
+                if (a.type?.includes("Transaction")) {
+                  const found = transacciones.find(t => t.id === a.payload?.id);
+                  if (found) name = `${found.descripcion || found.categoria} ($${found.monto.toLocaleString()})`;
+                } else if (a.type?.includes("Product")) {
+                  const found = (userProfile.productos || []).find(p => p.id === a.payload?.id);
+                  if (found) name = `${found.banco} - ${found.tipo} ${found.alias ? `(${found.alias})` : ''}`;
+                } else if (a.type?.includes("Sueno")) {
+                  const found = suenos.find(s => s.id === a.payload?.id);
+                  if (found) name = found.nombre;
+                }
+                if (!name) name = a.payload?.id?.substring(0, 8) + "...";
+
+                return (
+                  <li key={i} className="flex flex-col gap-0.5 border-l-2 border-rose-500 pl-2">
+                    <span className="font-bold text-[9px] text-slate-400 uppercase tracking-wider">
+                      {a.type === "deleteTransaction" && (selectedLanguage === 'ES' ? 'Eliminar Gasto' : 'Delete Expense')}
+                      {a.type === "editTransaction" && (selectedLanguage === 'ES' ? 'Editar Gasto' : 'Edit Expense')}
+                      {a.type === "deleteProduct" && (selectedLanguage === 'ES' ? 'Eliminar Tarjeta/Cuenta' : 'Delete Card/Account')}
+                      {a.type === "editProduct" && (selectedLanguage === 'ES' ? 'Editar Tarjeta/Cuenta' : 'Edit Card/Account')}
+                      {a.type === "deleteSueno" && (selectedLanguage === 'ES' ? 'Eliminar Sueño' : 'Delete Dream')}
+                      {a.type === "editSueno" && (selectedLanguage === 'ES' ? 'Editar Sueño' : 'Edit Dream')}
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-800">{name}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPendingActions(null)}
+                className="flex-1 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition active:scale-98 cursor-pointer"
+              >
+                {selectedLanguage === 'ES' ? 'Descartar' : 'Discard'}
+              </button>
+              <button
+                onClick={() => {
+                  executeDangerousActions(pendingActions);
+                  setPendingActions(null);
+                }}
+                className="flex-1 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-200 transition active:scale-98 cursor-pointer"
+              >
+                {selectedLanguage === 'ES' ? 'Confirmar' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
