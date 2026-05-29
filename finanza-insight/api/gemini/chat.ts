@@ -44,13 +44,9 @@ Si el usuario te pide registrar o cambiar una transacción, un producto financie
 Si el usuario adjunta un documento (el mensaje contendrá "[Documento adjunto:...]") y te pide agregar transacciones, debes extraer TODAS las transacciones que cumplan con el criterio del usuario y emitir una acción "addTransaction" por cada una en el array "actions". Por ejemplo, si pide solo los últimos 15 días, filtra por fecha antes de emitir las acciones. NUNCA digas que no puedes leer el documento, el contenido ya viene incluido en el mensaje. DEBES OBLIGATORIAMENTE extraer TODAS las transacciones que cumplan con el criterio del usuario y emitir una accion addTransaction por cada una. NO te limites a explicar el documento: tu objetivo es EJECUTAR las acciones.
 
 REGLAS CRÍTICAS PARA INTERPRETAR MONTOS (los estados de cuenta varían según país y banco):
-- El monto debe ser un número ENTERO que represente el valor completo en la moneda local, SIN decimales salvo que la moneda realmente use centavos.
-- En estados de cuenta de Latinoamérica (Colombia COP, Chile CLP), TANTO el punto "." como la coma "," se usan comúnmente como separadores de MILES. Ejemplo: "2.378.260" = 2378260, "1,250,000" = 1250000.
-- Los pesos chilenos (CLP) y colombianos (COP) NO usan centavos decimales. Trata cualquier "." o "," en estos montos como separador de miles, NUNCA como punto decimal.
-- Solo trata un separador como decimal si claramente son centavos en una moneda que los usa (USD "12.99", EUR "12,99") con exactamente 2 dígitos finales Y la magnitud tiene sentido.
-- Razona siempre sobre la MAGNITUD: si interpretar un separador como decimal produce un monto absurdamente pequeño (un arriendo convertido en "2.4"), es un separador de miles.
-- Emite el monto como entero puro: 2378260, nunca 2.378.260 ni 2378260.00.
-- IMPORTANTE: el campo "monto" en cada addTransaction debe ser un NUMERO (no string), entero, ya parseado. Por ejemplo: 2378260 (correcto), no "2.378.260", no "$2.378.260", no "2378260.00", no "dos millones". Si tienes duda sobre un monto, omitelo en lugar de inventarlo o mandarlo con formato extrano.
+- El campo "monto" en cada "addTransaction" y "editTransaction" DEBE ser un STRING con el valor crudo original (ej. "2.378.260", "146.637" o "5.070") tal como aparece en el documento o como lo indique el usuario. NO intentes parsearlo ni convertirlo tú mismo. El Backend de la aplicación se encargará de normalizarlo y parsearlo.
+- Para transacciones internacionales en dólares u otras monedas (ej. Apple, Amazon, Netflix, etc.) que muestren tanto un monto en USD/EUR (ej. "USD 319,9" o "USD 64,9" en el nombre, detalle o descripción de la transacción) como el cobro equivalente en la moneda local (ej. "291.313" o "59.177" CLP), extrae SIEMPRE el monto del cobro equivalente final en la moneda local (ej. "291.313"). IGNORA los montos en moneda extranjera que aparecen dentro de las descripciones.
+- Los pesos chilenos (CLP) y colombianos (COP) NO usan centavos decimales. Cualquier "." o "," en el cobro de la moneda local es un separador de miles. Sin embargo, no intentes convertirlo, emítelo como "291.313" o "5.070" (STRING).
 
 CUANDO EL DOCUMENTO ES UN ESTADO DE CUENTA DE TARJETA O BANCO:
 - Extrae cada compra/cargo individual como una transacción (con su fecha, descripción y monto).

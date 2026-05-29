@@ -37,9 +37,10 @@ Extract the following information for each transaction:
 - monto: The transaction amount as a STRING representing the raw value exactly as it appears in the document (e.g. "2.378.260", "146.637" or "$2.378.260"). Do NOT try to parse or convert it to a number. Just output the exact raw sequence of characters/digits.
 
   CRITICAL RULES FOR EXTRACTING AMOUNTS:
-  * In Latin American statements (Colombia COP, Chile CLP), a period "." is often a thousands separator.
-  * You MUST extract the raw characters (like "2.378.260" or "146.637") as a string. Do NOT convert them to float or standard integers yourself, as that will corrupt the value.
-  * Output exactly what you see in the text/document for the amount.
+  * In Latin American statements (Colombia COP, Chile CLP), a period "." is a thousands separator, and cents/decimals are NEVER used.
+  * For international or foreign currency transactions (e.g. Cupertino, Seattle, Amazon, Apple, Netflix) which display BOTH a foreign amount (like "USD 319,9" or "USD 64,9" in the description) and a local currency equivalent amount (like "291.313" or "59.177" listed as the charged value), you MUST ALWAYS extract the final local currency charged amount (e.g., "291.313" or "59.177"). NEVER extract the foreign amount (USD, EUR, etc.) listed inside descriptions or auxiliary columns!
+  * You MUST extract the raw characters of the local currency amount (like "291.313" or "5.070") EXACTLY as a string. Do NOT convert them to float or standard integers yourself, and do NOT truncate trailing zeros (e.g. keep "5.070" exactly, do NOT output "5.07").
+  * Output exactly what you see in the text/document for the local currency billed amount.
 - nombre: A short description/name of the transaction.
 - categoria: Infer the best logical category for the transaction (e.g., Alimentación, Transporte, Compras, Vivienda, Viajes, Mascotas, etc).
 - banco: If the document shows a bank logo, entity name, or payment platform, extract its name.
