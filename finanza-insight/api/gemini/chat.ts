@@ -123,6 +123,40 @@ En el texto de tu respuesta, describe brevemente la accion (ej.
 "Voy a eliminar tus 3 gastos de Netflix") para que el usuario vea
 lo que se va a hacer y pueda confirmar en el modal.
 
+INSTRUCCIONES PARA AGREGAR (importante, no inventar excusas):
+Cuando el usuario te pida agregar un gasto o ingreso (ej. "agrega un
+gasto de 100000 de Uber del 30 de mayo", "registrame 5000 en cafe",
+"anota un ingreso de 1.500.000 de sueldo"), DEBES OBLIGATORIAMENTE
+emitir UNA accion addTransaction en el array "actions".
+
+NUNCA respondas que el monto tiene un "formato invalido", que "falta
+el separador de miles", que "necesita comillas", o cualquier otra
+excusa similar. El monto en el payload debe ser un STRING tal como
+lo dio el usuario (puede ser "100000", "100.000", "100,000", "$100000",
+"100 mil", "100k", "1m", etc.). El backend tiene una funcion
+normalizarMonto que limpia y convierte cualquier formato, asi que
+NO es tu responsabilidad pedirle al usuario que reformatee.
+
+FORMATO CORRECTO:
+{"type": "addTransaction", "payload": {
+ "tipo": "Gasto",
+ "monto": "100000",
+ "categoria": "Transporte",
+ "descripcion": "Uber",
+ "fecha": "2026-05-30"
+}}
+
+NUNCA hagas esto (responder con texto en vez de emitir la accion):
+"El gasto no fue agregado porque el formato del monto era invalido..."
+
+Si te falta informacion CRITICA (ej. solo dijeron "agrega 5000" sin
+mas contexto), puedes preguntar amablemente que falta, pero solo
+eso. NUNCA inventes problemas de formato.
+
+Para el campo "fecha", usar formato ISO YYYY-MM-DD. Si el usuario
+dice "hoy", usar la fecha de hoy. Si dice "30 de mayo" sin ano,
+usar el ano en curso.
+
 REGLA CRITICA SOBRE EL CAMPO id (NO IGNORAR):
 Cuando emitas una accion de tipo deleteTransaction, editTransaction,
 deleteProduct, editProduct, deleteSueno o editSueno, el "payload"

@@ -61,6 +61,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [attachedFileName, setAttachedFileName] = useState<string | null>(null);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const attachInputRef = useRef<HTMLInputElement>(null);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll al ultimo mensaje cuando llega uno nuevo
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "end"
+      });
+    }
+  }, [chatMessages, isAIProcessing]);
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const copiarMensaje = (id: string, texto: string) => {
@@ -833,6 +844,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               </span>
             </div>
           )}
+
+          {/* Ancla invisible para auto-scroll al ultimo mensaje */}
+          <div ref={chatEndRef} />
         </div>
 
         <div className="my-2 overflow-x-auto no-scrollbar pt-1 flex gap-2 shrink-0">
