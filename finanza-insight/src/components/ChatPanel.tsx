@@ -504,12 +504,40 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         "deleteSueno", "editSueno"
       ];
 
-      const safeActions = (actions || []).filter(
+      const allActions = (actions || []);
+
+      const safeActions = allActions.filter(
         (a: any) => !destructiveTypes.includes(a.type)
       );
-      const dangerousActions = (actions || []).filter(
-        (a: any) => destructiveTypes.includes(a.type)
+
+      const validDangerous = allActions.filter(
+        (a: any) =>
+          destructiveTypes.includes(a.type) &&
+          a.payload &&
+          typeof a.payload.id === "string" &&
+          a.payload.id.trim().length > 0
       );
+
+      const invalidDangerous = allActions.filter(
+        (a: any) =>
+          destructiveTypes.includes(a.type) &&
+          (!a.payload ||
+            typeof a.payload.id !== "string" ||
+            a.payload.id.trim().length === 0)
+      );
+
+      if (invalidDangerous.length > 0) {
+        console.warn("[ChatPanel] Acciones destructivas con payload invalido ignoradas:", invalidDangerous);
+        triggerDynamicIsland(
+          selectedLanguage === "ES"
+            ? "Prako no identificó el elemento"
+            : "Prako could not identify the item",
+          selectedLanguage === "ES"
+            ? "Intenta pedirlo de forma más específica"
+            : "Try a more specific request",
+          false
+        );
+      }
 
       let currentTxList = [...transacciones];
       let currentProfile = { ...userProfile };
@@ -572,8 +600,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         saveSuenosList(currentSuenos);
       }
 
-      if (dangerousActions.length > 0) {
-        setPendingActions(dangerousActions);
+      if (validDangerous.length > 0) {
+        setPendingActions(validDangerous);
       }
       
     } catch (error) {

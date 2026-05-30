@@ -121,7 +121,31 @@ un id que no provenga directamente del contexto.
 
 En el texto de tu respuesta, describe brevemente la accion (ej.
 "Voy a eliminar tus 3 gastos de Netflix") para que el usuario vea
-lo que se va a hacer y pueda confirmar en el modal.`;
+lo que se va a hacer y pueda confirmar en el modal.
+
+REGLA CRITICA SOBRE EL CAMPO id (NO IGNORAR):
+Cuando emitas una accion de tipo deleteTransaction, editTransaction,
+deleteProduct, editProduct, deleteSueno o editSueno, el "payload"
+DEBE OBLIGATORIAMENTE incluir el campo "id" con el valor REAL
+tomado del contexto. Un payload vacio {} es INVALIDO y la app NO
+podra ejecutar la accion.
+
+FORMATO CORRECTO (con id):
+{"type": "deleteTransaction", "payload": {"id": "abc123xyz"}}
+
+FORMATO INCORRECTO (sin id, NO HAGAS ESTO):
+{"type": "deleteTransaction", "payload": {}}
+
+Los IDs estan en el contexto que se te entrega arriba (en
+Transacciones recientes, Productos, Suenos). Por ejemplo, si el
+contexto dice:
+ {"id": "tx_abc123", "descripcion": "Netflix", "monto": 12990, ...}
+y el usuario pide eliminar ese gasto, tu accion debe ser:
+ {"type": "deleteTransaction", "payload": {"id": "tx_abc123"}}
+
+NUNCA inventes un id. NUNCA dejes el payload vacio. Si no encuentras
+el id en el contexto, NO emitas la accion: responde con texto
+pidiendo al usuario que sea mas especifico.`;
 
 
     const ai = new GoogleGenAI({
@@ -151,7 +175,29 @@ lo que se va a hacer y pueda confirmar en el modal.`;
                 type: Type.OBJECT,
                 properties: {
                   type: { type: Type.STRING },
-                  payload: { type: Type.OBJECT }
+                  payload: {
+                    type: Type.OBJECT,
+                    properties: {
+                      // Comunes
+                      id: { type: Type.STRING },
+                      // addTransaction / editTransaction
+                      tipo: { type: Type.STRING },
+                      monto: { type: Type.STRING },
+                      categoria: { type: Type.STRING },
+                      descripcion: { type: Type.STRING },
+                      formaPago: { type: Type.STRING },
+                      fecha: { type: Type.STRING },
+                      // addProduct / editProduct
+                      banco: { type: Type.STRING },
+                      producto: { type: Type.STRING },
+                      cupo: { type: Type.NUMBER },
+                      utilizado: { type: Type.NUMBER },
+                      alias: { type: Type.STRING },
+                      // addSueno / editSueno
+                      nombre: { type: Type.STRING },
+                      meta: { type: Type.NUMBER }
+                    }
+                  }
                 },
                 required: ["type"]
               }
