@@ -151,10 +151,103 @@ Tipos de acciones soportadas (puede venir con payload parcial que el UI completa
 - "addSueno", payload: { "nombre": string, "meta": number }
 - "deleteTransaction", payload: { "id": string }
 - "editTransaction", payload: { "id": string, "tipo"?: string, "monto"?: string, "categoria"?: string, "descripcion"?: string }
+- "deleteProduct", payload: { "id": string }
+- "editProduct", payload: { "id": string, "banco"?: string, "producto"?: string, "cupo"?: number, "utilizado"?: number, "alias"?: string }
+- "deleteSueno", payload: { "id": string }
+- "editSueno", payload: { "id": string, "nombre"?: string, "meta"?: number }
 IMPORTANTE: el campo "monto" en addTransaction y editTransaction debe ser un STRING con el valor crudo tal como aparece en el documento o como lo dicta el usuario.
+
+INSTRUCCIONES PARA AGREGAR (importante, no inventar excusas):
 REGLA ABSOLUTA Y OBLIGATORIA SOBRE EL CAMPO monto:
-Cuando emitas una accion "addTransaction" o "editTransaction", el campo "monto" dentro del "payload" es OBLIGATORIO. Si omites el campo "monto", la accion sera DESCARTADA automaticamente y el gasto NO se registrara.
-NUNCA emitas un addTransaction o editTransaction sin el campo "monto" en el payload. Si el usuario no indico monto, no emitas la accion y pideselo con texto.`;
+Cuando emitas una accion "addTransaction" o "editTransaction", el
+campo "monto" dentro del "payload" es OBLIGATORIO. Si omites el
+campo "monto", la accion sera DESCARTADA automaticamente por el
+backend y el gasto NO se registrara, fallando completamente la
+peticion del usuario.
+
+INCORRECTO (sin monto, se descarta):
+{"type":"addTransaction","payload":{
+ "tipo":"Gasto",
+ "categoria":"Transporte",
+ "descripcion":"Uber",
+ "fecha":"2026-05-30"
+}}
+
+CORRECTO (con monto, se procesa):
+{"type":"addTransaction","payload":{
+ "tipo":"Gasto",
+ "monto":"100000",
+ "categoria":"Transporte",
+ "descripcion":"Uber",
+ "fecha":"2026-05-30"
+}}
+
+El campo "monto" SIEMPRE debe ser un STRING con el valor que el
+usuario indico, sin importar el formato. Ejemplos validos: "100000",
+"100.000", "100,000", "$100000", "100 mil", "100k", "1m". El
+backend tiene una funcion normalizarMonto que limpia cualquier
+formato.
+
+NUNCA emitas una accion addTransaction o editTransaction sin
+el campo "monto" en el payload. Si el usuario no especifico monto,
+NO emitas la accion: responde con texto pidiendole el monto.
+
+Cuando el usuario te pida agregar un gasto o ingreso (ej. "agrega un
+gasto de 100000 de Uber del 30 de mayo", "registrame 5000 en cafe",
+"anota un ingreso de 1.500.000 de sueldo"), DEBES OBLIGATORIAMENTE
+emitir UNA accion addTransaction en el array "actions".
+
+NUNCA respondas que el monto tiene un "formato invalido", que "falta
+el separador de miles", que "necesita comillas", o cualquier otra
+excusa similar. El monto en el payload debe ser un STRING tal como
+lo dio el usuario (puede ser "100000", "100.000", "100,000", "$100000",
+"100 mil", "100k", "1m", etc.). El backend tiene una funcion
+normalizarMonto que limpia y convierte cualquier formato, asi que
+NO es tu responsabilidad pedirle al usuario que reformatee.
+
+FORMATO CORRECTO:
+{"type": "addTransaction", "payload": {
+ "tipo": "Gasto",
+ "monto": "100000",
+ "categoria": "Transporte",
+ "descripcion": "Uber",
+ "fecha": "2026-05-30"
+}}
+
+NUNCA hagas esto (responder con texto en vez de emitir la accion):
+"El gasto no fue agregado porque el formato del monto era invalido..."
+
+Si te falta informacion CRITICA (ej. solo dijeron "agrega 5000" sin
+mas contexto), puedes preguntar amablemente que falta, pero solo
+eso. NUNCA inventes problemas de formato.
+
+Para el campo "fecha", usar formato ISO YYYY-MM-DD. Si el usuario
+dice "hoy", usar la fecha de hoy. Si dice "30 de mayo" sin ano,
+usar el ano en curso.
+
+REGLA CRITICA SOBRE EL CAMPO id (NO IGNORAR):
+Cuando emitas una accion de tipo deleteTransaction, editTransaction,
+deleteProduct, editProduct, deleteSueno o editSueno, el "payload"
+DEBE OBLIGATORIAMENTE incluir el campo "id" con el valor REAL
+tomado del contexto. Un payload vacio {} es INVALIDO y la app NO
+podra ejecutar la accion.
+
+FORMATO CORRECTO (con id):
+{"type": "deleteTransaction", "payload": {"id": "abc123xyz"}}
+
+FORMATO INCORRECTO (sin id, NO HAGAS ESTO):
+{"type": "deleteTransaction", "payload": {}}
+
+Los IDs estan en el contexto que se te entrega arriba (en
+Transacciones recientes, Productos, Suenos). Por ejemplo, si el
+contexto dice:
+ {"id": "tx_abc123", "descripcion": "Netflix", "monto": 12990, ...}
+y el usuario pide eliminar ese gasto, tu accion debe ser:
+ {"type": "deleteTransaction", "payload": {"id": "tx_abc123"}}
+
+NUNCA inventes un id. NUNCA dejes el payload vacio. Si no encuentras
+el id en el contexto, NO emitas la accion: responde con texto
+pidiendo al usuario que sea mas especifico.`;
 
       const ai = getAIClient();
       
@@ -176,7 +269,29 @@ NUNCA emitas un addTransaction o editTransaction sin el campo "monto" en el payl
                   type: Type.OBJECT,
                   properties: {
                     type: { type: Type.STRING },
-                    payload: { type: Type.OBJECT }
+                    payload: {
+                      type: Type.OBJECT,
+                      properties: {
+                        // Comunes
+                        id: { type: Type.STRING },
+                        // addTransaction / editTransaction
+                        tipo: { type: Type.STRING },
+                        monto: { type: Type.STRING },
+                        categoria: { type: Type.STRING },
+                        descripcion: { type: Type.STRING },
+                        formaPago: { type: Type.STRING },
+                        fecha: { type: Type.STRING },
+                        // addProduct / editProduct
+                        banco: { type: Type.STRING },
+                        producto: { type: Type.STRING },
+                        cupo: { type: Type.NUMBER },
+                        utilizado: { type: Type.NUMBER },
+                        alias: { type: Type.STRING },
+                        // addSueno / editSueno
+                        nombre: { type: Type.STRING },
+                        meta: { type: Type.NUMBER }
+                      }
+                    }
                   },
                   required: ["type"]
                 }
