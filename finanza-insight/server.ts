@@ -151,7 +151,10 @@ Tipos de acciones soportadas (puede venir con payload parcial que el UI completa
 - "addSueno", payload: { "nombre": string, "meta": number }
 - "deleteTransaction", payload: { "id": string }
 - "editTransaction", payload: { "id": string, "tipo"?: string, "monto"?: string, "categoria"?: string, "descripcion"?: string }
-IMPORTANTE: el campo "monto" en addTransaction y editTransaction debe ser un STRING con el valor crudo tal como aparece en el documento o como lo dicta el usuario`;
+IMPORTANTE: el campo "monto" en addTransaction y editTransaction debe ser un STRING con el valor crudo tal como aparece en el documento o como lo dicta el usuario.
+REGLA ABSOLUTA Y OBLIGATORIA SOBRE EL CAMPO monto:
+Cuando emitas una accion "addTransaction" o "editTransaction", el campo "monto" dentro del "payload" es OBLIGATORIO. Si omites el campo "monto", la accion sera DESCARTADA automaticamente y el gasto NO se registrara.
+NUNCA emitas un addTransaction o editTransaction sin el campo "monto" en el payload. Si el usuario no indico monto, no emitas la accion y pideselo con texto.`;
 
       const ai = getAIClient();
       
@@ -242,9 +245,11 @@ IMPORTANTE: el campo "monto" en addTransaction y editTransaction debe ser un STR
               const monto = normalizarMonto(montoOriginal);
               if (monto === undefined || isNaN(monto) || monto <= 0 || monto > 999999999999) {
                 console.warn("[chat.ts] Monto omitido:", JSON.stringify({
-                  original: montoOriginal,
+                  original: montoOriginal === undefined ? "UNDEFINED" : montoOriginal,
+                  originalType: typeof montoOriginal,
                   parseado: monto,
-                  descripcion: action.payload.descripcion
+                  payloadCompleto: action.payload,
+                  descripcion: action.payload?.descripcion
                 }));
                 countOmitted++;
                 continue;
@@ -258,7 +263,7 @@ IMPORTANTE: el campo "monto" en addTransaction y editTransaction debe ser un STR
           }
           parsed.actions = filteredActions;
           if (countOmitted > 0) {
-            const omissionMsg = `\n\n(Se procesaron con éxito y agregaron ${countAdded} transacciones; ${countOmitted} fueron omitidas por tener un monto inválido).`;
+            const omissionMsg = `\n\n(Se procesaron con éxito y agregaron ${countAdded} transacciones; ${countOmitted} fueron omitidas. Por favor especifica el monto claramente en tu mensaje - ej. "agrega 100000 de Uber").`;
             parsed.text = (parsed.text || "") + omissionMsg;
           }
           responseText = JSON.stringify(parsed);

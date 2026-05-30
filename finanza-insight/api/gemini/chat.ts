@@ -124,6 +124,40 @@ En el texto de tu respuesta, describe brevemente la accion (ej.
 lo que se va a hacer y pueda confirmar en el modal.
 
 INSTRUCCIONES PARA AGREGAR (importante, no inventar excusas):
+REGLA ABSOLUTA Y OBLIGATORIA SOBRE EL CAMPO monto:
+Cuando emitas una accion "addTransaction" o "editTransaction", el
+campo "monto" dentro del "payload" es OBLIGATORIO. Si omites el
+campo "monto", la accion sera DESCARTADA automaticamente por el
+backend y el gasto NO se registrara, fallando completamente la
+peticion del usuario.
+
+INCORRECTO (sin monto, se descarta):
+{"type":"addTransaction","payload":{
+ "tipo":"Gasto",
+ "categoria":"Transporte",
+ "descripcion":"Uber",
+ "fecha":"2026-05-30"
+}}
+
+CORRECTO (con monto, se procesa):
+{"type":"addTransaction","payload":{
+ "tipo":"Gasto",
+ "monto":"100000",
+ "categoria":"Transporte",
+ "descripcion":"Uber",
+ "fecha":"2026-05-30"
+}}
+
+El campo "monto" SIEMPRE debe ser un STRING con el valor que el
+usuario indico, sin importar el formato. Ejemplos validos: "100000",
+"100.000", "100,000", "$100000", "100 mil", "100k", "1m". El
+backend tiene una funcion normalizarMonto que limpia cualquier
+formato.
+
+NUNCA emitas una accion addTransaction o editTransaction sin
+el campo "monto" en el payload. Si el usuario no especifico monto,
+NO emitas la accion: responde con texto pidiendole el monto.
+
 Cuando el usuario te pida agregar un gasto o ingreso (ej. "agrega un
 gasto de 100000 de Uber del 30 de mayo", "registrame 5000 en cafe",
 "anota un ingreso de 1.500.000 de sueldo"), DEBES OBLIGATORIAMENTE
@@ -318,9 +352,11 @@ pidiendo al usuario que sea mas especifico.`;
             const monto = normalizarMonto(montoOriginal);
             if (monto === undefined || isNaN(monto) || monto <= 0 || monto > 999999999999) {
               console.warn("[chat.ts] Monto omitido:", JSON.stringify({
-                original: montoOriginal,
+                original: montoOriginal === undefined ? "UNDEFINED" : montoOriginal,
+                originalType: typeof montoOriginal,
                 parseado: monto,
-                descripcion: action.payload.descripcion
+                payloadCompleto: action.payload,
+                descripcion: action.payload?.descripcion
               }));
               countOmitted++;
               continue;
@@ -334,7 +370,7 @@ pidiendo al usuario que sea mas especifico.`;
         }
         parsed.actions = filteredActions;
         if (countOmitted > 0) {
-          const omissionMsg = `\n\n(Se procesaron con éxito y agregaron ${countAdded} transacciones; ${countOmitted} fueron omitidas por tener un monto inválido).`;
+          const omissionMsg = `\n\n(Se procesaron con éxito y agregaron ${countAdded} transacciones; ${countOmitted} fueron omitidas. Por favor especifica el monto claramente en tu mensaje - ej. "agrega 100000 de Uber").`;
           parsed.text = (parsed.text || "") + omissionMsg;
         }
         responseText = JSON.stringify(parsed);
