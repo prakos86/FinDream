@@ -79,7 +79,7 @@ Si te escriben desde Chile, responde usando un tono natural, profesional pero am
     });
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: isEn ? `Based on: "${cleanQuery}" specify the recommended financial products.` : `Basado en: "${cleanQuery}", genera las recomendaciones de productos financieros.`,
       config: {
         systemInstruction: systemPrompt,

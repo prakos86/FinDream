@@ -228,7 +228,7 @@ pidiendo al usuario que sea mas especifico.`;
     const contents = [...(history || []), { role: "user", parts: [{ text: cleanMessage }] }];
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents,
       config: {
         systemInstruction: sysInstruction,

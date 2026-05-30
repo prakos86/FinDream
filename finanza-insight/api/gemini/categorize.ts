@@ -54,7 +54,7 @@ Example Output:
     });
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: "Classive this transaction details into a category.",
       config: {
         systemInstruction: systemPrompt,

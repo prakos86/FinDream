@@ -77,7 +77,7 @@ Reglas para la propuesta en formato JSON:
     });
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: isEn ? "Analyze these constraints and propose the dream metadata." : "Analiza los datos fiscales y genera la recomendación para el sueño.",
       config: {
         systemInstruction: systemPrompt,
