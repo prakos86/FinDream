@@ -3605,7 +3605,7 @@ export default function App() {
                 transacciones={transacciones}
                 saveTransacciones={saveTransacciones}
                 saveUserProfileData={saveUserProfileData}
-                setSuenos={setSuenos}
+                saveSuenosList={saveSuenosList}
                 triggerDynamicIsland={triggerDynamicIsland}
                 playTone={playTone}
                 isMuted={isMuted}

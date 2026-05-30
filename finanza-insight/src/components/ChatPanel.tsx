@@ -18,7 +18,7 @@ interface ChatPanelProps {
   transacciones: Transaccion[];
   saveTransacciones: (t: Transaccion[]) => void;
   saveUserProfileData: (p: UserProfile) => void;
-  setSuenos: (s: Sueno[]) => void;
+  saveSuenosList: (s: Sueno[]) => void;
   triggerDynamicIsland: (title: string, msg: string, isPositive: boolean) => void;
   playTone: (type: 'tap' | 'success' | 'delete' | 'voice', isMuted: boolean) => void;
   isMuted: boolean;
@@ -40,7 +40,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   transacciones,
   saveTransacciones,
   saveUserProfileData,
-  setSuenos,
+  saveSuenosList,
   triggerDynamicIsland,
   playTone,
   isMuted,
@@ -133,6 +133,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const executeDangerousActions = (actionsList: any[]) => {
     if (!actionsList || actionsList.length === 0) return;
 
+    console.log("[ChatPanel] executeDangerousActions iniciada con",
+      actionsList.length, "acciones:", JSON.stringify(actionsList));
+    console.log("[ChatPanel] Estado actual: transacciones=",
+      transacciones.length, "productos=",
+      (userProfile.productos || []).length, "suenos=", suenos.length);
+
     const normalizarMontoLocal = (valor: any): number => {
       if (valor === null || valor === undefined) return NaN;
       if (typeof valor === "number") {
@@ -201,82 +207,116 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
     actionsList.forEach(action => {
       if (action.type === 'deleteTransaction' && action.payload?.id) {
-        const idToDelete = action.payload.id;
-        const found = currentTxList.find(t => t.id === idToDelete);
+        const idToDelete = String(action.payload.id).trim();
+        const found = currentTxList.find(t => String(t.id).trim() === idToDelete);
+        console.log("[ChatPanel] deleteTransaction id=", idToDelete, "encontrada=", !!found);
         if (found) {
-          currentTxList = currentTxList.filter(t => t.id !== idToDelete);
+          currentTxList = currentTxList.filter(t => String(t.id).trim() !== idToDelete);
           txChanged = true;
           triggerDynamicIsland(
             selectedLanguage === 'ES' ? 'Transaccion eliminada' : 'Transaction deleted',
             `${found.descripcion || found.categoria} - $${found.monto.toLocaleString()}`,
             true
           );
+        } else {
+          console.warn("[ChatPanel] No se encontro transaccion con id=", idToDelete);
         }
       } else if (action.type === 'editTransaction' && action.payload?.id) {
         const p = action.payload;
-        currentTxList = currentTxList.map(t =>
-          t.id === p.id ? {
-            ...t,
-            ...(p.tipo && { tipo: p.tipo }),
-            ...(p.monto && { monto: normalizarMontoLocal(p.monto) || t.monto }),
-            ...(p.categoria && { categoria: p.categoria }),
-            ...(p.descripcion && { descripcion: p.descripcion }),
-          } : t
-        );
-        txChanged = true;
-        triggerDynamicIsland(
-          selectedLanguage === 'ES' ? 'Transaccion actualizada' : 'Transaction updated',
-          `${p.descripcion || p.categoria || ''}`, true
-        );
+        const idToEdit = String(p.id).trim();
+        const found = currentTxList.find(t => String(t.id).trim() === idToEdit);
+        console.log("[ChatPanel] editTransaction id=", idToEdit, "encontrada=", !!found);
+        if (found) {
+          currentTxList = currentTxList.map(t =>
+            String(t.id).trim() === idToEdit ? {
+              ...t,
+              ...(p.tipo && { tipo: p.tipo }),
+              ...(p.monto !== undefined && { monto: normalizarMontoLocal(p.monto) || t.monto }),
+              ...(p.categoria && { categoria: p.categoria }),
+              ...(p.descripcion && { descripcion: p.descripcion }),
+            } : t
+          );
+          txChanged = true;
+          triggerDynamicIsland(
+            selectedLanguage === 'ES' ? 'Transaccion actualizada' : 'Transaction updated',
+            `${p.descripcion || p.categoria || ''}`, true
+          );
+        } else {
+          console.warn("[ChatPanel] No se encontro transaccion para editar con id=", idToEdit);
+        }
       } else if (action.type === 'deleteProduct' && action.payload?.id) {
-        const idToDelete = action.payload.id;
-        const found = (currentProfile.productos || []).find(prod => prod.id === idToDelete);
-        currentProfile.productos = (currentProfile.productos || []).filter(p => p.id !== idToDelete);
-        profileChanged = true;
-        triggerDynamicIsland(
-          selectedLanguage === 'ES' ? 'Producto eliminado' : 'Product deleted',
-          found ? `${found.banco} - ${found.tipo}` : '', true
-        );
+        const idToDelete = String(action.payload.id).trim();
+        const found = (currentProfile.productos || []).find(prod => String(prod.id).trim() === idToDelete);
+        console.log("[ChatPanel] deleteProduct id=", idToDelete, "encontrada=", !!found);
+        if (found) {
+          currentProfile.productos = (currentProfile.productos || []).filter(p => String(p.id).trim() !== idToDelete);
+          profileChanged = true;
+          triggerDynamicIsland(
+            selectedLanguage === 'ES' ? 'Producto eliminado' : 'Product deleted',
+            `${found.banco} - ${found.tipo}`, true
+          );
+        } else {
+          console.warn("[ChatPanel] No se encontro producto con id=", idToDelete);
+        }
       } else if (action.type === 'editProduct' && action.payload?.id) {
         const p = action.payload;
-        currentProfile.productos = (currentProfile.productos || []).map(prod =>
-          prod.id === p.id ? {
-            ...prod,
-            banco: p.banco !== undefined ? p.banco : prod.banco,
-            tipo: p.producto !== undefined ? p.producto : prod.tipo,
-            alias: p.alias !== undefined ? p.alias : prod.alias,
-            montoTotal: p.cupo !== undefined ? p.cupo : prod.montoTotal,
-            montoUtilizado: p.utilizado !== undefined ? p.utilizado : prod.montoUtilizado
-          } : prod
-        );
-        profileChanged = true;
-        triggerDynamicIsland(
-          selectedLanguage === 'ES' ? 'Producto actualizado' : 'Product updated',
-          p.banco || p.alias || '', true
-        );
+        const idToEdit = String(p.id).trim();
+        const found = (currentProfile.productos || []).find(prod => String(prod.id).trim() === idToEdit);
+        console.log("[ChatPanel] editProduct id=", idToEdit, "encontrada=", !!found);
+        if (found) {
+          currentProfile.productos = (currentProfile.productos || []).map(prod =>
+            String(prod.id).trim() === idToEdit ? {
+              ...prod,
+              ...(p.banco !== undefined && { banco: p.banco }),
+              ...(p.producto !== undefined && { tipo: p.producto }),
+              ...(p.alias !== undefined && { alias: p.alias }),
+              ...(p.cupo !== undefined && { montoTotal: p.cupo }),
+              ...(p.utilizado !== undefined && { montoUtilizado: p.utilizado })
+            } : prod
+          );
+          profileChanged = true;
+          triggerDynamicIsland(
+            selectedLanguage === 'ES' ? 'Producto actualizado' : 'Product updated',
+            p.banco || p.alias || '', true
+          );
+        } else {
+          console.warn("[ChatPanel] No se encontro producto para editar con id=", idToEdit);
+        }
       } else if (action.type === 'deleteSueno' && action.payload?.id) {
-        const idToDelete = action.payload.id;
-        const found = currentSuenos.find(s => s.id === idToDelete);
-        currentSuenos = currentSuenos.filter(s => s.id !== idToDelete);
-        suenosChanged = true;
-        triggerDynamicIsland(
-          selectedLanguage === 'ES' ? 'Sueño eliminado' : 'Dream deleted',
-          found ? found.nombre : '', true
-        );
+        const idToDelete = String(action.payload.id).trim();
+        const found = currentSuenos.find(s => String(s.id).trim() === idToDelete);
+        console.log("[ChatPanel] deleteSueno id=", idToDelete, "encontrada=", !!found);
+        if (found) {
+          currentSuenos = currentSuenos.filter(s => String(s.id).trim() !== idToDelete);
+          suenosChanged = true;
+          triggerDynamicIsland(
+            selectedLanguage === 'ES' ? 'Sueño eliminado' : 'Dream deleted',
+            found.nombre, true
+          );
+        } else {
+          console.warn("[ChatPanel] No se encontro sueño con id=", idToDelete);
+        }
       } else if (action.type === 'editSueno' && action.payload?.id) {
         const p = action.payload;
-        currentSuenos = currentSuenos.map(s =>
-          s.id === p.id ? {
-            ...s,
-            nombre: p.nombre !== undefined ? p.nombre : s.nombre,
-            meta: p.meta !== undefined ? p.meta : s.meta
-          } : s
-        );
-        suenosChanged = true;
-        triggerDynamicIsland(
-          selectedLanguage === 'ES' ? 'Sueño actualizado' : 'Dream updated',
-          p.nombre || '', true
-        );
+        const idToEdit = String(p.id).trim();
+        const found = currentSuenos.find(s => String(s.id).trim() === idToEdit);
+        console.log("[ChatPanel] editSueno id=", idToEdit, "encontrada=", !!found);
+        if (found) {
+          currentSuenos = currentSuenos.map(s =>
+            String(s.id).trim() === idToEdit ? {
+              ...s,
+              ...(p.nombre !== undefined && { nombre: p.nombre }),
+              ...(p.meta !== undefined && { meta: p.meta })
+            } : s
+          );
+          suenosChanged = true;
+          triggerDynamicIsland(
+            selectedLanguage === 'ES' ? 'Sueño actualizado' : 'Dream updated',
+            p.nombre || found.nombre, true
+          );
+        } else {
+          console.warn("[ChatPanel] No se encontro sueño para editar con id=", idToEdit);
+        }
       }
     });
 
@@ -287,8 +327,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       saveUserProfileData(currentProfile);
     }
     if (suenosChanged) {
-      setSuenos(currentSuenos);
+      saveSuenosList(currentSuenos);
     }
+
+    console.log("[ChatPanel] Persistencia: txChanged=", txChanged,
+      "profileChanged=", profileChanged, "suenosChanged=", suenosChanged);
+    console.log("[ChatPanel] Nuevos totales: tx=", currentTxList.length,
+      "productos=", (currentProfile.productos || []).length,
+      "suenos=", currentSuenos.length);
   };
 
   const handleSendChatMessage = async (msgText: string) => {
@@ -523,7 +569,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         saveUserProfileData(currentProfile);
       }
       if (suenosChanged) {
-        setSuenos(currentSuenos);
+        saveSuenosList(currentSuenos);
       }
 
       if (dangerousActions.length > 0) {
