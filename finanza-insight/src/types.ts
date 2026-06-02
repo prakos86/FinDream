@@ -52,12 +52,24 @@ export interface ActivoPortafolio {
   plataforma: string;
 }
 
+export interface Suscripcion {
+  id: string;
+  nombre: string; // ej. "Netflix", "Spotify"
+  monto: number; // monto en la moneda original
+  moneda: "USD" | "CLP" | "COP"; // moneda original
+  frecuencia: "Mensual" | "Anual";
+  fechaInicio?: string; // ISO YYYY-MM-DD opcional
+  categoria?: string; // ej. "Streaming", "Software"
+  icono?: string; // opcional, nombre de Lucide icon
+}
+
 export interface UserProfile {
   nombre: string;
   correo: string;
   celular: string;
   productos: ProductoFinanciero[];
   portafolios?: ActivoPortafolio[];
+  suscripciones?: Suscripcion[];
 }
 
 export interface ChatMessage {

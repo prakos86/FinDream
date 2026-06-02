@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { UserProfile, Transaccion, Sueno, Categoria } from '../types';
+import { UserProfile, Transaccion, Sueno, Categoria, Suscripcion } from '../types';
 
 export const useFirestore = (
   showSplash: boolean,
@@ -14,6 +14,8 @@ export const useFirestore = (
   setCategorias: React.Dispatch<React.SetStateAction<Omit<Categoria, 'monto'>[]>>,
   paymentMethods: string[],
   setPaymentMethods: React.Dispatch<React.SetStateAction<string[]>>,
+  suscripciones: Suscripcion[],
+  setSuscripciones: React.Dispatch<React.SetStateAction<Suscripcion[]>>,
   setNotchAlert: (alert: { text: string; subtext: string; isPositive: boolean } | null) => void,
   selectedLanguage: string,
   selectedCountry: 'CO' | 'CL'
@@ -57,7 +59,8 @@ export const useFirestore = (
     updatedTransacciones?: Transaccion[],
     updatedSuenos?: Sueno[],
     updatedCategorias?: any[],
-    updatedPaymentMethods?: string[]
+    updatedPaymentMethods?: string[],
+    updatedSuscripciones?: Suscripcion[]
   ) => {
     try {
       const { auth } = await import('../firebase');
@@ -84,12 +87,14 @@ export const useFirestore = (
           payload.celular = updatedProfile.celular;
           payload.productos = updatedProfile.productos || [];
           payload.portafolios = updatedProfile.portafolios || [];
+          payload.suscripciones = updatedProfile.suscripciones || [];
         }
         
         if (updatedTransacciones) payload.transacciones = updatedTransacciones;
         if (updatedSuenos) payload.suenos = updatedSuenos;
         if (updatedCategorias) payload.categorias = updatedCategorias;
         if (updatedPaymentMethods) payload.paymentMethods = updatedPaymentMethods;
+        if (updatedSuscripciones) payload.suscripciones = updatedSuscripciones;
         
         setIsSyncing(true);
         await setDoc(userDocRef, JSON.parse(JSON.stringify(payload)), { merge: true });
@@ -108,12 +113,14 @@ export const useFirestore = (
         userPayload.celular = updatedProfile.celular;
         if (updatedProfile.productos) financialPayload.productos = updatedProfile.productos;
         if (updatedProfile.portafolios) financialPayload.portafolios = updatedProfile.portafolios;
+        if (updatedProfile.suscripciones) financialPayload.suscripciones = updatedProfile.suscripciones;
       }
       
       if (updatedTransacciones) financialPayload.transacciones = updatedTransacciones;
       if (updatedSuenos) financialPayload.suenos = updatedSuenos;
       if (updatedCategorias) financialPayload.categorias = updatedCategorias;
       if (updatedPaymentMethods) financialPayload.paymentMethods = updatedPaymentMethods;
+      if (updatedSuscripciones) financialPayload.suscripciones = updatedSuscripciones;
       
       setIsSyncing(true);
       await Promise.all([
@@ -165,7 +172,8 @@ export const useFirestore = (
                 correo: data.correo || (user?.email) || '',
                 celular: data.celular || '',
                 productos: data.productos || [],
-                portafolios: data.portafolios || []
+                portafolios: data.portafolios || [],
+                suscripciones: data.suscripciones || []
               };
               setUserProfile(loadedProfile);
               localStorage.setItem('finanza_user_profile_v2', JSON.stringify(loadedProfile));
@@ -174,6 +182,7 @@ export const useFirestore = (
             if (Array.isArray(data.suenos)) setSuenos(data.suenos);
             if (Array.isArray(data.categorias)) setCategorias(data.categorias);
             if (Array.isArray(data.paymentMethods)) setPaymentMethods(data.paymentMethods);
+            if (Array.isArray(data.suscripciones)) setSuscripciones(data.suscripciones);
             
             setLastSyncedTime(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
             setIsSyncing(false);
@@ -184,7 +193,7 @@ export const useFirestore = (
               correo: userProfile.correo || (user?.email) || '',
               celular: userProfile.celular || '',
               productos: userProfile.productos || [],
-              transacciones, suenos, categorias, paymentMethods,
+              transacciones, suenos, categorias, paymentMethods, suscripciones,
               updatedAt: new Date().toISOString()
             };
             setDoc(userDocRef, payload).catch(e => console.error(e));
@@ -215,6 +224,7 @@ export const useFirestore = (
                      productos: data.productos || [],
                      portafolios: data.portafolios || [],
                      paymentMethods: data.paymentMethods || [],
+                     suscripciones: data.suscripciones || [],
                      updatedAt: new Date().toISOString()
                   }, { merge: false });
                }
@@ -239,7 +249,8 @@ export const useFirestore = (
               correo: userData.correo || (user?.email) || '',
               celular: userData.celular || '',
               productos: financialData.productos || [],
-              portafolios: financialData.portafolios || []
+              portafolios: financialData.portafolios || [],
+              suscripciones: financialData.suscripciones || []
             };
             setUserProfile(loadedProfile);
             localStorage.setItem(`finanza_user_profile_v2_${selectedCountry}`, JSON.stringify(loadedProfile));
@@ -248,6 +259,7 @@ export const useFirestore = (
           if (Array.isArray(financialData.suenos)) setSuenos(financialData.suenos);
           if (Array.isArray(financialData.categorias)) setCategorias(financialData.categorias);
           if (Array.isArray(financialData.paymentMethods)) setPaymentMethods(financialData.paymentMethods);
+          if (Array.isArray(financialData.suscripciones)) setSuscripciones(financialData.suscripciones);
           
           setLastSyncedTime(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
           setIsSyncing(false);
@@ -258,6 +270,7 @@ export const useFirestore = (
             portafolios: selectedCountry === 'CO' ? (userProfile.portafolios || []) : [],
             transacciones: selectedCountry === 'CO' ? transacciones : [],
             suenos: selectedCountry === 'CO' ? suenos : [],
+            suscripciones: selectedCountry === 'CO' ? suscripciones : [],
             categorias: selectedCountry === 'CO' ? categorias : [
               { nombre: 'Vivienda', icon: 'Home', color: '#8B5A2B' },
               { nombre: 'Transporte', icon: 'Car', color: '#EF4444' },

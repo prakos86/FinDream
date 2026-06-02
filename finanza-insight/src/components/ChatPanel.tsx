@@ -421,10 +421,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       let responseText = data.text;
       let actions: any[] = [];
       try {
-        const parsed = JSON.parse(data.text);
+        let cleaned = data.text.trim();
+        if (cleaned.startsWith("```")) {
+          cleaned = cleaned.replace(/^```(json)?\s*/i, "");
+        }
+        if (cleaned.endsWith("```")) {
+          cleaned = cleaned.replace(/\s*```$/, "");
+        }
+        cleaned = cleaned.trim();
+        const parsed = JSON.parse(cleaned);
         if (parsed.text) responseText = parsed.text;
         if (parsed.actions && Array.isArray(parsed.actions)) actions = parsed.actions;
-      } catch (e) {}
+      } catch (e) {
+        console.warn("[ChatPanel] Parse error:", e);
+      }
 
       const modelMsg: ChatMessage = {
         id: `chat-${Date.now()}-ai`,

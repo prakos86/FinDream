@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react'; 
+import React, { useState, useEffect, useRef, useMemo } from 'react'; 
 import { auth, setCachedAccessToken } from './firebase';
 import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged } from 'firebase/auth';
 import { 
@@ -55,7 +55,8 @@ import {
   Heart,
   Scissors,
   Briefcase,
-  Upload
+  Upload,
+  Repeat
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
@@ -126,13 +127,15 @@ export const normalizarMonto = (valor: any): number => {
   if (esNegativo) n = -Math.abs(n);
   return n;
 };
-import { Categoria, TipoMovimiento, Transaccion, FiltroTiempo, Sueno, UserProfile, ProductoFinanciero, ChatMessage } from './types';
+import { Categoria, TipoMovimiento, Transaccion, FiltroTiempo, Sueno, UserProfile, ProductoFinanciero, ChatMessage, Suscripcion } from './types';
 import { useFirestore } from './hooks/useFirestore';
 import { useGoogleSheets } from './hooks/useGoogleSheets';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
+import { useExchangeRate } from './hooks/useExchangeRate';
 import { DreamComplianceChart } from './components/DreamComplianceChart';
 import { ChatPanel } from './components/ChatPanel';
 import { TransactionForm } from './components/TransactionForm';
+import { SuscripcionesPanel } from './components/SuscripcionesPanel';
 import { SplashIntro } from './components/SplashIntro';
 import { FinDreamLogo } from './components/FinDreamLogo';
 import { ProfileModal } from './components/ProfileModal';
@@ -208,6 +211,7 @@ const TRANSLATIONS = {
     chat_initial_greeting: "¡Hola! Soy **Prako**, tu asesor financiero personal de FinDream. Puedo analizar tus deudas, ingresos y tu meta de ahorro. ¿En qué puedo ayudarte hoy?",
     tab_productos: "Producto",
     tab_portafolio: "Portafolio",
+    tab_suscripciones: "Suscripciones",
     productos_actuales: "Mis Productos",
     recomendaciones_ai: "Recomendaciones AI",
     sincronizado_ai: "Sincronizado automáticamente con tus gastos",
@@ -284,6 +288,7 @@ const TRANSLATIONS = {
     chat_initial_greeting: "Hello! I am **Prako**, your personal financial assistant from FinDream. I can analyze your debts, income, and your savings goal. How can I assist you today?",
     tab_productos: "Product",
     tab_portafolio: "Portfolio",
+    tab_suscripciones: "Subscriptions",
     productos_actuales: "My Products",
     recomendaciones_ai: "AI Recommendations",
     sincronizado_ai: "Automatically synced with your expenses",
@@ -905,6 +910,8 @@ export default function App() {
   // Enforce country configuration only for admin
   const MULTIPAIS_HABILITADO = true;
   const effectiveCountry = selectedCountry;
+  const currencySymbol = '$';
+  const monedaPais = effectiveCountry === 'CL' ? 'CLP' : 'COP';
   
   const activeBanks = effectiveCountry === 'CL' ? CHILEAN_BANKS : COLOMBIAN_BANKS;
   const activeProducts = effectiveCountry === 'CL' ? PRODUCT_TAB_DEBTS_ONLY_CL : PRODUCT_TAB_DEBTS_ONLY_CO;
@@ -937,7 +944,7 @@ export default function App() {
   };
 
   // Navigation tabs state
-  const [activeTab, setActiveTab] = useState<'finance' | 'cloud' | 'productos' | 'portafolios' | 'insights'>('finance');
+  const [activeTab, setActiveTab] = useState<'finance' | 'cloud' | 'productos' | 'portafolios' | 'insights' | 'suscripciones'>('finance');
   
   // Portafolio state
   const [nuevoPortafolio, setNuevoPortafolio] = useState({ nombre: '', valor: '', plataforma: '' });
@@ -1396,6 +1403,21 @@ export default function App() {
   // Speech Recognition hook states
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
 
+  // Suscripciones state and persistence handler
+  const [suscripciones, setSuscripciones] = useState<Suscripcion[]>([]);
+  const saveSuscripcionesList = (updated: Suscripcion[]) => {
+    setSuscripciones(updated);
+    pushToFirestore(undefined, undefined, undefined, undefined, undefined, updated);
+  };
+
+  const { rates, loading: exchangeLoading, convertir } = useExchangeRate();
+  const totalSuscripcionesMes = useMemo(() => {
+    return (suscripciones || []).reduce((sum, s) => {
+      const convertedMonto = convertir(s.monto, s.moneda, effectiveCountry === 'CL' ? 'CLP' : 'COP');
+      return sum + (s.frecuencia === "Anual" ? convertedMonto / 12 : convertedMonto);
+    }, 0);
+  }, [suscripciones, convertir, effectiveCountry]);
+
   const { isSyncing, lastSyncedTime, pushToFirestore, isLocalMode } = useFirestore(
     showSplash,
     userProfile, setUserProfile,
@@ -1403,6 +1425,7 @@ export default function App() {
     suenos, setSuenos,
     categorias, setCategorias,
     paymentMethods, setPaymentMethods,
+    suscripciones, setSuscripciones,
     setNotchAlert,
     selectedLanguage,
     effectiveCountry
@@ -2564,6 +2587,48 @@ export default function App() {
           </div>
         </div>
 
+        {/* --- DYNAMIC RECURRING SUBSCRIPTIONS (Cambio 6) --- */}
+        {suscripciones.length > 0 && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.03)] mt-2">
+            <div className="flex items-center justify-between mb-3 text-left">
+              <h3 className="text-xs font-black text-slate-800 tracking-wider block uppercase flex items-center gap-1.5">
+                <Repeat className="w-4 h-4 text-rose-500 stroke-[2.5]" />
+                {selectedLanguage === 'ES' ? 'Gastos recurrentes estimados' : 'Estimated Recurring Expenses'}
+              </h3>
+              <span className="text-sm font-black text-rose-600">
+                - {currencySymbol}{totalSuscripcionesMes.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+              </span>
+            </div>
+            <ul className="space-y-1.5 text-xs text-slate-600 text-left">
+              {suscripciones.map(s => (
+                <li key={s.id} className="flex justify-between items-center border-b border-gray-55 pb-1 last:border-0 last:pb-0">
+                  <span className="font-semibold text-slate-705">{s.nombre}</span>
+                  <span className="font-bold text-slate-900">
+                    {currencySymbol}
+                    {convertir(
+                      s.frecuencia === "Anual" ? s.monto / 12 : s.monto,
+                      s.moneda,
+                      monedaPais
+                    ).toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      {' '}/ {s.frecuencia === 'Anual' ? (selectedLanguage === 'ES' ? 'Mes (Anual)' : 'Month (Annual)') : (selectedLanguage === 'ES' ? 'Mes' : 'Month')}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="border-t border-dashed border-slate-200 mt-3 pt-3 flex justify-between items-center text-left">
+              <span className="text-xs font-bold text-slate-500">
+                {selectedLanguage === 'ES' ? 'Total estimado disponible' : 'Total estimated available'}
+              </span>
+              <span className={`text-sm font-black ${((totalActivos - totalPasivos) - totalSuscripcionesMes) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                {hideBalances ? "******" : `${currencySymbol}${((totalActivos - totalPasivos) - totalSuscripcionesMes).toLocaleString('es-ES', { minimumFractionDigits: 0 })}`}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* --- RECENT TRANSACTIONS LOG (Highly polished list, swipeable deletion) --- */}
         <div className="space-y-3 pt-2">
           <div className="flex flex-col gap-3">
@@ -3649,6 +3714,13 @@ export default function App() {
               </div>
             )}
           </div>
+        ) : activeTab === 'suscripciones' ? (
+          <SuscripcionesPanel
+            suscripciones={suscripciones}
+            saveSuscripcionesList={saveSuscripcionesList}
+            selectedCountry={effectiveCountry}
+            selectedLanguage={selectedLanguage}
+          />
         ) : null}
       </div>
 
@@ -3715,6 +3787,18 @@ export default function App() {
           <Briefcase className="w-5.5 h-5.5 stroke-[2.5px]" />
           <span className="text-[10px] font-black mt-1 uppercase tracking-tight">
             {t('tab_portafolio')}
+          </span>
+        </button>
+
+        {/* Tab 5: Suscripciones */}
+        <button
+          id="tab-btn-suscripciones"
+          onClick={() => { handleTap(); setActiveTab('suscripciones'); document.getElementById('main-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          className={`flex-1 flex flex-col items-center justify-center py-1 transition-all cursor-pointer ${activeTab === 'suscripciones' ? 'text-[#00897B]' : 'text-slate-400'}`}
+        >
+          <Repeat className="w-5.5 h-5.5 stroke-[2.5px]" />
+          <span className="text-[10px] font-black mt-1 uppercase tracking-tight">
+            {t('tab_suscripciones')}
           </span>
         </button>
 

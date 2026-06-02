@@ -304,9 +304,20 @@ pidiendo al usuario que sea mas especifico.`;
 
       let responseText = response.text || "{}";
       try {
-        const parsed = JSON.parse(responseText);
+        // Safe JSON parsing with markdown code fence cleaning
+        let cleanedJSONString = responseText.trim();
+        if (cleanedJSONString.startsWith("```")) {
+          cleanedJSONString = cleanedJSONString.replace(/^```(json)?\s*/i, "");
+        }
+        if (cleanedJSONString.endsWith("```")) {
+          cleanedJSONString = cleanedJSONString.replace(/\s*```$/, "");
+        }
+        cleanedJSONString = cleanedJSONString.trim();
+
+        const parsed = JSON.parse(cleanedJSONString);
         let countAdded = 0;
         let countOmitted = 0;
+        
         const normalizarMonto = (valor: any): number => {
           if (valor === null || valor === undefined) return NaN;
           if (typeof valor === "number") {
@@ -318,10 +329,21 @@ pidiendo al usuario que sea mas especifico.`;
           }
           let raw = valor.trim();
           if (!raw) return NaN;
+
+          const lowercase = raw.toLowerCase();
+          // Detect multipliers
+          let multiplier = 1;
+          if (lowercase.includes('mill') || lowercase.includes('mm') || (lowercase.includes('m') && !lowercase.includes('mil'))) {
+            multiplier = 1000000;
+          } else if (lowercase.includes('k') || lowercase.includes('mil')) {
+            multiplier = 1000;
+          }
+
           const esNegativo = /^\(.*\)$/.test(raw) || /^-/.test(raw);
           // quita TODO menos digitos, punto y coma
           let s = raw.replace(/[^0-9.,]/g, "");
           if (!s) return NaN;
+          
           if (s.includes(".") && s.includes(",")) {
             if (s.lastIndexOf(",") > s.lastIndexOf(".")) {
               s = s.replace(/\./g, "").replace(",", ".");
@@ -347,7 +369,7 @@ pidiendo al usuario que sea mas especifico.`;
             if (soloDigitos) n = parseInt(soloDigitos, 10);
           }
           if (isNaN(n)) return NaN;
-          n = Math.round(n);
+          n = Math.round(n * multiplier);
           if (esNegativo) n = -Math.abs(n);
           return n;
         };
