@@ -783,6 +783,16 @@ const renderCategoriaIcon = (iconName: string, color: string, className = "w-5 h
   }
 };
 
+// Definicion de todas las pestanas con su config
+const ALL_TABS = [
+  { id: "finance",       label: "tab_resumen",       icon: "Database",   tabKey: "finance" },
+  { id: "cloud",         label: "tab_sueno",         icon: "Cloud",      tabKey: "cloud" },
+  { id: "productos",     label: "tab_productos",     icon: "CreditCard", tabKey: "productos" },
+  { id: "portafolios",   label: "tab_portafolio",    icon: "Briefcase",  tabKey: "portafolios" },
+  { id: "suscripciones", label: "tab_suscripciones", icon: "Repeat",     tabKey: "suscripciones" },
+  { id: "insights",      label: "tab_insights",      icon: "Sparkles",   tabKey: "insights" },
+];
+
 export default function App() {
   // Customizable categories state loaded from localStorage with premium defaults
   const [categorias, setCategorias] = useState<Omit<Categoria, 'monto'>[]>([
@@ -946,6 +956,82 @@ export default function App() {
   // Navigation tabs state
   const [activeTab, setActiveTab] = useState<'finance' | 'cloud' | 'productos' | 'portafolios' | 'insights' | 'suscripciones'>('finance');
   
+  // Estado del orden, persistido en localStorage
+  const [tabOrder, setTabOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("findream_tab_order_v1");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Asegurar que no falten tabs nuevas
+        const allIds = ALL_TABS.map(t => t.id);
+        const missing = allIds.filter(id => !parsed.includes(id));
+        return [...parsed, ...missing];
+      }
+    } catch (e) {}
+    return ALL_TABS.map(t => t.id);
+  });
+
+  const [draggingTab, setDraggingTab] = useState<string | null>(null);
+  const [dragOverTab, setDragOverTab] = useState<string | null>(null);
+  const [isReorderMode, setIsReorderMode] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleTabLongPress = (tabId: string) => {
+    longPressTimer.current = setTimeout(() => {
+      setIsReorderMode(true);
+      setDraggingTab(tabId);
+      // Vibrar si el dispositivo lo soporta
+      if (navigator.vibrate) navigator.vibrate(40);
+    }, 500); // 500ms = tap largo
+  };
+
+  const handleTabPressEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handleDragOver = (tabId: string) => {
+    if (!draggingTab || draggingTab === tabId) return;
+    setDragOverTab(tabId);
+    // Reordenar en tiempo real
+    setTabOrder(prev => {
+      const newOrder = [...prev];
+      const fromIdx = newOrder.indexOf(draggingTab);
+      const toIdx = newOrder.indexOf(tabId);
+      newOrder.splice(fromIdx, 1);
+      newOrder.splice(toIdx, 0, draggingTab);
+      return newOrder;
+    });
+  };
+
+  const handleDragEnd = () => {
+    setDraggingTab(null);
+    setDragOverTab(null);
+    setIsReorderMode(false);
+    // Guardar en localStorage
+    localStorage.setItem("findream_tab_order_v1", JSON.stringify(tabOrder));
+  };
+  
+  useEffect(() => {
+    const activeBtn = document.getElementById(`tab-btn-${
+      activeTab === "finance" ? "finance" :
+      activeTab === "cloud" ? "cloud" :
+      activeTab === "productos" ? "productos" :
+      activeTab === "portafolios" ? "portafolio" :
+      activeTab === "suscripciones" ? "suscripciones" :
+      "insights"
+    }`);
+    if (activeBtn) {
+      activeBtn.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center"
+      });
+    }
+  }, [activeTab]);
+
   // Portafolio state
   const [nuevoPortafolio, setNuevoPortafolio] = useState({ nombre: '', valor: '', plataforma: '' });
   const [activeProductSubTab, setActiveProductSubTab] = useState<'actuales' | 'recomendaciones'>('actuales');
@@ -3741,78 +3827,67 @@ export default function App() {
         </button>
       </div>
 
-      <div className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 flex items-center justify-between z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] px-4">
-        {/* Leftmost Tab: Registros de Ingresos y Egresos */}
-        <button
-          id="tab-btn-finance"
-          onClick={() => { handleTap(); setActiveTab('finance'); document.getElementById('main-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          className={`flex-1 flex flex-col items-center justify-center py-1 transition-all cursor-pointer ${activeTab === 'finance' ? 'text-[#00897B]' : 'text-slate-400'}`}
-        >
-          <Database className="w-5.5 h-5.5 stroke-[2.5px]" />
-          <span className="text-[10px] font-black mt-1 uppercase tracking-tight">
-            {t('tab_resumen')}
+      {isReorderMode && (
+        <div className="absolute bottom-[4rem] inset-x-0 flex justify-center z-50 pb-1 pointer-events-none">
+          <span className="bg-slate-800/90 text-white text-xs px-3 py-1 rounded-full shadow-md animate-bounce">
+            {selectedLanguage === "ES"
+              ? "Arrastra para reordenar"
+              : "Drag to reorder"}
           </span>
-        </button>
+        </div>
+      )}
 
-        {/* Tab 2: Mi Sueño */}
-        <button
-          id="tab-btn-cloud"
-          onClick={() => { handleTap(); setActiveTab('cloud'); document.getElementById('main-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          className={`flex-1 flex flex-col items-center justify-center py-1 transition-all cursor-pointer ${activeTab === 'cloud' ? 'text-[#00897B]' : 'text-slate-400'}`}
-        >
-          <Cloud className="w-5.5 h-5.5 stroke-[2.5px]" />
-          <span className="text-[10px] font-black mt-1 uppercase tracking-tight">
-            {t('tab_sueno')}
-          </span>
-        </button>
-
-        {/* Tab 3: Productos */}
-        <button
-          id="tab-btn-productos"
-          onClick={() => { handleTap(); setActiveTab('productos'); document.getElementById('main-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          className={`flex-1 flex flex-col items-center justify-center py-1 transition-all cursor-pointer ${activeTab === 'productos' ? 'text-[#00897B]' : 'text-slate-400'}`}
-        >
-          <CreditCard className="w-5.5 h-5.5 stroke-[2.5px]" />
-          <span className="text-[10px] font-black mt-1 uppercase tracking-tight">
-            {t('tab_productos')}
-          </span>
-        </button>
-
-        {/* Tab 4: Portafolio */}
-        <button
-          id="tab-btn-portafolio"
-          onClick={() => { handleTap(); setActiveTab('portafolios'); document.getElementById('main-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          className={`flex-1 flex flex-col items-center justify-center py-1 transition-all cursor-pointer ${activeTab === 'portafolios' ? 'text-[#00897B]' : 'text-slate-400'}`}
-        >
-          <Briefcase className="w-5.5 h-5.5 stroke-[2.5px]" />
-          <span className="text-[10px] font-black mt-1 uppercase tracking-tight">
-            {t('tab_portafolio')}
-          </span>
-        </button>
-
-        {/* Tab 5: Suscripciones */}
-        <button
-          id="tab-btn-suscripciones"
-          onClick={() => { handleTap(); setActiveTab('suscripciones'); document.getElementById('main-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          className={`flex-1 flex flex-col items-center justify-center py-1 transition-all cursor-pointer ${activeTab === 'suscripciones' ? 'text-[#00897B]' : 'text-slate-400'}`}
-        >
-          <Repeat className="w-5.5 h-5.5 stroke-[2.5px]" />
-          <span className="text-[10px] font-black mt-1 uppercase tracking-tight">
-            {t('tab_suscripciones')}
-          </span>
-        </button>
-
-        {/* Rightmost Tab: AI Insights Chatbot */}
-        <button
-          id="tab-btn-insights"
-          onClick={() => { handleTap(); setActiveTab('insights'); document.getElementById('main-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          className={`flex-1 flex flex-col items-center justify-center py-1 transition-all cursor-pointer ${activeTab === 'insights' ? 'text-[#00897B]' : 'text-slate-400'}`}
-        >
-          <Sparkles className="w-5.5 h-5.5 stroke-[2.5px] animate-pulse" />
-          <span className="text-[10px] font-black mt-1 uppercase tracking-tight">
-            {t('tab_insights')}
-          </span>
-        </button>
+      <div id="bottom-nav-scroll" style={{ WebkitOverflowScrolling: "touch", overflowX: "scroll" }} className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 flex items-center justify-start z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] px-2 no-scrollbar scroll-smooth">
+        {tabOrder.map(tabId => {
+          const tab = ALL_TABS.find(t => t.id === tabId);
+          if (!tab) return null;
+          const isActive = activeTab === tab.tabKey;
+          const isDragging = draggingTab === tabId;
+          const isDragOver = dragOverTab === tabId;
+          return (
+            <button
+              key={tabId}
+              id={`tab-btn-${tabId}`}
+              onMouseDown={() => handleTabLongPress(tabId)}
+              onTouchStart={() => handleTabLongPress(tabId)}
+              onMouseUp={handleTabPressEnd}
+              onTouchEnd={() => {
+                handleTabPressEnd();
+                if (!isReorderMode) {
+                  handleTap();
+                  setActiveTab(tab.tabKey as any);
+                  document.getElementById("main-scroll-container")?.scrollTo({ top: 0, behavior: "smooth" });
+                }
+                handleDragEnd();
+              }}
+              onMouseEnter={() => isReorderMode && handleDragOver(tabId)}
+              onClick={() => {
+                if (!isReorderMode) {
+                  handleTap();
+                  setActiveTab(tab.tabKey as any);
+                  document.getElementById("main-scroll-container")?.scrollTo({ top: 0, behavior: "smooth" });
+                }
+              }}
+              className={`shrink-0 w-[4.5rem] flex flex-col items-center justify-center py-1 transition-all cursor-pointer relative select-none ${isActive ? "text-[#00897B]" : "text-slate-400"} ${isDragging ? "opacity-50 scale-95" : ""} ${isDragOver ? "scale-105" : ""} ${isReorderMode ? "cursor-grab" : ""}`}
+            >
+              {tab.icon === "Database" && <Database className="w-5.5 h-5.5 stroke-[2.5px]" />}
+              {tab.icon === "Cloud" && <Cloud className="w-5.5 h-5.5 stroke-[2.5px]" />}
+              {tab.icon === "CreditCard" && <CreditCard className="w-5.5 h-5.5 stroke-[2.5px]" />}
+              {tab.icon === "Briefcase" && <Briefcase className="w-5.5 h-5.5 stroke-[2.5px]" />}
+              {tab.icon === "Repeat" && <Repeat className="w-5.5 h-5.5 stroke-[2.5px]" />}
+              {tab.icon === "Sparkles" && <Sparkles className="w-5.5 h-5.5 stroke-[2.5px] animate-pulse" />}
+              <span className="text-[10px] font-black mt-1 uppercase tracking-tight">
+                {t(tab.label as any)}
+              </span>
+              {isReorderMode && (
+                <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-teal-500 animate-ping" />
+              )}
+            </button>
+          );
+        })}
+        
+        {/* Fade derecho que insinua mas pestanas */}
+        <div className="pointer-events-none sticky right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/95 to-transparent z-40 shrink-0" />
       </div>
 
       {/* --- ADDING DIALOG/BOTTOM SHEET (Aesthetic Apple iOS-style drawer modal bottom sheet) --- */}
