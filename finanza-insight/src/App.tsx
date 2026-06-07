@@ -3868,7 +3868,7 @@ export default function App() {
                   document.getElementById("main-scroll-container")?.scrollTo({ top: 0, behavior: "smooth" });
                 }
               }}
-              className={`shrink-0 w-[20vw] flex flex-col items-center justify-center py-1 transition-all cursor-pointer relative select-none ${isActive ? "text-[#00897B]" : "text-slate-400"} ${isDragging ? "opacity-50 scale-95" : ""} ${isDragOver ? "scale-105" : ""} ${isReorderMode ? "cursor-grab" : ""}`}
+              className={`shrink-0 w-16 flex flex-col items-center justify-center py-1 transition-all cursor-pointer relative select-none ${isActive ? "text-[#00897B]" : "text-slate-400"} ${isDragging ? "opacity-50 scale-95" : ""} ${isDragOver ? "scale-105" : ""} ${isReorderMode ? "cursor-grab" : ""}`}
             >
               {tab.icon === "Database" && <Database className="w-5.5 h-5.5 stroke-[2.5px]" />}
               {tab.icon === "Cloud" && <Cloud className="w-5.5 h-5.5 stroke-[2.5px]" />}

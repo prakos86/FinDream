@@ -10,7 +10,7 @@ import {
   AlertCircle, 
   Edit2, 
   Tag, 
-
+  Calendar,
   Globe,
   PlusCircle,
   HelpCircle
@@ -133,6 +133,17 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
     setShowModal(false);
   };
 
+  // Auto-assign nice color accent per major subscription or category
+  const getSubBadgeColor = (name: string, cat?: string) => {
+    const text = (name + (cat || '')).toLowerCase();
+    if (text.includes('netflix') || text.includes('video') || text.includes('hbo') || text.includes('prime')) return 'border-red-200 bg-red-50 text-red-700';
+    if (text.includes('spotify') || text.includes('music') || text.includes('apple') || text.includes('youtube')) return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    if (text.includes('office') || text.includes('microsoft') || text.includes('work') || text.includes('notion')) return 'border-blue-200 bg-blue-50 text-blue-700';
+    if (text.includes('cloud') || text.includes('icloud') || text.includes('drive') || text.includes('dropbox') || text.includes('storage')) return 'border-sky-200 bg-sky-50 text-sky-700';
+    if (text.includes('gym') || text.includes('health') || text.includes('fit')) return 'border-rose-200 bg-rose-50 text-rose-700';
+    return 'border-gray-200 bg-gray-50 text-gray-700';
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 pb-32">
       {/* Header con total mensual */}
@@ -181,6 +192,7 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
         ) : (
           suscripciones.map(s => {
             const hasConversion = s.moneda !== monedaPais;
+            const badgeStyle = getSubBadgeColor(s.nombre, s.categoria);
             return (
               <div 
                 key={s.id} 
@@ -189,12 +201,26 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="font-bold text-slate-800 truncate">{s.nombre}</p>
+                    {s.categoria && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${badgeStyle}`}>
+                        {s.categoria}
+                      </span>
+                    )}
                   </div>
                   
                   <p className="text-xs text-slate-500 mt-1 font-medium flex items-center gap-1 flex-wrap">
                     <span className="text-slate-800 font-bold">{s.moneda} {s.monto.toLocaleString()}</span>
                     <span className="text-slate-400">/</span>
                     <span className="capitalize">{s.frecuencia === "Anual" ? t.yearly : t.monthly}</span>
+                    {s.fechaInicio && (
+                      <>
+                        <span className="text-slate-400">•</span>
+                        <span className="flex items-center gap-0.5 text-slate-400 text-[10px]">
+                          <Calendar className="w-3 h-3" />
+                          {s.fechaInicio}
+                        </span>
+                      </>
+                    )}
                   </p>
                   
                   {hasConversion && (
