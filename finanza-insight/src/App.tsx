@@ -3848,6 +3848,7 @@ export default function App() {
             <button
               key={tabId}
               id={`tab-btn-${tabId}`}
+              style={{ width: "calc(100vw / 5)", flexShrink: 0 }}
               onMouseDown={() => handleTabLongPress(tabId)}
               onTouchStart={() => handleTabLongPress(tabId)}
               onMouseUp={handleTabPressEnd}
@@ -3868,7 +3869,7 @@ export default function App() {
                   document.getElementById("main-scroll-container")?.scrollTo({ top: 0, behavior: "smooth" });
                 }
               }}
-              className={`shrink-0 w-[19vw] flex flex-col items-center justify-center py-1 transition-all cursor-pointer relative select-none ${isActive ? "text-[#00897B]" : "text-slate-400"} ${isDragging ? "opacity-50 scale-95" : ""} ${isDragOver ? "scale-105" : ""} ${isReorderMode ? "cursor-grab" : ""}`}
+              className={`flex flex-col items-center justify-center py-1 transition-all cursor-pointer relative select-none ${isActive ? "text-[#00897B]" : "text-slate-400"} ${isDragging ? "opacity-50 scale-95" : ""} ${isDragOver ? "scale-105" : ""} ${isReorderMode ? "cursor-grab" : ""}`}
             >
               {tab.icon === "Database" && <Database className="w-5.5 h-5.5 stroke-[2.5px]" />}
               {tab.icon === "Cloud" && <Cloud className="w-5.5 h-5.5 stroke-[2.5px]" />}
