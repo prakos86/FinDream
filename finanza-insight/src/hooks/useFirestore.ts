@@ -111,16 +111,16 @@ export const useFirestore = (
         userPayload.nombre = updatedProfile.nombre;
         userPayload.correo = updatedProfile.correo || (user?.email) || '';
         userPayload.celular = updatedProfile.celular;
+        userPayload.suscripciones = updatedProfile.suscripciones || [];
         if (updatedProfile.productos) financialPayload.productos = updatedProfile.productos;
         if (updatedProfile.portafolios) financialPayload.portafolios = updatedProfile.portafolios;
-        if (updatedProfile.suscripciones) financialPayload.suscripciones = updatedProfile.suscripciones;
       }
       
       if (updatedTransacciones) financialPayload.transacciones = updatedTransacciones;
       if (updatedSuenos) financialPayload.suenos = updatedSuenos;
       if (updatedCategorias) financialPayload.categorias = updatedCategorias;
       if (updatedPaymentMethods) financialPayload.paymentMethods = updatedPaymentMethods;
-      if (updatedSuscripciones) financialPayload.suscripciones = updatedSuscripciones;
+      if (updatedSuscripciones) userPayload.suscripciones = updatedSuscripciones;
       
       setIsSyncing(true);
       await Promise.all([
@@ -250,7 +250,7 @@ export const useFirestore = (
               celular: userData.celular || '',
               productos: financialData.productos || [],
               portafolios: financialData.portafolios || [],
-              suscripciones: financialData.suscripciones || []
+              suscripciones: userData.suscripciones || []
             };
             setUserProfile(loadedProfile);
             localStorage.setItem(`finanza_user_profile_v2_${selectedCountry}`, JSON.stringify(loadedProfile));
@@ -259,7 +259,7 @@ export const useFirestore = (
           if (Array.isArray(financialData.suenos)) setSuenos(financialData.suenos);
           if (Array.isArray(financialData.categorias)) setCategorias(financialData.categorias);
           if (Array.isArray(financialData.paymentMethods)) setPaymentMethods(financialData.paymentMethods);
-          if (Array.isArray(financialData.suscripciones)) setSuscripciones(financialData.suscripciones);
+          if (Array.isArray(userData.suscripciones)) setSuscripciones(userData.suscripciones);
           
           setLastSyncedTime(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
           setIsSyncing(false);
@@ -270,7 +270,6 @@ export const useFirestore = (
             portafolios: selectedCountry === 'CO' ? (userProfile.portafolios || []) : [],
             transacciones: selectedCountry === 'CO' ? transacciones : [],
             suenos: selectedCountry === 'CO' ? suenos : [],
-            suscripciones: selectedCountry === 'CO' ? suscripciones : [],
             categorias: selectedCountry === 'CO' ? categorias : [
               { nombre: 'Vivienda', icon: 'Home', color: '#8B5A2B' },
               { nombre: 'Transporte', icon: 'Car', color: '#EF4444' },
@@ -288,6 +287,7 @@ export const useFirestore = (
             nombre: userProfile.nombre || userData.nombre || (user?.displayName) || 'Invitado',
             correo: userProfile.correo || userData.correo || (user?.email) || '',
             celular: userProfile.celular || userData.celular || '',
+            suscripciones: suscripciones,
             updatedAt: new Date().toISOString()
           };
           
