@@ -23,6 +23,7 @@ export const useFirestore = (
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
   const [isLocalMode, setIsLocalMode] = useState<boolean | null>(null);
+  const [availableCountries, setAvailableCountries] = useState<('CO' | 'CL')[]>([]);
   const syncUnsubscribeRef = useRef<(() => void) | null>(null);
 
   const resolveUserId = (user: any): string | null => {
@@ -159,6 +160,19 @@ export const useFirestore = (
       setIsLocalMode(false);
       const userDocRef = doc(db, 'users', userRefId);
       const esAdmin = Boolean(userProfile?.correo?.toLowerCase().trim() === 'prakos@gmail.com' || (user?.email && user.email.toLowerCase().trim() === 'prakos@gmail.com'));
+
+      try {
+        const [coSnap, clSnap] = await Promise.all([
+          getDoc(doc(db, 'users', userRefId, 'paises', 'CO')),
+          getDoc(doc(db, 'users', userRefId, 'paises', 'CL'))
+        ]);
+        const available: ('CO' | 'CL')[] = [];
+        if (coSnap.exists()) available.push('CO');
+        if (clSnap.exists()) available.push('CL');
+        setAvailableCountries(available);
+      } catch (e) {
+        console.warn("Loading available countries snapshot failed", e);
+      }
 
       if (!esAdmin) {
         if (syncUnsubscribeRef.current) syncUnsubscribeRef.current();
@@ -327,5 +341,5 @@ export const useFirestore = (
     };
   }, [showSplash, selectedCountry]);
 
-  return { isSyncing, lastSyncedTime, pushToFirestore, isLocalMode };
+  return { isSyncing, lastSyncedTime, pushToFirestore, isLocalMode, availableCountries };
 };

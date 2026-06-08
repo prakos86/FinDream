@@ -879,6 +879,7 @@ export default function App() {
   // Country & Language config state
   const [selectedCountry, setSelectedCountry] = useState<'CO' | 'CL'>('CO');
   const [selectedLanguage, setSelectedLanguage] = useState<'ES' | 'EN'>('ES');
+  const [showCountrySelector, setShowCountrySelector] = useState(false);
 
   // AI Chat Messages state (preserved across tabs)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -1510,7 +1511,7 @@ export default function App() {
     }, 0);
   }, [suscripciones, convertir, effectiveCountry]);
 
-  const { isSyncing, lastSyncedTime, pushToFirestore, isLocalMode } = useFirestore(
+  const { isSyncing, lastSyncedTime, pushToFirestore, isLocalMode, availableCountries } = useFirestore(
     showSplash,
     userProfile, setUserProfile,
     transacciones, setTransacciones,
@@ -1522,6 +1523,12 @@ export default function App() {
     selectedLanguage,
     effectiveCountry
   );
+
+  useEffect(() => {
+    if (!showSplash && availableCountries && availableCountries.length > 1) {
+      setShowCountrySelector(true);
+    }
+  }, [availableCountries, showSplash]);
 
   // Handlers
 
@@ -1626,12 +1633,26 @@ export default function App() {
             if (matchedPm) forma = matchedPm;
           }
           
+          const corregirFechaApp = (fVal: string): string => {
+            if (!fVal) return formatLocalYYYYMMDD(new Date());
+            const match = fVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+              const year = parseInt(match[1]);
+              const today = new Date();
+              if (year < today.getFullYear()) {
+                return `${today.getFullYear()}-${match[2]}-${match[3]}`;
+              }
+              return fVal;
+            }
+            return formatLocalYYYYMMDD(new Date());
+          };
+
           const tx: Transaccion = {
             id: Math.random().toString(36).substring(2, 9),
             tipo: data.tipo === 'Ingreso' ? 'Ingreso' : 'Gasto',
             monto: Math.abs(normalizarMonto(data.monto)) || 0,
             categoria: cat,
-            fecha: data.fecha || formatLocalYYYYMMDD(new Date()),
+            fecha: corregirFechaApp(data.fecha || ''),
             descripcion: data.descripcion || `Transacción en ${cat}`,
             formaPago: forma
           };
@@ -4036,6 +4057,7 @@ export default function App() {
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
+              onClick={(e) => e.stopPropagation()}
               transition={{ type: 'spring', damping: 24, stiffness: 220 }}
               className="absolute bottom-0 inset-x-0 bg-white rounded-t-[30px] z-50 p-6 shadow-2xl flex flex-col border-t border-slate-100 max-h-[92%] overflow-y-auto text-left"
             >
@@ -4192,7 +4214,7 @@ export default function App() {
                 {/* CONFIRM ADD BUTTON */}
                 <button
                   type="button"
-                  onClick={handleAddCategory}
+                  onClick={(e) => { e.stopPropagation(); handleAddCategory(); }}
                   className="w-full py-3 bg-gradient-to-r from-teal-600 to-[#312E81] text-white font-black text-xs uppercase tracking-wider rounded-xl hover:opacity-95 shadow-lg active:scale-98 transition flex items-center justify-center gap-1.5 cursor-pointer mt-2"
                 >
                   <PlusCircle className="w-4 h-4" />
@@ -4964,6 +4986,40 @@ export default function App() {
               >
                 Aceptar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCountrySelector && (
+        <div className='fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-6'>
+          <div className='bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl text-center'>
+            <p className='text-3xl mb-2'>🗺️</p>
+            <h2 className='text-lg font-black text-slate-900 mb-1'>
+              {selectedLanguage === 'ES' ? '¿A qué país quieres ir?' : 'Which country?'}
+            </h2>
+            <p className='text-xs text-slate-500 mb-5'>
+              {selectedLanguage === 'ES'
+                ? 'Tienes datos en más de un país'
+                : 'You have data in more than one country'}
+            </p>
+            <div className='flex flex-col gap-3'>
+              {(availableCountries || []).map(country => (
+                <button key={country}
+                  onClick={() => {
+                    setSelectedCountry(country);
+                    setShowCountrySelector(false);
+                  }}
+                  className='w-full py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 bg-slate-50 hover:bg-teal-50 border-2 border-slate-200 hover:border-teal-400 transition-all active:scale-95'
+                >
+                  <span className='text-2xl'>
+                    {country === 'CO' ? '🇨🇴' : '🇨🇱'}
+                  </span>
+                  <span>
+                    {country === 'CO' ? 'Colombia (COP)' : 'Chile (CLP)'}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
         </div>

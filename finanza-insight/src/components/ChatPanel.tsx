@@ -498,6 +498,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
     if (lastMsgWithVideo && lastMsgWithVideo.videoPendingTransacciones) {
       if (isAnswerConfirming()) {
+        const corregirFecha = (fechaVal: string): string => {
+          if (!fechaVal) return new Date().toISOString().split('T')[0];
+          const match = fechaVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
+          if (match) {
+            const year = parseInt(match[1]);
+            const today = new Date();
+            if (year < today.getFullYear()) {
+              return `${today.getFullYear()}-${match[2]}-${match[3]}`;
+            }
+            return fechaVal;
+          }
+          return new Date().toISOString().split('T')[0];
+        };
+
         const actions = lastMsgWithVideo.videoPendingTransacciones.map(t => ({
           type: 'addTransaction',
           payload: {
@@ -505,7 +519,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             monto: t.monto,
             descripcion: t.descripcion,
             categoria: t.categoria || 'Otros',
-            fecha: t.fecha,
+            fecha: corregirFecha(t.fecha || ''),
             banco: t.banco
           }
         }));
