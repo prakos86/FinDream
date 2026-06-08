@@ -158,10 +158,19 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
         <p className="text-3xl font-black mt-2 tracking-tight">
           {currencySymbol} {Math.round(totalMensual).toLocaleString()} <span className="text-base font-normal opacity-80">{monedaPais}</span>
         </p>
-        <p className="text-xs opacity-75 mt-2 flex items-center gap-1.5 font-medium">
-          <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
-          {suscripciones.length} {t.activeSubs}
-        </p>
+        <div className="flex items-center justify-between mt-3">
+          <p className="text-xs opacity-75 flex items-center gap-1.5 font-medium">
+            <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+            {suscripciones.length} {t.activeSubs}
+          </p>
+          <button
+            onClick={handleOpenAdd}
+            className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 active:scale-95 transition-all text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/30"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {isEn ? "Add" : "Agregar"}
+          </button>
+        </div>
       </div>
 
       {exchangeLoading && (
@@ -255,10 +264,10 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
         )}
       </div>
 
-      {/* Boton + flotante para agregar */}
+      {/* Boton + flotante para agregar - subido para no quedar tapado */}
       <button 
         onClick={handleOpenAdd}
-        className="fixed bottom-24 right-4 w-14 h-14 rounded-full bg-teal-600 text-white shadow-xl flex items-center justify-center hover:bg-teal-700 active:scale-95 transition-transform duration-100 z-40 cursor-pointer border border-teal-500"
+        className="fixed bottom-28 right-4 w-14 h-14 rounded-full bg-teal-600 text-white shadow-xl flex items-center justify-center hover:bg-teal-700 active:scale-95 transition-transform duration-100 z-40 cursor-pointer border border-teal-500"
       >
         <Plus className="w-7 h-7" />
       </button>
