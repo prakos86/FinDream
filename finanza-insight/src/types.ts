@@ -78,5 +78,11 @@ export interface ChatMessage {
   text: string;
   timestamp: string; // ISO string
   attachedFileName?: string;
+  videoPendingTransacciones?: Array<{
+    fecha: string;
+    monto: string;
+    descripcion: string;
+    tipo: 'Gasto' | 'Ingreso';
+  }>;
 }
 

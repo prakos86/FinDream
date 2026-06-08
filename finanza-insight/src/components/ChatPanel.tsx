@@ -106,6 +106,60 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const handleChatFileAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const isVideo = file.type.startsWith('video/');
+    if (isVideo) {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = (reader.result as string).split(',')[1];
+        const processingMsg: ChatMessage = {
+          id: Date.now().toString(), sender: 'model',
+          text: 'Analizando video... puede tomar unos segundos.',
+          timestamp: new Date().toISOString()
+        };
+        setChatMessages(prev => [...prev, processingMsg]);
+        try {
+          const resp = await fetch('/api/gemini/extract-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              videoBase64: base64, mimeType: file.type,
+              country: selectedCountry
+            })
+          });
+          const data = await resp.json();
+          const txs = data.transacciones || [];
+          if (txs.length > 0) {
+            const preview = txs.slice(0, 5)
+              .map((t: any) => `- ${t.descripcion}: ${t.monto}`)
+              .join('\n');
+            const confirmMsg: ChatMessage = {
+              id: (Date.now()+1).toString(), sender: 'model',
+              text: `Encontre ${txs.length} transacciones en el video:\n`
+                + preview + '\n\n\u00bfLas agrego todas?',
+              timestamp: new Date().toISOString(),
+              videoPendingTransacciones: txs
+            };
+            setChatMessages(prev =>
+              [...prev.filter(m => m.id !== processingMsg.id), confirmMsg]);
+          } else {
+            setChatMessages(prev => prev.map(m =>
+              m.id === processingMsg.id ? { ...m,
+                text: 'No encontre transacciones en el video. '
+                + 'Intenta con mejor iluminacion o mas cerca.' } : m));
+          }
+        } catch {
+          setChatMessages(prev => prev.map(m =>
+            m.id === processingMsg.id ? { ...m,
+              text: 'Error procesando el video. Intentalo de nuevo.' }
+            : m));
+        }
+      };
+      reader.readAsDataURL(file);
+      if (e.target) e.target.value = '';
+      return;
+    }
+
     setIsProcessingFile(true);
     try {
       let text = '';
@@ -350,6 +404,44 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleSendChatMessage = async (msgText: string) => {
     if (!msgText.trim() || isAIProcessing) return;
+
+    const lowercaseMsg = msgText.toLowerCase().trim();
+    const lastMsgWithVideo = chatMessages.slice().reverse().find(m => m.videoPendingTransacciones && m.videoPendingTransacciones.length > 0);
+    
+    if (lastMsgWithVideo && lastMsgWithVideo.videoPendingTransacciones && ['si', 'sí', 'yes', 'claro', 'por supuesto', 'agrega', 'agregalas', 'agrega todas', 'dale'].includes(lowercaseMsg)) {
+      const actions = lastMsgWithVideo.videoPendingTransacciones.map(t => ({
+        type: 'addTransaction',
+        payload: {
+          tipo: t.tipo,
+          monto: t.monto,
+          descripcion: t.descripcion,
+          categoria: 'Video Extracción',
+          fecha: t.fecha
+        }
+      }));
+      
+      const userMsg: ChatMessage = {
+        id: `chat-${Date.now()}`,
+        sender: 'user',
+        text: msgText,
+        timestamp: new Date().toISOString()
+      };
+      
+      setChatMessages(prev => {
+        const newMsgs = prev.map(m => m.id === lastMsgWithVideo.id ? { ...m, videoPendingTransacciones: undefined } : m);
+        return [...newMsgs, userMsg, {
+          id: `chat-${Date.now()+1}`,
+          sender: 'model',
+          text: `Agregué ${actions.length} transacciones extraídas del video.`,
+          timestamp: new Date().toISOString()
+        }];
+      });
+      
+      // Usa el executeDangerousActions ya provisto para procesar actions de tipo addTransaction
+      executeDangerousActions(actions);
+      setChatInput('');
+      return;
+    }
     
     const tempAttachedFileText = attachedFileText;
     const tempAttachedFileName = attachedFileName;
@@ -894,7 +986,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           <input
             ref={attachInputRef}
             type="file"
-            accept=".pdf,.csv,.xlsx,.xls,.png,.jpg,.jpeg,.webp"
+            accept=".pdf,.csv,.xlsx,.xls,.png,.jpg,.jpeg,.webp,video/*"
             onChange={handleChatFileAttach}
             className="hidden"
           />

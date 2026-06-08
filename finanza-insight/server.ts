@@ -654,6 +654,49 @@ ${textContent ? textContent.substring(0, 50000) : ""}`;
     }
   });
 
+  // API Route for Video Extraction
+  app.post("/api/gemini/extract-video", customRateLimiter(20, 10 * 60 * 1000), async (req, res) => {
+    try {
+      const { videoBase64, mimeType, country } = req.body;
+      if (!videoBase64 || !mimeType) {
+        return res.status(400).json({ error: 'videoBase64 y mimeType requeridos' });
+      }
+      const ai = getAIClient();
+      const moneda = country === 'CL' ? 'Chile CLP' : 'Colombia COP';
+      const prompt =
+        'Analiza este video de movimientos bancarios. '
+        + 'Extrae TODAS las transacciones visibles. '
+        + 'Para cada una: '
+        + 'fecha (YYYY-MM-DD, si no aparece usa hoy), '
+        + 'monto (STRING exacto como aparece en pantalla), '
+        + 'descripcion (comercio o descripcion), '
+        + 'tipo (Gasto o Ingreso). '
+        + 'Pais: ' + moneda + '. El punto es separador de miles. '
+        + 'Ignora pagos a tarjeta, cupos y totales. '
+        + 'Si el mismo movimiento aparece varias veces, registralo una sola vez. '
+        + 'Responde SOLO con JSON valido sin markdown: '
+        + '{ "transacciones": [' 
+        + ' { "fecha":"...","monto":"...","descripcion":"...","tipo":"..."}' 
+        + '] }';
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts: [
+          { inlineData: { data: videoBase64, mimeType } },
+          { text: prompt }
+        ]}]
+      });
+      
+      const raw = (response.text || '')
+        .replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(raw);
+      res.status(200).json(parsed);
+    } catch (err: any) {
+      console.error('[extract-video] Error:', err.message);
+      res.status(500).json({ error: 'Error procesando el video' });
+    }
+  });
+
   // API Route for Auto Transaction Categorization - Rate-limited to 60 requests per 10 minutes per IP
   app.post("/api/gemini/categorize", customRateLimiter(60, 10 * 60 * 1000), async (req, res) => {
     try {
