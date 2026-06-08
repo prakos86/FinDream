@@ -978,6 +978,18 @@ export default function App() {
   });
 
   const [draggingTab, setDraggingTab] = useState<string | null>(null);
+  const navScrollRef = useRef<HTMLDivElement>(null);
+  const [tabBtnWidth, setTabBtnWidth] = useState<number>(78);
+  useEffect(() => {
+    const measure = () => {
+      if (navScrollRef.current) {
+        setTabBtnWidth(Math.floor(navScrollRef.current.offsetWidth / 5));
+      }
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
   const [dragOverTab, setDragOverTab] = useState<string | null>(null);
   const [isReorderMode, setIsReorderMode] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -3843,11 +3855,9 @@ export default function App() {
         </div>
       )}
 
-      <div id="bottom-nav-scroll" style={{ WebkitOverflowScrolling: "touch", overflowX: "scroll" }} className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] no-scrollbar">
-        <div style={{ display: "flex", width: `${Math.floor(window.innerWidth / 5) * tabOrder.length}px`, height: "100%", alignItems: "center" }}>
+      <div ref={navScrollRef} id="bottom-nav-scroll" style={{ WebkitOverflowScrolling: "touch", overflowX: "scroll", whiteSpace: "nowrap", display: "block" }} className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] no-scrollbar">
         {tabOrder.map((tabId, _idx) => {
           const tab = ALL_TABS.find(t => t.id === tabId);
-          const tabBtnWidth = Math.floor(window.innerWidth / 5);
           if (!tab) return null;
           const isActive = activeTab === tab.tabKey;
           const isDragging = draggingTab === tabId;
@@ -3856,7 +3866,7 @@ export default function App() {
             <button
               key={tabId}
               id={`tab-btn-${tabId}`}
-              style={{ width: `${tabBtnWidth}px`, minWidth: `${tabBtnWidth}px`, flexShrink: 0 }}
+              style={{ width: `${tabBtnWidth}px`, minWidth: `${tabBtnWidth}px`, display: "inline-flex", flexDirection: "column", alignItems: "center", justifyContent: "center", verticalAlign: "middle", flexShrink: 0 }}
               onMouseDown={() => handleTabLongPress(tabId)}
               onTouchStart={() => handleTabLongPress(tabId)}
               onMouseUp={handleTabPressEnd}
@@ -3877,7 +3887,7 @@ export default function App() {
                   document.getElementById("main-scroll-container")?.scrollTo({ top: 0, behavior: "smooth" });
                 }
               }}
-              className={`flex flex-col items-center justify-center py-1 transition-all cursor-pointer relative select-none ${isActive ? "text-[#00897B]" : "text-slate-400"} ${isDragging ? "opacity-50 scale-95" : ""} ${isDragOver ? "scale-105" : ""} ${isReorderMode ? "cursor-grab" : ""}`}
+              className={`py-1 transition-all cursor-pointer relative select-none ${isActive ? "text-[#00897B]" : "text-slate-400"} ${isDragging ? "opacity-50 scale-95" : ""} ${isDragOver ? "scale-105" : ""} ${isReorderMode ? "cursor-grab" : ""}`}
             >
               {tab.icon === "Database" && <Database className="w-5.5 h-5.5 stroke-[2.5px]" />}
               {tab.icon === "Cloud" && <Cloud className="w-5.5 h-5.5 stroke-[2.5px]" />}
@@ -3894,7 +3904,6 @@ export default function App() {
             </button>
           );
         })}
-        </div>
       </div>
       
       {/* Fade derecho que insinua mas pestanas */}
