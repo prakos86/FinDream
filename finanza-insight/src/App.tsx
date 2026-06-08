@@ -3843,7 +3843,8 @@ export default function App() {
         </div>
       )}
 
-      <div id="bottom-nav-scroll" style={{ WebkitOverflowScrolling: "touch", overflowX: "scroll" }} className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 flex items-center justify-start z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] px-0 no-scrollbar scroll-smooth">
+      <div id="bottom-nav-scroll" style={{ WebkitOverflowScrolling: "touch", overflowX: "scroll" }} className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] no-scrollbar">
+        <div style={{ display: "flex", width: `${Math.floor(window.innerWidth / 5) * tabOrder.length}px`, height: "100%", alignItems: "center" }}>
         {tabOrder.map((tabId, _idx) => {
           const tab = ALL_TABS.find(t => t.id === tabId);
           const tabBtnWidth = Math.floor(window.innerWidth / 5);
@@ -3893,9 +3894,10 @@ export default function App() {
             </button>
           );
         })}
+        </div>
       </div>
       
-      {/* Fade derecho que insinua mas pestanas (Placed as a sibling outside of the flex layout container to prevent layout squeezing) */}
+      {/* Fade derecho que insinua mas pestanas */}
       <div className="pointer-events-none absolute bottom-0 right-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] w-8 bg-gradient-to-l from-white/95 to-transparent z-40" />
 
       {/* --- ADDING DIALOG/BOTTOM SHEET (Aesthetic Apple iOS-style drawer modal bottom sheet) --- */}
