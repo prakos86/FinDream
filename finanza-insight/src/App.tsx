@@ -880,6 +880,7 @@ export default function App() {
   const [selectedCountry, setSelectedCountry] = useState<'CO' | 'CL'>('CO');
   const [selectedLanguage, setSelectedLanguage] = useState<'ES' | 'EN'>('ES');
   const [showCountrySelector, setShowCountrySelector] = useState(false);
+  const [hasShownCountrySelector, setHasShownCountrySelector] = useState(false);
 
   // AI Chat Messages state (preserved across tabs)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -1525,10 +1526,11 @@ export default function App() {
   );
 
   useEffect(() => {
-    if (!showSplash && availableCountries && availableCountries.length > 1) {
+    if (!showSplash && availableCountries && availableCountries.length > 1 && !hasShownCountrySelector) {
       setShowCountrySelector(true);
+      setHasShownCountrySelector(true);
     }
-  }, [availableCountries, showSplash]);
+  }, [availableCountries, showSplash, hasShownCountrySelector]);
 
   // Handlers
 
@@ -2159,6 +2161,7 @@ export default function App() {
   };
 
   const handleAddCategory = () => {
+    console.log('[Cat] newCatName al confirmar:', newCatName);
     if (!newCatName.trim()) {
       triggerDynamicIsland("Escribe nombre", "Ingresa un nombre para la categoría", false);
       return;
@@ -4132,6 +4135,10 @@ export default function App() {
                     placeholder={selectedLanguage === 'ES' ? 'Ej: Mascotas, Regalos...' : 'Ej: Pets, Gifts...'}
                     value={newCatName}
                     onChange={(e) => setNewCatName(e.target.value)}
+                    onBlur={(e) => {
+                      // Prevenir que el blur resetee el valor
+                      e.preventDefault();
+                    }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
@@ -4214,7 +4221,11 @@ export default function App() {
                 {/* CONFIRM ADD BUTTON */}
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); handleAddCategory(); }}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleAddCategory();
+                  }}
                   className="w-full py-3 bg-gradient-to-r from-teal-600 to-[#312E81] text-white font-black text-xs uppercase tracking-wider rounded-xl hover:opacity-95 shadow-lg active:scale-98 transition flex items-center justify-center gap-1.5 cursor-pointer mt-2"
                 >
                   <PlusCircle className="w-4 h-4" />
@@ -5010,12 +5021,12 @@ export default function App() {
                     setSelectedCountry(country);
                     setShowCountrySelector(false);
                   }}
-                  className='w-full py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-3 bg-slate-50 hover:bg-teal-50 border-2 border-slate-200 hover:border-teal-400 transition-all active:scale-95'
+                  className='w-full py-4 rounded-2xl font-bold text-sm flex items-center gap-4 px-5 bg-slate-50 hover:bg-teal-50 border-2 border-slate-200 hover:border-teal-400 transition-all active:scale-95 text-left'
                 >
-                  <span className='text-2xl'>
+                  <span className='text-3xl leading-none'>
                     {country === 'CO' ? '🇨🇴' : '🇨🇱'}
                   </span>
-                  <span>
+                  <span className='text-slate-900 text-base font-black'>
                     {country === 'CO' ? 'Colombia (COP)' : 'Chile (CLP)'}
                   </span>
                 </button>
