@@ -107,12 +107,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const isVideo = (file.type && file.type.startsWith('video/')) || 
-                    file.name.toLowerCase().endsWith('.mp4') || 
-                    file.name.toLowerCase().endsWith('.mov') || 
-                    file.name.toLowerCase().endsWith('.avi') || 
-                    file.name.toLowerCase().endsWith('.mkv') ||
-                    file.name.toLowerCase().endsWith('.3gp');
+    const isVideo = file.type.startsWith('video/');
     if (isVideo) {
       const reader = new FileReader();
       reader.onload = async () => {
@@ -128,7 +123,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              videoBase64: base64, mimeType: file.type || 'video/mp4',
+              videoBase64: base64, mimeType: file.type,
               country: selectedCountry
             })
           });
