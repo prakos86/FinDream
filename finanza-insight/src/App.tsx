@@ -958,17 +958,23 @@ export default function App() {
   
   // Estado del orden, persistido en localStorage
   const [tabOrder, setTabOrder] = useState<string[]>(() => {
+    const defaultIds = ALL_TABS.map(t => t.id);
     try {
       const saved = localStorage.getItem("findream_tab_order_v1");
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Asegurar que no falten tabs nuevas
-        const allIds = ALL_TABS.map(t => t.id);
-        const missing = allIds.filter(id => !parsed.includes(id));
-        return [...parsed, ...missing];
+        if (Array.isArray(parsed)) {
+          const existing = parsed.filter(id => defaultIds.includes(id));
+          const missing = defaultIds.filter(id => !existing.includes(id));
+          const combined = [...existing, ...missing];
+          const unique = Array.from(new Set(combined));
+          if (unique.length === defaultIds.length) {
+            return unique;
+          }
+        }
       }
     } catch (e) {}
-    return ALL_TABS.map(t => t.id);
+    return defaultIds;
   });
 
   const [draggingTab, setDraggingTab] = useState<string | null>(null);
@@ -1019,7 +1025,7 @@ export default function App() {
       activeTab === "finance" ? "finance" :
       activeTab === "cloud" ? "cloud" :
       activeTab === "productos" ? "productos" :
-      activeTab === "portafolios" ? "portafolio" :
+      activeTab === "portafolios" ? "portafolios" :
       activeTab === "suscripciones" ? "suscripciones" :
       "insights"
     }`);
@@ -3838,8 +3844,9 @@ export default function App() {
       )}
 
       <div id="bottom-nav-scroll" style={{ WebkitOverflowScrolling: "touch", overflowX: "scroll" }} className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 flex items-center justify-start z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] px-0 no-scrollbar scroll-smooth">
-        {tabOrder.map(tabId => {
+        {tabOrder.map((tabId, _idx) => {
           const tab = ALL_TABS.find(t => t.id === tabId);
+          const tabBtnWidth = Math.floor(window.innerWidth / 5);
           if (!tab) return null;
           const isActive = activeTab === tab.tabKey;
           const isDragging = draggingTab === tabId;
@@ -3848,7 +3855,7 @@ export default function App() {
             <button
               key={tabId}
               id={`tab-btn-${tabId}`}
-              style={{ width: "calc(100vw / 5)", flexShrink: 0 }}
+              style={{ width: `${tabBtnWidth}px`, minWidth: `${tabBtnWidth}px`, flexShrink: 0 }}
               onMouseDown={() => handleTabLongPress(tabId)}
               onTouchStart={() => handleTabLongPress(tabId)}
               onMouseUp={handleTabPressEnd}
@@ -3886,10 +3893,10 @@ export default function App() {
             </button>
           );
         })}
-        
-        {/* Fade derecho que insinua mas pestanas */}
-        <div className="pointer-events-none sticky right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/95 to-transparent z-40 shrink-0" />
       </div>
+      
+      {/* Fade derecho que insinua mas pestanas (Placed as a sibling outside of the flex layout container to prevent layout squeezing) */}
+      <div className="pointer-events-none absolute bottom-0 right-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] w-8 bg-gradient-to-l from-white/95 to-transparent z-40" />
 
       {/* --- ADDING DIALOG/BOTTOM SHEET (Aesthetic Apple iOS-style drawer modal bottom sheet) --- */}
       <AnimatePresence>
