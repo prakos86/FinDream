@@ -2156,10 +2156,7 @@ export default function App() {
     setNewCatName('');
     triggerDynamicIsland("Añadida", `Categoría "${newCat.nombre}" agregada con éxito`, true);
     playTone('success', isMuted);
-    
-    // Smoothly close categories modal and navigate home
-    setShowManageCategories(false);
-    setActiveTab('finance');
+    // NO cerrar el modal ni redirigir: el usuario puede seguir agregando
   };
 
   const handleDeleteCategory = (nombre: string) => {
@@ -2793,48 +2790,6 @@ export default function App() {
             })}
           </div>
         </div>
-
-        {/* --- DYNAMIC RECURRING SUBSCRIPTIONS (Cambio 6) --- */}
-        {suscripciones.length > 0 && (
-          <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.03)] mt-2">
-            <div className="flex items-center justify-between mb-3 text-left">
-              <h3 className="text-xs font-black text-slate-800 tracking-wider block uppercase flex items-center gap-1.5">
-                <Repeat className="w-4 h-4 text-rose-500 stroke-[2.5]" />
-                {selectedLanguage === 'ES' ? 'Gastos recurrentes estimados' : 'Estimated Recurring Expenses'}
-              </h3>
-              <span className="text-sm font-black text-rose-600">
-                - {currencySymbol}{totalSuscripcionesMes.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
-              </span>
-            </div>
-            <ul className="space-y-1.5 text-xs text-slate-600 text-left">
-              {suscripciones.map(s => (
-                <li key={s.id} className="flex justify-between items-center border-b border-gray-55 pb-1 last:border-0 last:pb-0">
-                  <span className="font-semibold text-slate-705">{s.nombre}</span>
-                  <span className="font-bold text-slate-900">
-                    {currencySymbol}
-                    {convertir(
-                      s.frecuencia === "Anual" ? s.monto / 12 : s.monto,
-                      s.moneda,
-                      monedaPais
-                    ).toLocaleString('es-ES', { minimumFractionDigits: 0 })}
-                    <span className="text-[10px] text-slate-400 font-normal">
-                      {' '}/ {s.frecuencia === 'Anual' ? (selectedLanguage === 'ES' ? 'Mes (Anual)' : 'Month (Annual)') : (selectedLanguage === 'ES' ? 'Mes' : 'Month')}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-
-            <div className="border-t border-dashed border-slate-200 mt-3 pt-3 flex justify-between items-center text-left">
-              <span className="text-xs font-bold text-slate-500">
-                {selectedLanguage === 'ES' ? 'Total estimado disponible' : 'Total estimated available'}
-              </span>
-              <span className={`text-sm font-black ${((totalActivos - totalPasivos) - totalSuscripcionesMes) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                {hideBalances ? "******" : `${currencySymbol}${((totalActivos - totalPasivos) - totalSuscripcionesMes).toLocaleString('es-ES', { minimumFractionDigits: 0 })}`}
-              </span>
-            </div>
-          </div>
-        )}
 
         {/* --- RECENT TRANSACTIONS LOG (Highly polished list, swipeable deletion) --- */}
         <div className="space-y-3 pt-2">
@@ -4150,6 +4105,7 @@ export default function App() {
                   </label>
                   <input
                     type="text"
+                    autoComplete="off"
                     maxLength={20}
                     placeholder={selectedLanguage === 'ES' ? 'Ej: Mascotas, Regalos...' : 'Ej: Pets, Gifts...'}
                     value={newCatName}

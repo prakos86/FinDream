@@ -782,7 +782,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             monto: numericMonto,
             categoria: p.categoria || (p.tipo === 'Ingreso' ? 'Salario' : 'Otros'),
             descripcion: p.descripcion || 'Acción desde Prako AI',
-            fecha: p.fecha || new Date().toISOString(),
+            fecha: p.fecha || new Date().toISOString().split('T')[0],
             formaPago: p.formaPago || 'Efectivo'
           };
           currentTxList = [newT, ...currentTxList];
