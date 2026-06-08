@@ -670,13 +670,15 @@ ${textContent ? textContent.substring(0, 50000) : ""}`;
         + 'fecha (YYYY-MM-DD, si no aparece usa hoy), '
         + 'monto (STRING exacto como aparece en pantalla), '
         + 'descripcion (comercio o descripcion), '
-        + 'tipo (Gasto o Ingreso). '
+        + 'tipo (Gasto o Ingreso), '
+        + 'categoria (Una categoria sugerida, ej: Alimentación, Transporte, Servicios, Suscripciones, Compras, Entretenimiento, Salud, Educación, Transferencias, Otros), '
+        + 'banco (El nombre del banco o emisor, ej: CMR, Falabella, Bancolombia, etc.). '
         + 'Pais: ' + moneda + '. El punto es separador de miles. '
         + 'Ignora pagos a tarjeta, cupos y totales. '
         + 'Si el mismo movimiento aparece varias veces, registralo una sola vez. '
         + 'Responde SOLO con JSON valido sin markdown: '
         + '{ "transacciones": [' 
-        + ' { "fecha":"...","monto":"...","descripcion":"...","tipo":"..."}' 
+        + ' { "fecha":"...","monto":"...","descripcion":"...","tipo":"...","categoria":"...","banco":"..."}' 
         + '] }';
       
       const response = await ai.models.generateContent({

@@ -1599,7 +1599,7 @@ export default function App() {
             const tx: Transaccion = {
               id: Math.random().toString(36).substring(2, 9),
               tipo: data.tipo === 'Ingreso' ? 'Ingreso' : 'Gasto',
-              monto: normalizarMonto(data.monto) || 0,
+              monto: Math.abs(normalizarMonto(data.monto)) || 0,
               categoria: cat,
               fecha: data.fecha || formatLocalYYYYMMDD(new Date()),
               descripcion: data.descripcion || `Transacción en ${cat}`,
@@ -3858,6 +3858,8 @@ export default function App() {
                 askPdfPassword={askPdfPassword}
                 chatMessages={chatMessages}
                 setChatMessages={setChatMessages}
+                categorias={categorias}
+                getMergedPaymentMethods={getMergedPaymentMethods}
               />
             ) : (
               /* --- B) INSIGHTS VIEW (Moved from Sueño tab) --- */

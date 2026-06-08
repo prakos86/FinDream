@@ -27,6 +27,8 @@ interface ChatPanelProps {
   askPdfPassword: (file: File) => Promise<string>;
   chatMessages: ChatMessage[];
   setChatMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
+  categorias: any[];
+  getMergedPaymentMethods: () => string[];
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -48,7 +50,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   extractPdfText,
   askPdfPassword,
   chatMessages,
-  setChatMessages
+  setChatMessages,
+  categorias,
+  getMergedPaymentMethods
 }) => {
   const [chatInput, setChatInput] = useState('');
   const [pendingActions, setPendingActions] = useState<any[] | null>(null);
@@ -291,6 +295,50 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         } else {
           console.warn("[ChatPanel] No se encontro transaccion con id=", idToDelete);
         }
+      } else if (action.type === 'addTransaction') {
+        const p = action.payload;
+        let cat = 'Otros';
+        if (p.categoria) {
+          let matchedCat = categorias.find(c => c.nombre.toLowerCase() === p.categoria.toLowerCase());
+          if (!matchedCat) {
+            matchedCat = categorias.find(c => p.categoria.toLowerCase().includes(c.nombre.toLowerCase()) || 
+                                             c.nombre.toLowerCase().includes(p.categoria.toLowerCase()));
+          }
+          if (matchedCat) cat = matchedCat.nombre;
+        }
+
+        let forma = getMergedPaymentMethods()[0];
+        if (p.banco) {
+          const pms = getMergedPaymentMethods();
+          let matchedPm = pms.find((pm: string) => pm.toLowerCase().includes(p.banco.toLowerCase()) || p.banco.toLowerCase().includes(pm.toLowerCase()));
+          if (matchedPm) forma = matchedPm;
+        } else if (p.formaPago) {
+          const pms = getMergedPaymentMethods();
+          let matchedPm = pms.find((pm: string) => pm.toLowerCase().includes(p.formaPago.toLowerCase()) || p.formaPago.toLowerCase().includes(pm.toLowerCase()));
+          if (matchedPm) forma = matchedPm;
+        }
+
+        // Siempre guardar montos positivos absolutos en transacciones directas
+        const finalMonto = Math.abs(normalizarMontoLocal(p.monto)) || 0;
+
+        const tx: Transaccion = {
+          id: Math.random().toString(36).substring(2, 9),
+          tipo: p.tipo === 'Ingreso' ? 'Ingreso' : 'Gasto',
+          monto: finalMonto,
+          categoria: cat,
+          fecha: p.fecha || new Date().toISOString().split('T')[0],
+          descripcion: p.descripcion || (p.tipo === 'Ingreso' ? `Ingreso de ${cat}` : `Gasto en ${cat}`),
+          formaPago: forma
+        };
+        
+        currentTxList = [tx, ...currentTxList];
+        txChanged = true;
+        
+        triggerDynamicIsland(
+          selectedLanguage === 'ES' ? 'Transaccion agregada' : 'Transaction added',
+          `${tx.descripcion} - $${tx.monto.toLocaleString()}`,
+          tx.tipo === 'Ingreso'
+        );
       } else if (action.type === 'editTransaction' && action.payload?.id) {
         const p = action.payload;
         const idToEdit = String(p.id).trim();
@@ -420,8 +468,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           tipo: t.tipo,
           monto: t.monto,
           descripcion: t.descripcion,
-          categoria: 'Video Extracción',
-          fecha: t.fecha
+          categoria: t.categoria || 'Otros',
+          fecha: t.fecha,
+          banco: t.banco
         }
       }));
       
