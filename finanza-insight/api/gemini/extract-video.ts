@@ -9,47 +9,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' }); return;
   }
-
   try {
-    const { videoBase64, mimeType, country } = req.body;
-    if (!videoBase64 || !mimeType) {
-      res.status(400).json({ error: 'videoBase64 y mimeType son requeridos' });
+    const { frames, country } = req.body;
+    if (!frames || !Array.isArray(frames) || frames.length === 0) {
+      res.status(400).json({ error: 'Se requiere array de frames' });
       return;
     }
-
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
-    const moneda = country === 'CL' ? 'Chile (CLP)' : 'Colombia (COP)';
-
+    const ai = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY || '',
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+    const moneda = country === 'CL'
+      ? 'Chile (CLP)' : 'Colombia (COP)';
     const prompt =
-      'Analiza este video que muestra movimientos bancarios. ' +
-      'Extrae TODAS las transacciones visibles en los fotogramas del video. ' +
-      'Para cada transaccion extrae: ' +
-      'fecha (formato YYYY-MM-DD, si no aparece usa la fecha de hoy), ' +
-      'monto (valor exacto como STRING tal como aparece en pantalla, ej. "146.637", "$2.378.260"), ' +
-      'descripcion (nombre del comercio o descripcion del movimiento), ' +
-      'tipo ("Gasto" o "Ingreso"). ' +
-      'Pais: ' + moneda + '. El punto es separador de miles, NO decimal. ' +
-      'Ignora pagos a tarjeta, cupos, totales y resumenes. ' +
-      'Si el mismo movimiento aparece en varios fotogramas, registralo solo una vez. ' +
-      'Responde SOLO con JSON valido sin markdown: ' +
-      '{ "transacciones": [{ "fecha":"...","monto":"...","descripcion":"...","tipo":"Gasto"}] }';
-
+      'Estas son capturas de un video de movimientos bancarios en '
+      + moneda + '. '
+      + 'Extrae TODAS las transacciones visibles. '
+      + 'Para cada una: fecha (YYYY-MM-DD, si no aparece usa hoy), '
+      + 'monto (STRING exacto como aparece en pantalla, ej: "146.637", "$2.378.260"), '
+      + 'descripcion (nombre del comercio o descripcion), '
+      + 'tipo (Gasto o Ingreso), '
+      + 'categoria (Una categoria sugerida, ej: Alimentación, Transporte, Servicios, Suscripciones, Compras, Entretenimiento, Salud, Educación, Transferencias, Otros), '
+      + 'banco (El nombre del banco o emisor, ej: CMR, Falabella, Bancolombia, etc.). '
+      + 'El punto es separador de miles, NUNCA decimal. '
+      + 'Ignora pagos a tarjeta, cupos y totales. '
+      + 'Si el mismo movimiento aparece varias veces, registralo una sola vez. '
+      + 'Responde SOLO con JSON valido sin markdown: '
+      + '{"transacciones":[{"fecha":"...","monto":"...","descripcion":"...","tipo":"Gasto","categoria":"...","banco":"..."}]}';
+    
+    const parts: any[] = frames.map((f: string) => ({
+      inlineData: { data: f, mimeType: 'image/jpeg' }
+    }));
+    parts.push({ text: prompt });
+    
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: [{
-        role: 'user',
-        parts: [
-          { inlineData: { data: videoBase64, mimeType } },
-          { text: prompt }
-        ]
-      }]
+      contents: [{ role: 'user', parts }]
     });
-
-    const raw = (response.text || '').replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(raw);
+    
+    const raw = (response.text || '')
+      .replace(/```json|```/g, '').trim();
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      console.error('[extract-video] parse error:', raw.slice(0, 200));
+      res.status(500).json({ error: 'Error parseando respuesta' });
+      return;
+    }
     res.status(200).json(parsed);
   } catch (err: any) {
     console.error('[extract-video] Error:', err.message);
-    res.status(500).json({ error: 'Error procesando el video', detail: err.message });
+    res.status(500).json({
+      error: 'Error procesando frames', detail: err.message
+    });
   }
 }

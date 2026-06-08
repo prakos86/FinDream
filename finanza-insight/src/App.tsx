@@ -1556,81 +1556,109 @@ export default function App() {
     if (isVideo) {
       setIsUploadingDocument(true);
       triggerDynamicIsland("Procesando", selectedLanguage === 'ES' ? "Analizando video con IA..." : "Analyzing video with AI...", true);
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64 = (reader.result as string).split(',')[1];
-          const resp = await fetch('/api/gemini/extract-video', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              videoBase64: base64, mimeType: file.type || 'video/mp4',
-              country: selectedCountry
-            })
-          });
-          if (!resp.ok) throw new Error('Error en el servidor');
-          const data = await resp.json();
-          const txs = data.transacciones || [];
-          
-          if (txs.length === 0) {
-            triggerDynamicIsland("Error", selectedLanguage === 'ES' ? "No se encontraron transacciones en el video." : "No transactions found in the video.", false);
-            setIsUploadingDocument(false);
-            return;
-          }
-
-          const newTxList = txs.map((data: any) => {
-            let cat = 'Otros';
-            if (data.categoria) {
-              let matchedCat = categorias.find(c => c.nombre.toLowerCase() === data.categoria.toLowerCase());
-              if (!matchedCat) {
-                matchedCat = categorias.find(c => data.categoria.toLowerCase().includes(c.nombre.toLowerCase()) || 
-                                                 c.nombre.toLowerCase().includes(data.categoria.toLowerCase()));
-              }
-              if (matchedCat) cat = matchedCat.nombre;
-            }
-            
-            let forma = getMergedPaymentMethods()[0];
-            if (data.banco) {
-              const pms = getMergedPaymentMethods();
-              let matchedPm = pms.find(pm => pm.toLowerCase().includes(data.banco.toLowerCase()) || data.banco.toLowerCase().includes(pm.toLowerCase()));
-              if (matchedPm) forma = matchedPm;
-            }
-            
-            const tx: Transaccion = {
-              id: Math.random().toString(36).substring(2, 9),
-              tipo: data.tipo === 'Ingreso' ? 'Ingreso' : 'Gasto',
-              monto: Math.abs(normalizarMonto(data.monto)) || 0,
-              categoria: cat,
-              fecha: data.fecha || formatLocalYYYYMMDD(new Date()),
-              descripcion: data.descripcion || `Transacción en ${cat}`,
-              formaPago: forma
+      try {
+        const videoUrl = URL.createObjectURL(file);
+        const videoEl = document.createElement('video');
+        videoEl.src = videoUrl;
+        videoEl.muted = true;
+        videoEl.playsInline = true;
+        await new Promise<void>((resolve, reject) => {
+          videoEl.onloadedmetadata = () => resolve();
+          videoEl.onerror = () => reject(new Error('No se pudo cargar el video'));
+          setTimeout(() => reject(new Error('Timeout')), 10000);
+        });
+        const duration = videoEl.duration || 10;
+        const canvas = document.createElement('canvas');
+        canvas.width = 720;
+        canvas.height = Math.round(
+          720 * (videoEl.videoHeight / (videoEl.videoWidth || 720)));
+        const ctx = canvas.getContext('2d')!;
+        
+        // Capturar 6 frames distribuidos en el video
+        const NUM_FRAMES = 6;
+        const frames: string[] = [];
+        for (let i = 0; i < NUM_FRAMES; i++) {
+          const seekTime = (duration / (NUM_FRAMES + 1)) * (i + 1);
+          await new Promise<void>((resolve) => {
+            videoEl.currentTime = seekTime;
+            videoEl.onseeked = () => {
+              ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+              const frameBase64 = canvas.toDataURL('image/jpeg', 0.7)
+                .split(',')[1];
+              frames.push(frameBase64);
+              resolve();
             };
-            return tx;
           });
+        }
+        URL.revokeObjectURL(videoUrl);
 
-          setIsAddingOpen(false);
-          
-          requestConfirmation(
-            selectedLanguage === 'ES' ? "Confirmar importación de Video" : "Confirm Video Import",
-            selectedLanguage === 'ES' 
-              ? `Se encontraron ${newTxList.length} movimientos en el video por un total de $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. ¿Deseas agregarlos?` 
-              : `Found ${newTxList.length} transactions in video totaling $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. Do you want to add them?`,
-            () => {
-              saveTransacciones([...newTxList, ...transacciones]);
-              triggerDynamicIsland("Completado", selectedLanguage === 'ES' ? `Se agregaron ${newTxList.length} movimientos.` : `${newTxList.length} transactions added.`, true);
-              playTone('success', isMuted);
-            }
-          );
-
-        } catch (error) {
-          console.error(error);
-          triggerDynamicIsland("Error", selectedLanguage === 'ES' ? "No se pudo extraer información del video" : "Could not extract info from video", false);
-        } finally {
+        const resp = await fetch('/api/gemini/extract-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ frames, country: selectedCountry })
+        });
+        if (!resp.ok) throw new Error('Error en el servidor');
+        const data = await resp.json();
+        const txs = data.transacciones || [];
+        
+        if (txs.length === 0) {
+          triggerDynamicIsland("Error", selectedLanguage === 'ES' ? "No se encontraron transacciones en el video." : "No transactions found in the video.", false);
           setIsUploadingDocument(false);
           if (e.target) e.target.value = '';
+          return;
         }
-      };
-      reader.readAsDataURL(file);
+
+        const newTxList = txs.map((data: any) => {
+          let cat = 'Otros';
+          if (data.categoria) {
+            let matchedCat = categorias.find(c => c.nombre.toLowerCase() === data.categoria.toLowerCase());
+            if (!matchedCat) {
+              matchedCat = categorias.find(c => data.categoria.toLowerCase().includes(c.nombre.toLowerCase()) || 
+                                               c.nombre.toLowerCase().includes(data.categoria.toLowerCase()));
+            }
+            if (matchedCat) cat = matchedCat.nombre;
+          }
+          
+          let forma = getMergedPaymentMethods()[0];
+          if (data.banco) {
+            const pms = getMergedPaymentMethods();
+            let matchedPm = pms.find(pm => pm.toLowerCase().includes(data.banco.toLowerCase()) || data.banco.toLowerCase().includes(pm.toLowerCase()));
+            if (matchedPm) forma = matchedPm;
+          }
+          
+          const tx: Transaccion = {
+            id: Math.random().toString(36).substring(2, 9),
+            tipo: data.tipo === 'Ingreso' ? 'Ingreso' : 'Gasto',
+            monto: Math.abs(normalizarMonto(data.monto)) || 0,
+            categoria: cat,
+            fecha: data.fecha || formatLocalYYYYMMDD(new Date()),
+            descripcion: data.descripcion || `Transacción en ${cat}`,
+            formaPago: forma
+          };
+          return tx;
+        });
+
+        setIsAddingOpen(false);
+        
+        requestConfirmation(
+          selectedLanguage === 'ES' ? "Confirmar importación de Video" : "Confirm Video Import",
+          selectedLanguage === 'ES' 
+            ? `Se encontraron ${newTxList.length} movimientos en el video por un total de $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. ¿Deseas agregarlos?` 
+            : `Found ${newTxList.length} transactions in video totaling $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. Do you want to add them?`,
+          () => {
+            saveTransacciones([...newTxList, ...transacciones]);
+            triggerDynamicIsland("Completado", selectedLanguage === 'ES' ? `Se agregaron ${newTxList.length} movimientos.` : `${newTxList.length} transactions added.`, true);
+            playTone('success', isMuted);
+          }
+        );
+
+      } catch (error) {
+        console.error(error);
+        triggerDynamicIsland("Error", selectedLanguage === 'ES' ? "No se pudo extraer información del video" : "Could not extract info from video", false);
+      } finally {
+        setIsUploadingDocument(false);
+        if (e.target) e.target.value = '';
+      }
       return;
     }
 

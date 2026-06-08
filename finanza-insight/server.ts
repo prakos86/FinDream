@@ -657,45 +657,51 @@ ${textContent ? textContent.substring(0, 50000) : ""}`;
   // API Route for Video Extraction
   app.post("/api/gemini/extract-video", customRateLimiter(20, 10 * 60 * 1000), async (req, res) => {
     try {
-      const { videoBase64, mimeType, country } = req.body;
-      if (!videoBase64 || !mimeType) {
-        return res.status(400).json({ error: 'videoBase64 y mimeType requeridos' });
+      const { frames, country } = req.body;
+      if (!frames || !Array.isArray(frames) || frames.length === 0) {
+        return res.status(400).json({ error: 'Se requiere el array de frames' });
       }
       const ai = getAIClient();
-      const moneda = country === 'CL' ? 'Chile CLP' : 'Colombia COP';
+      const moneda = country === 'CL' ? 'Chile (CLP)' : 'Colombia (COP)';
       const prompt =
-        'Analiza este video de movimientos bancarios. '
+        'Estas son capturas de un video de movimientos bancarios en '
+        + moneda + '. '
         + 'Extrae TODAS las transacciones visibles. '
         + 'Para cada una: '
         + 'fecha (YYYY-MM-DD, si no aparece usa hoy), '
-        + 'monto (STRING exacto como aparece en pantalla), '
-        + 'descripcion (comercio o descripcion), '
-        + 'tipo (Gasto o Ingreso), '
+        + 'monto (STRING exacto como aparece en pantalla, ej: "146.637"), '
+        + 'descripcion (nombre del comercio), tipo (Gasto o Ingreso), '
         + 'categoria (Una categoria sugerida, ej: Alimentación, Transporte, Servicios, Suscripciones, Compras, Entretenimiento, Salud, Educación, Transferencias, Otros), '
         + 'banco (El nombre del banco o emisor, ej: CMR, Falabella, Bancolombia, etc.). '
-        + 'Pais: ' + moneda + '. El punto es separador de miles. '
+        + 'El punto es separador de miles, NUNCA decimal. '
         + 'Ignora pagos a tarjeta, cupos y totales. '
         + 'Si el mismo movimiento aparece varias veces, registralo una sola vez. '
         + 'Responde SOLO con JSON valido sin markdown: '
-        + '{ "transacciones": [' 
-        + ' { "fecha":"...","monto":"...","descripcion":"...","tipo":"...","categoria":"...","banco":"..."}' 
-        + '] }';
+        + '{"transacciones":[{"fecha":"...","monto":"...","descripcion":"...","tipo":"Gasto","categoria":"...","banco":"..."}]}';
       
+      const parts: any[] = frames.map((f: string) => ({
+        inlineData: { data: f, mimeType: 'image/jpeg' }
+      }));
+      parts.push({ text: prompt });
+
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: [{ role: 'user', parts: [
-          { inlineData: { data: videoBase64, mimeType } },
-          { text: prompt }
-        ]}]
+        contents: [{ role: 'user', parts }]
       });
       
       const raw = (response.text || '')
         .replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(raw);
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        console.error('[extract-video] parse error:', raw.slice(0, 200));
+        return res.status(500).json({ error: 'Error parseando respuesta' });
+      }
       res.status(200).json(parsed);
     } catch (err: any) {
       console.error('[extract-video] Error:', err.message);
-      res.status(500).json({ error: 'Error procesando el video' });
+      res.status(500).json({ error: 'Error procesando frames', detail: err.message });
     }
   });
 

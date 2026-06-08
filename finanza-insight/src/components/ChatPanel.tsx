@@ -118,53 +118,76 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     file.name.toLowerCase().endsWith('.mkv') ||
                     file.name.toLowerCase().endsWith('.3gp');
     if (isVideo) {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = (reader.result as string).split(',')[1];
-        const processingMsg: ChatMessage = {
-          id: Date.now().toString(), sender: 'model',
-          text: 'Analizando video... puede tomar unos segundos.',
-          timestamp: new Date().toISOString()
-        };
-        setChatMessages(prev => [...prev, processingMsg]);
-        try {
-          const resp = await fetch('/api/gemini/extract-video', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              videoBase64: base64, mimeType: file.type || 'video/mp4',
-              country: selectedCountry
-            })
-          });
-          const data = await resp.json();
-          const txs = data.transacciones || [];
-          if (txs.length > 0) {
-            const preview = txs.slice(0, 5)
-              .map((t: any) => `- ${t.descripcion}: ${t.monto}`)
-              .join('\n');
-            const confirmMsg: ChatMessage = {
-              id: (Date.now()+1).toString(), sender: 'model',
-              text: `Encontre ${txs.length} transacciones en el video:\n`
-                + preview + '\n\n\u00bfLas agrego todas?',
-              timestamp: new Date().toISOString(),
-              videoPendingTransacciones: txs
+      const processingMsg: ChatMessage = {
+        id: Date.now().toString(), sender: 'model',
+        text: 'Leyendo video... extrayendo fotogramas para analizar.',
+        timestamp: new Date().toISOString()
+      };
+      setChatMessages(prev => [...prev, processingMsg]);
+      try {
+        const videoUrl = URL.createObjectURL(file);
+        const videoEl = document.createElement('video');
+        videoEl.src = videoUrl;
+        videoEl.muted = true;
+        videoEl.playsInline = true;
+        await new Promise<void>((resolve, reject) => {
+          videoEl.onloadedmetadata = () => resolve();
+          videoEl.onerror = () => reject(new Error('No se pudo cargar el video'));
+          setTimeout(() => reject(new Error('Timeout')), 10000);
+        });
+        const duration = videoEl.duration || 10;
+        const canvas = document.createElement('canvas');
+        canvas.width = 720;
+        canvas.height = Math.round(
+          720 * (videoEl.videoHeight / (videoEl.videoWidth || 720)));
+        const ctx = canvas.getContext('2d')!;
+        
+        // Capturar 6 frames distribuidos en el video
+        const NUM_FRAMES = 6;
+        const frames: string[] = [];
+        for (let i = 0; i < NUM_FRAMES; i++) {
+          const seekTime = (duration / (NUM_FRAMES + 1)) * (i + 1);
+          await new Promise<void>((resolve) => {
+            videoEl.currentTime = seekTime;
+            videoEl.onseeked = () => {
+              ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+              const frameBase64 = canvas.toDataURL('image/jpeg', 0.7)
+                .split(',')[1];
+              frames.push(frameBase64);
+              resolve();
             };
-            setChatMessages(prev =>
-              [...prev.filter(m => m.id !== processingMsg.id), confirmMsg]);
-          } else {
-            setChatMessages(prev => prev.map(m =>
-              m.id === processingMsg.id ? { ...m,
-                text: 'No encontre transacciones en el video. '
-                + 'Intenta con mejor iluminacion o mas cerca.' } : m));
-          }
-        } catch {
+          });
+        }
+        URL.revokeObjectURL(videoUrl);
+        const resp = await fetch('/api/gemini/extract-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ frames, country: selectedCountry })
+        });
+        const data = await resp.json();
+        const txs = data.transacciones || [];
+        if (txs.length > 0) {
+          const preview = txs.slice(0, 5)
+            .map((t: any) => `- ${t.descripcion}: ${t.monto}`).join('\n');
+          const confirmMsg: ChatMessage = {
+            id: (Date.now()+1).toString(), sender: 'model',
+            text: `Encontre ${txs.length} transacciones en el video:\n`
+              + preview + '\n\n\u00bfLas agrego todas?',
+            timestamp: new Date().toISOString(),
+            videoPendingTransacciones: txs
+          };
+          setChatMessages(prev =>
+            [...prev.filter(m => m.id !== processingMsg.id), confirmMsg]);
+        } else {
           setChatMessages(prev => prev.map(m =>
             m.id === processingMsg.id ? { ...m,
-              text: 'Error procesando el video. Intentalo de nuevo.' }
-            : m));
+              text: 'No encontre transacciones. Intenta grabar mas cerca con buena iluminacion.' } : m));
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (err: any) {
+        setChatMessages(prev => prev.map(m =>
+          m.id === processingMsg.id ? { ...m,
+            text: 'Error procesando el video: ' + (err.message || 'intenta de nuevo.') } : m));
+      }
       if (e.target) e.target.value = '';
       return;
     }
@@ -459,42 +482,78 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     if (!msgText.trim() || isAIProcessing) return;
 
     const lowercaseMsg = msgText.toLowerCase().trim();
+    const normalizedMsg = lowercaseMsg.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
     const lastMsgWithVideo = chatMessages.slice().reverse().find(m => m.videoPendingTransacciones && m.videoPendingTransacciones.length > 0);
     
-    if (lastMsgWithVideo && lastMsgWithVideo.videoPendingTransacciones && ['si', 'sí', 'yes', 'claro', 'por supuesto', 'agrega', 'agregalas', 'agrega todas', 'dale'].includes(lowercaseMsg)) {
-      const actions = lastMsgWithVideo.videoPendingTransacciones.map(t => ({
-        type: 'addTransaction',
-        payload: {
-          tipo: t.tipo,
-          monto: t.monto,
-          descripcion: t.descripcion,
-          categoria: t.categoria || 'Otros',
-          fecha: t.fecha,
-          banco: t.banco
-        }
-      }));
-      
-      const userMsg: ChatMessage = {
-        id: `chat-${Date.now()}`,
-        sender: 'user',
-        text: msgText,
-        timestamp: new Date().toISOString()
-      };
-      
-      setChatMessages(prev => {
-        const newMsgs = prev.map(m => m.id === lastMsgWithVideo.id ? { ...m, videoPendingTransacciones: undefined } : m);
-        return [...newMsgs, userMsg, {
-          id: `chat-${Date.now()+1}`,
-          sender: 'model',
-          text: `Agregué ${actions.length} transacciones extraídas del video.`,
+    const isAnswerConfirming = () => {
+      const positiveWords = ['si', 'yes', 'claro', 'por supuesto', 'agrega', 'dale', 'ok', 'sii', 'siii', 'sip', 'sipi', 'bueno', 'confirm', 'vale', 'perfecto', 'agregalas', 'agregalos'];
+      return positiveWords.some(word => normalizedMsg.includes(word));
+    };
+
+    const isAnswerRefusing = () => {
+      const negativeWords = ['no', 'cancela', 'nono', 'nop', 'nopi', 'no agregues', 'borra', 'rechaza'];
+      return negativeWords.some(word => normalizedMsg.includes(word));
+    };
+
+    if (lastMsgWithVideo && lastMsgWithVideo.videoPendingTransacciones) {
+      if (isAnswerConfirming()) {
+        const actions = lastMsgWithVideo.videoPendingTransacciones.map(t => ({
+          type: 'addTransaction',
+          payload: {
+            tipo: t.tipo,
+            monto: t.monto,
+            descripcion: t.descripcion,
+            categoria: t.categoria || 'Otros',
+            fecha: t.fecha,
+            banco: t.banco
+          }
+        }));
+        
+        const userMsg: ChatMessage = {
+          id: `chat-${Date.now()}`,
+          sender: 'user',
+          text: msgText,
           timestamp: new Date().toISOString()
-        }];
-      });
-      
-      // Usa el executeDangerousActions ya provisto para procesar actions de tipo addTransaction
-      executeDangerousActions(actions);
-      setChatInput('');
-      return;
+        };
+        
+        setChatMessages(prev => {
+          const newMsgs = prev.map(m => m.id === lastMsgWithVideo.id ? { ...m, videoPendingTransacciones: undefined } : m);
+          return [...newMsgs, userMsg, {
+            id: `chat-${Date.now()+1}`,
+            sender: 'model',
+            text: selectedLanguage === 'ES' 
+              ? `Agregué ${actions.length} transacciones extraídas del video.`
+              : `Added ${actions.length} transactions extracted from the video.`,
+            timestamp: new Date().toISOString()
+          }];
+        });
+        
+        executeDangerousActions(actions);
+        setChatInput('');
+        return;
+      } else if (isAnswerRefusing()) {
+        const userMsg: ChatMessage = {
+          id: `chat-${Date.now()}`,
+          sender: 'user',
+          text: msgText,
+          timestamp: new Date().toISOString()
+        };
+        
+        setChatMessages(prev => {
+          const newMsgs = prev.map(m => m.id === lastMsgWithVideo.id ? { ...m, videoPendingTransacciones: undefined } : m);
+          return [...newMsgs, userMsg, {
+            id: `chat-${Date.now()+1}`,
+            sender: 'model',
+            text: selectedLanguage === 'ES' 
+              ? `De acuerdo, no se agregaron los movimientos.`
+              : `Understood, transactions were not added.`,
+            timestamp: new Date().toISOString()
+          }];
+        });
+        setChatInput('');
+        return;
+      }
     }
     
     const tempAttachedFileText = attachedFileText;
