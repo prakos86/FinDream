@@ -1547,6 +1547,93 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const isVideo = (file.type && file.type.startsWith('video/')) || 
+                    file.name.toLowerCase().endsWith('.mp4') || 
+                    file.name.toLowerCase().endsWith('.mov') || 
+                    file.name.toLowerCase().endsWith('.avi') || 
+                    file.name.toLowerCase().endsWith('.mkv') ||
+                    file.name.toLowerCase().endsWith('.3gp');
+    if (isVideo) {
+      setIsUploadingDocument(true);
+      triggerDynamicIsland("Procesando", selectedLanguage === 'ES' ? "Analizando video con IA..." : "Analyzing video with AI...", true);
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64 = (reader.result as string).split(',')[1];
+          const resp = await fetch('/api/gemini/extract-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              videoBase64: base64, mimeType: file.type || 'video/mp4',
+              country: selectedCountry
+            })
+          });
+          if (!resp.ok) throw new Error('Error en el servidor');
+          const data = await resp.json();
+          const txs = data.transacciones || [];
+          
+          if (txs.length === 0) {
+            triggerDynamicIsland("Error", selectedLanguage === 'ES' ? "No se encontraron transacciones en el video." : "No transactions found in the video.", false);
+            setIsUploadingDocument(false);
+            return;
+          }
+
+          const newTxList = txs.map((data: any) => {
+            let cat = 'Otros';
+            if (data.categoria) {
+              let matchedCat = categorias.find(c => c.nombre.toLowerCase() === data.categoria.toLowerCase());
+              if (!matchedCat) {
+                matchedCat = categorias.find(c => data.categoria.toLowerCase().includes(c.nombre.toLowerCase()) || 
+                                                 c.nombre.toLowerCase().includes(data.categoria.toLowerCase()));
+              }
+              if (matchedCat) cat = matchedCat.nombre;
+            }
+            
+            let forma = getMergedPaymentMethods()[0];
+            if (data.banco) {
+              const pms = getMergedPaymentMethods();
+              let matchedPm = pms.find(pm => pm.toLowerCase().includes(data.banco.toLowerCase()) || data.banco.toLowerCase().includes(pm.toLowerCase()));
+              if (matchedPm) forma = matchedPm;
+            }
+            
+            const tx: Transaccion = {
+              id: Math.random().toString(36).substring(2, 9),
+              tipo: data.tipo === 'Ingreso' ? 'Ingreso' : 'Gasto',
+              monto: normalizarMonto(data.monto) || 0,
+              categoria: cat,
+              fecha: data.fecha || formatLocalYYYYMMDD(new Date()),
+              descripcion: data.descripcion || `Transacción en ${cat}`,
+              formaPago: forma
+            };
+            return tx;
+          });
+
+          setIsAddingOpen(false);
+          
+          requestConfirmation(
+            selectedLanguage === 'ES' ? "Confirmar importación de Video" : "Confirm Video Import",
+            selectedLanguage === 'ES' 
+              ? `Se encontraron ${newTxList.length} movimientos en el video por un total de $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. ¿Deseas agregarlos?` 
+              : `Found ${newTxList.length} transactions in video totaling $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. Do you want to add them?`,
+            () => {
+              saveTransacciones([...newTxList, ...transacciones]);
+              triggerDynamicIsland("Completado", selectedLanguage === 'ES' ? `Se agregaron ${newTxList.length} movimientos.` : `${newTxList.length} transactions added.`, true);
+              playTone('success', isMuted);
+            }
+          );
+
+        } catch (error) {
+          console.error(error);
+          triggerDynamicIsland("Error", selectedLanguage === 'ES' ? "No se pudo extraer información del video" : "Could not extract info from video", false);
+        } finally {
+          setIsUploadingDocument(false);
+          if (e.target) e.target.value = '';
+        }
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+
     setIsUploadingDocument(true);
     triggerDynamicIsland("Procesando", selectedLanguage === 'ES' ? "Analizando documento con IA..." : "Analyzing document with AI...", true);
 
@@ -3845,27 +3932,17 @@ export default function App() {
         </div>
       )}
 
-      <div id="bottom-nav-scroll" style={{ WebkitOverflowScrolling: "touch", overflowX: "scroll" }} className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 flex items-center justify-start z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] px-0 no-scrollbar scroll-smooth">
-        {tabOrder.map((tabId, idx) => {
+      <div id="bottom-nav-scroll" className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 grid grid-cols-7 items-center justify-items-center z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] px-1 overflow-hidden">
+        {tabOrder.slice(0, 3).map((tabId) => {
           const tab = ALL_TABS.find(t => t.id === tabId);
           if (!tab) return null;
           const isActive = activeTab === tab.tabKey;
           const isDragging = draggingTab === tabId;
           const isDragOver = dragOverTab === tabId;
           return (
-            <React.Fragment key={tabId}>
-              {idx === 2 && (
-                <div style={{
-                  width: "20%",
-                  minWidth: "20%",
-                  display: 'inline-block',
-                  flexShrink: 0
-                }} />
-              )}
-              <button
-                key={`btn-${tabId}`}
-                id={`tab-btn-${tabId}`}
-                style={{ width: "20%", minWidth: "20%", display: 'inline-flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', verticalAlign: 'middle', flexShrink: 0 }}
+            <button
+              key={`btn-${tabId}`}
+              id={`tab-btn-${tabId}`}
               onMouseDown={() => handleTabLongPress(tabId)}
               onTouchStart={() => handleTabLongPress(tabId)}
               onMouseUp={handleTabPressEnd}
@@ -3886,7 +3963,7 @@ export default function App() {
                   document.getElementById("main-scroll-container")?.scrollTo({ top: 0, behavior: "smooth" });
                 }
               }}
-              className={`flex flex-col items-center justify-center py-1 transition-all cursor-pointer relative select-none ${isActive ? "text-[#00897B]" : "text-slate-400"} ${isDragging ? "opacity-50 scale-95" : ""} ${isDragOver ? "scale-105" : ""} ${isReorderMode ? "cursor-grab" : ""}`}
+              className={`flex flex-col items-center justify-center w-full py-1 transition-all cursor-pointer relative select-none ${isActive ? "text-[#00897B]" : "text-slate-400"} ${isDragging ? "opacity-50 scale-95" : ""} ${isDragOver ? "scale-105" : ""} ${isReorderMode ? "cursor-grab" : ""}`}
             >
               {tab.icon === "Database" && <Database className="w-5.5 h-5.5 stroke-[2.5px]" />}
               {tab.icon === "Cloud" && <Cloud className="w-5.5 h-5.5 stroke-[2.5px]" />}
@@ -3894,20 +3971,67 @@ export default function App() {
               {tab.icon === "Briefcase" && <Briefcase className="w-5.5 h-5.5 stroke-[2.5px]" />}
               {tab.icon === "Repeat" && <Repeat className="w-5.5 h-5.5 stroke-[2.5px]" />}
               {tab.icon === "Sparkles" && <Sparkles className="w-5.5 h-5.5 stroke-[2.5px] animate-pulse" />}
-              <span className="text-[10px] font-black mt-1 uppercase tracking-tight">
+              <span className="text-[8px] sm:text-[9.5px] font-black mt-1 uppercase tracking-tighter truncate max-w-full px-0.5 text-center w-full">
                 {t(tab.label as any)}
               </span>
               {isReorderMode && (
                 <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-teal-500 animate-ping" />
               )}
             </button>
-            </React.Fragment>
+          );
+        })}
+
+        {/* Central Spacer Column (4th grid-column out of 7) */}
+        <div className="w-full h-8 flex items-center justify-center pointer-events-none" />
+
+        {tabOrder.slice(3).map((tabId) => {
+          const tab = ALL_TABS.find(t => t.id === tabId);
+          if (!tab) return null;
+          const isActive = activeTab === tab.tabKey;
+          const isDragging = draggingTab === tabId;
+          const isDragOver = dragOverTab === tabId;
+          return (
+            <button
+              key={`btn-${tabId}`}
+              id={`tab-btn-${tabId}`}
+              onMouseDown={() => handleTabLongPress(tabId)}
+              onTouchStart={() => handleTabLongPress(tabId)}
+              onMouseUp={handleTabPressEnd}
+              onTouchEnd={() => {
+                handleTabPressEnd();
+                if (!isReorderMode) {
+                  handleTap();
+                  setActiveTab(tab.tabKey as any);
+                  document.getElementById("main-scroll-container")?.scrollTo({ top: 0, behavior: "smooth" });
+                }
+                handleDragEnd();
+              }}
+              onMouseEnter={() => isReorderMode && handleDragOver(tabId)}
+              onClick={() => {
+                if (!isReorderMode) {
+                  handleTap();
+                  setActiveTab(tab.tabKey as any);
+                  document.getElementById("main-scroll-container")?.scrollTo({ top: 0, behavior: "smooth" });
+                }
+              }}
+              className={`flex flex-col items-center justify-center w-full py-1 transition-all cursor-pointer relative select-none ${isActive ? "text-[#00897B]" : "text-slate-400"} ${isDragging ? "opacity-50 scale-95" : ""} ${isDragOver ? "scale-105" : ""} ${isReorderMode ? "cursor-grab" : ""}`}
+            >
+              {tab.icon === "Database" && <Database className="w-5.5 h-5.5 stroke-[2.5px]" />}
+              {tab.icon === "Cloud" && <Cloud className="w-5.5 h-5.5 stroke-[2.5px]" />}
+              {tab.icon === "CreditCard" && <CreditCard className="w-5.5 h-5.5 stroke-[2.5px]" />}
+              {tab.icon === "Briefcase" && <Briefcase className="w-5.5 h-5.5 stroke-[2.5px]" />}
+              {tab.icon === "Repeat" && <Repeat className="w-5.5 h-5.5 stroke-[2.5px]" />}
+              {tab.icon === "Sparkles" && <Sparkles className="w-5.5 h-5.5 stroke-[2.5px] animate-pulse" />}
+              <span className="text-[8px] sm:text-[9.5px] font-black mt-1 uppercase tracking-tighter truncate max-w-full px-0.5 text-center w-full">
+                {t(tab.label as any)}
+              </span>
+              {isReorderMode && (
+                <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-teal-500 animate-ping" />
+              )}
+            </button>
           );
         })}
       </div>
-      
-      {/* Fade derecho que insinua mas pestanas (Placed as a sibling outside of the flex layout container to prevent layout squeezing) */}
-      <div className="pointer-events-none absolute bottom-0 right-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] w-8 bg-gradient-to-l from-white/95 to-transparent z-40" />
 
       {/* --- ADDING DIALOG/BOTTOM SHEET (Aesthetic Apple iOS-style drawer modal bottom sheet) --- */}
       <AnimatePresence>
@@ -4176,7 +4300,7 @@ export default function App() {
                     {/* Document Upload Choice */}
                     <input 
                       type="file" 
-                      accept=".pdf,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/*"
+                      accept="video/*,image/*,application/pdf,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.mp4,.mov"
                       style={{ display: 'none' }}
                       id="file-upload-input"
                       onChange={handleDocumentUpload}
@@ -4195,9 +4319,13 @@ export default function App() {
                         {isUploadingDocument ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6" />}
                       </div>
                       <div className="flex flex-col text-left">
-                        <span className="text-xs font-extrabold text-slate-800">Cargar Documento (PDF, Excel, Foto)</span>
+                        <span className="text-xs font-extrabold text-slate-800">
+                          {selectedLanguage === 'ES' ? 'Cargar Documento o Video (PDF, Excel, Foto, Video)' : 'Upload Document or Video (PDF, Excel, Photo, Video)'}
+                        </span>
                         <span className="text-[9px] text-gray-400 mt-1 leading-relaxed">
-                          La inteligencia artificial leerá el monto, fecha y detalles automáticamente.
+                          {selectedLanguage === 'ES' 
+                            ? 'La IA extraerá transacciones y detalles de cualquier archivo o video automáticamente.' 
+                            : 'The AI will extract transactions and details from any document or video automatically.'}
                         </span>
                       </div>
                     </button>
