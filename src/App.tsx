@@ -4148,45 +4148,25 @@ export default function App() {
               </div>
 
               {/* ADD NEW CATEGORY PANEL */}
-              <div className="border-t border-slate-100 pt-5 space-y-4">
-                <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                  {selectedLanguage === 'ES' ? 'Agregar Nueva Categoría' : 'Add New Category'}
-                </h4>
-
-                <div>
-                  <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1 block">
-                    {selectedLanguage === 'ES' ? 'Nombre de Categoría' : 'Category Name'}
-                  </label>
-                  <input
-                    type="text"
-                    autoComplete="off"
-                    maxLength={20}
-                    placeholder={selectedLanguage === 'ES' ? 'Ej: Mascotas, Regalos...' : 'Ej: Pets, Gifts...'}
-                    value={newCatName}
-                    onChange={(e) => setNewCatName(e.target.value)}
-                    onBlur={(e) => {
-                      // Prevenir que el blur resetee el valor
-                      e.preventDefault();
-                    }}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-
-                {/* QUICK ADD CATEGORIES (un toque) */}
-                <div>
-                  <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1 block">
-                    {selectedLanguage === 'ES' ? 'Agregar Rápido (un toque)' : 'Quick Add (one tap)'}
-                  </label>
+              <div className="border-t border-slate-100 pt-5 space-y-5">
+                {/* 1. SECCIÓN DE AGREGADO RÁPIDO */}
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-black uppercase tracking-wider text-indigo-600">
+                    {selectedLanguage === 'ES' ? '1. Recomendadas (Un toque para Agregar)' : '1. Suggested (One tap to Add)'}
+                  </h4>
+                  <p className="text-[10px] text-slate-500 font-semibold">
+                    {selectedLanguage === 'ES' ? 'Toca cualquier categoría para agregarla instantáneamente:' : 'Tap any category to instantly add it to your list:'}
+                  </p>
                   <div className="grid grid-cols-4 gap-2">
                     {[
                       { key: 'Home', label: '\u{1F3E0} Vivienda', name: 'Vivienda' },
-                      { key: 'Utensils', label: '\u{1F374} Comida', name: 'Comida' },
-                      { key: 'Car', label: '\u{1F697} Auto', name: 'Auto' },
+                      { key: 'Utensils', label: '\u{1F374} Comida', name: 'Alimentación' },
+                      { key: 'Car', label: '\u{1F697} Auto', name: 'Transporte' },
                       { key: 'ShoppingBag', label: '\u{1F6CD}\u{FE0F} Compras', name: 'Compras' },
                       { key: 'Plane', label: '\u{2708}\u{FE0F} Viajes', name: 'Viajes' },
-                      { key: 'Sparkles', label: '\u{2728} Especial', name: 'Especial' },
-                      { key: 'Heart', label: '\u{2764}\u{FE0F} Mascota', name: 'Mascota' },
-                      { key: 'Scissors', label: '\u{2702}\u{FE0F} Moda', name: 'Moda' }
+                      { key: 'Sparkles', label: '\u{2728} Especial', name: 'Cuidado Personal y Entretenimiento' },
+                      { key: 'Heart', label: '\u{2764}\u{FE0F} Mascota', name: 'Mascotas' },
+                      { key: 'Scissors', label: '\u{2702}\u{FE0F} Moda', name: 'Moda y Estilo' }
                     ].map((iconData) => {
                       const yaExiste = categorias.some(
                         c => c.nombre.toLowerCase() === iconData.name.toLowerCase()
@@ -4195,76 +4175,145 @@ export default function App() {
                         <button
                           key={iconData.key}
                           type="button"
-                          disabled={yaExiste}
-                          onClick={() => handleQuickAddCategory(iconData.name, iconData.key)}
-                          className={`p-2 rounded-lg border text-xs font-bold flex flex-col items-center justify-center transition-all ${
+                          onClick={() => {
+                            if (!yaExiste) {
+                              handleQuickAddCategory(iconData.name, iconData.key);
+                            }
+                          }}
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center justify-center transition-all cursor-pointer ${
                             yaExiste
-                              ? 'border-slate-150 text-slate-300 opacity-50 cursor-not-allowed'
-                              : 'border-slate-150 hover:bg-slate-50 text-slate-600 cursor-pointer active:scale-95'
+                              ? 'border-emerald-100 bg-emerald-50 text-emerald-700 font-extrabold cursor-default opacity-85'
+                              : 'border-slate-150 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 active:scale-95 shadow-3xs'
                           }`}
                         >
-                          <span className="text-sm shrink-0 mb-1">
+                          <span className="text-base shrink-0 mb-1">
                             {iconData.label.split(' ')[0]}
                           </span>
-                          <span className="text-[8px] font-bold tracking-tight block truncate w-full">
-                            {iconData.label.split(' ').slice(1).join(' ')}{yaExiste ? ' \u2713' : ''}
+                          <span className="text-[9px] leading-tight font-extrabold tracking-tight block text-center truncate w-full">
+                            {iconData.name}
                           </span>
+                          {yaExiste && (
+                            <span className="text-[8px] bg-emerald-500 text-white rounded-full px-1.5 py-0.2 mt-1 scale-90">
+                              ✓
+                            </span>
+                          )}
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* COLOR CHOOSER */}
-                <div>
-                  <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1.5 block">
-                    {selectedLanguage === 'ES' ? 'Color de Categoría' : 'Category Color'}
-                  </label>
-                  <div className="flex flex-wrap gap-2.5">
-                    {[
-                      '#8B5A2B', // Brown
-                      '#F97316', // Orange
-                      '#EF4444', // Red
-                      '#EC4899', // Pink
-                      '#3B82F6', // Blue
-                      '#10B981', // Emerald
-                      '#F43F5E', // Rose
-                      '#9333EA', // Purple
-                      '#14B8A6', // Teal
-                      '#EAB308', // Yellow
-                      '#6366F1'  // Indigo
-                    ].map((col) => {
-                      const isSel = newCatColor === col;
-                      return (
-                        <button
-                          key={col}
-                          type="button"
-                          onClick={() => { handleTap(); setNewCatColor(col); }}
-                          className={`w-6 h-6 rounded-full border transition-all cursor-pointer flex items-center justify-center ${
-                            isSel ? 'ring-2 ring-indigo-650 scale-110 shadow-3xs border-white' : 'border-transparent hover:scale-105'
-                          }`}
-                          style={{ backgroundColor: col }}
-                        >
-                          {isSel && <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                {/* 2. SECCIÓN DE CREACIÓN PERSONALIZADA */}
+                <div className="border-t border-dashed border-slate-150 pt-4 space-y-3.5">
+                  <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    {selectedLanguage === 'ES' ? '2. O crea una Personalizada' : '2. Or Create Custom Category'}
+                  </h4>
 
-                {/* CONFIRM ADD BUTTON */}
-                <button
-                  type="button"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleAddCategory();
-                  }}
-                  className="w-full py-3 bg-gradient-to-r from-teal-600 to-[#312E81] text-white font-black text-xs uppercase tracking-wider rounded-xl hover:opacity-95 shadow-lg active:scale-98 transition flex items-center justify-center gap-1.5 cursor-pointer mt-2"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>{selectedLanguage === 'ES' ? 'Confirmar Categoría' : 'Confirm Category'}</span>
-                </button>
+                  <div>
+                    <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1 block">
+                      {selectedLanguage === 'ES' ? 'Nombre de Categoría' : 'Category Name'}
+                    </label>
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      maxLength={20}
+                      placeholder={selectedLanguage === 'ES' ? 'Ej: Cumpleaños, Suscripciones...' : 'Ej: Birthday, Subscriptions...'}
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* SELECT ICON FOR CUSTOM CATEGORY */}
+                  <div>
+                    <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1 block">
+                      {selectedLanguage === 'ES' ? 'Icono de Categoría' : 'Category Icon'}
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        { key: 'Sparkles', label: '✨' },
+                        { key: 'Heart', label: '❤️' },
+                        { key: 'ShoppingBag', label: '🛍️' },
+                        { key: 'Utensils', label: '🍴' },
+                        { key: 'Car', label: '🚗' },
+                        { key: 'Home', label: '🏠' },
+                        { key: 'Plane', label: '✈️' },
+                        { key: 'Scissors', label: '✂️' }
+                      ].map((iconData) => {
+                        const isSelected = newCatIcon === iconData.key;
+                        return (
+                          <button
+                            key={iconData.key}
+                            type="button"
+                            onClick={() => {
+                              handleTap();
+                              setNewCatIcon(iconData.key);
+                              setIconManuallySet(true);
+                            }}
+                            className={`p-2 rounded-xl border text-base font-bold flex flex-col items-center justify-center transition-all cursor-pointer ${
+                              isSelected
+                                ? 'border-[#312E81] bg-indigo-50 leading-none shadow-3xs ring-2 ring-[#312E81]/30 scale-102'
+                                : 'border-slate-150 hover:bg-slate-50 hover:border-slate-300'
+                            }`}
+                          >
+                            <span>{iconData.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* COLOR CHOOSER */}
+                  <div>
+                    <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1.5 block">
+                      {selectedLanguage === 'ES' ? 'Color de Categoría' : 'Category Color'}
+                    </label>
+                    <div className="flex flex-wrap gap-2.5">
+                      {[
+                        '#8B5A2B', // Brown
+                        '#F97316', // Orange
+                        '#EF4444', // Red
+                        '#EC4899', // Pink
+                        '#3B82F6', // Blue
+                        '#10B981', // Emerald
+                        '#F43F5E', // Rose
+                        '#9333EA', // Purple
+                        '#14B8A6', // Teal
+                        '#EAB308', // Yellow
+                        '#6366F1'  // Indigo
+                      ].map((col) => {
+                        const isSel = newCatColor === col;
+                        return (
+                          <button
+                            key={col}
+                            type="button"
+                            onClick={() => { handleTap(); setNewCatColor(col); }}
+                            className={`w-6 h-6 rounded-full border transition-all cursor-pointer flex items-center justify-center ${
+                              isSel ? 'ring-2 ring-indigo-650 scale-110 shadow-3xs border-white' : 'border-transparent hover:scale-105'
+                            }`}
+                            style={{ backgroundColor: col }}
+                          >
+                            {isSel && <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* CONFIRM ADD BUTTON */}
+                  <button
+                    type="button"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleAddCategory();
+                    }}
+                    className="w-full py-3 bg-gradient-to-r from-teal-600 to-[#312E81] text-white font-black text-xs uppercase tracking-wider rounded-xl hover:opacity-95 shadow-lg active:scale-98 transition flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    <span>{selectedLanguage === 'ES' ? 'Confirmar Nueva Categoría' : 'Confirm New Category'}</span>
+                  </button>
+                </div>
               </div>
             </motion.div>
           </>

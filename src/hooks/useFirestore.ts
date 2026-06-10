@@ -88,7 +88,7 @@ export const useFirestore = (
           payload.celular = updatedProfile.celular;
           payload.productos = updatedProfile.productos || [];
           payload.portafolios = updatedProfile.portafolios || [];
-          payload.suscripciones = updatedProfile.suscripciones || [];
+          payload.suscripciones = updatedProfile.suscripciones || suscripciones;
         }
         
         if (updatedTransacciones) payload.transacciones = updatedTransacciones;
@@ -112,7 +112,7 @@ export const useFirestore = (
         userPayload.nombre = updatedProfile.nombre;
         userPayload.correo = updatedProfile.correo || (user?.email) || '';
         userPayload.celular = updatedProfile.celular;
-        userPayload.suscripciones = updatedProfile.suscripciones || [];
+        userPayload.suscripciones = updatedProfile.suscripciones || suscripciones;
         if (updatedProfile.productos) financialPayload.productos = updatedProfile.productos;
         if (updatedProfile.portafolios) financialPayload.portafolios = updatedProfile.portafolios;
       }

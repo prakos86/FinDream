@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Suscripcion } from '../types';
 import { useExchangeRate } from '../hooks/useExchangeRate';
 import { 
@@ -43,6 +44,7 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
   
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Translations
   const t = {
@@ -100,9 +102,15 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
 
   // Handle delete
   const handleDeleteSuscripcion = (id: string) => {
-    if (window.confirm(t.confirmDelete)) {
-      const updated = suscripciones.filter(s => s.id !== id);
+    setDeleteConfirmId(id);
+  };
+
+  // Confirm delete actual operation
+  const confirmDeleteSuscripcion = () => {
+    if (deleteConfirmId) {
+      const updated = suscripciones.filter(s => s.id !== deleteConfirmId);
       saveSuscripcionesList(updated);
+      setDeleteConfirmId(null);
     }
   };
 
@@ -411,6 +419,56 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
           </div>
         </div>
       )}
+
+      {/* Custom non-blocking delete confirmation modal */}
+      <AnimatePresence>
+        {deleteConfirmId && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDeleteConfirmId(null)}
+              className="fixed inset-0 bg-black/60 z-50 backdrop-blur-[2px]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 15 }}
+              transition={{ type: "spring", duration: 0.3 }}
+              className="fixed inset-x-4 top-[35%] max-w-sm mx-auto bg-white rounded-2xl p-5 border border-slate-150 shadow-2xl z-50 flex flex-col items-center text-center space-y-4"
+            >
+              <div className="w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 animate-bounce">
+                <Trash2 className="w-6 h-6 stroke-[2.5]" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-extrabold text-[#312E81] text-base leading-tight">
+                  {selectedLanguage === 'ES' ? '¿Eliminar Suscripción?' : 'Delete Subscription?'}
+                </h4>
+                <p className="text-xs text-slate-500 max-w-[240px]">
+                  {t.confirmDelete}
+                </p>
+              </div>
+              <div className="flex gap-2 w-full pt-1">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmId(null)}
+                  className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteSuscripcion}
+                  className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-rose-100"
+                >
+                  {selectedLanguage === 'ES' ? 'Eliminar' : 'Delete'}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
