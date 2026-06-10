@@ -152,6 +152,15 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
         <div className="absolute right-0 top-0 w-32 h-32 bg-white/5 rounded-full blur-2xl transform translate-x-12 -translate-y-12"></div>
         <div className="absolute bottom-0 right-1/4 w-24 h-24 bg-teal-300/10 rounded-full blur-xl"></div>
         
+        {/* Boton Agregar siempre visible */}
+        <button
+          onClick={handleOpenAdd}
+          className="absolute top-4 right-4 z-20 flex items-center gap-1.5 bg-white/20 hover:bg-white/30 backdrop-blur px-3 py-2 rounded-xl text-white text-xs font-bold active:scale-95 transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          {isEn ? 'Add' : 'Agregar'}
+        </button>
+
         <p className="text-xs uppercase tracking-wider opacity-85 font-medium">
           {t.totalEst}
         </p>

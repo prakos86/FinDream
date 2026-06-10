@@ -2192,6 +2192,26 @@ export default function App() {
     // NO cerrar el modal ni redirigir: el usuario puede seguir agregando
   };
 
+  // Agregado rapido desde el grid de categorias sugeridas (un solo toque)
+  const handleQuickAddCategory = (nombre: string, icon: string) => {
+    handleTap();
+    const yaExiste = categorias.some(
+      c => c.nombre.toLowerCase() === nombre.toLowerCase()
+    );
+    if (yaExiste) {
+      triggerDynamicIsland("Ya existe", `"${nombre}" ya está en tus categorías`, false);
+      return;
+    }
+    const colorByIcon: Record<string, string> = {
+      Home: '#8B5A2B', Utensils: '#F97316', Car: '#EF4444', ShoppingBag: '#EC4899',
+      Plane: '#3B82F6', Sparkles: '#10B981', Heart: '#F43F5E', Scissors: '#9333EA',
+    };
+    const newCat = { nombre, icon, color: colorByIcon[icon] || '#008B81' };
+    saveCategorias([...categorias, newCat]);
+    triggerDynamicIsland("Añadida", `Categoría "${nombre}" agregada con éxito`, true);
+    playTone('success', isMuted);
+  };
+
   const handleDeleteCategory = (nombre: string) => {
     if (nombre === 'Otros') {
       triggerDynamicIsland("No permitido", "La categoría de respaldo no se puede borrar", false);
@@ -4152,44 +4172,42 @@ export default function App() {
                   />
                 </div>
 
-                {/* ICON CHOOSE LIST */}
+                {/* QUICK ADD CATEGORIES (un toque) */}
                 <div>
                   <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1 block">
-                    {selectedLanguage === 'ES' ? 'Seleccionar Icono' : 'Select Icon'}
+                    {selectedLanguage === 'ES' ? 'Agregar Rápido (un toque)' : 'Quick Add (one tap)'}
                   </label>
                   <div className="grid grid-cols-4 gap-2">
                     {[
-                      { key: 'Home', label: '🏠 Vivienda', name: 'Vivienda' },
-                      { key: 'Utensils', label: '🍴 Comida', name: 'Comida' },
-                      { key: 'Car', label: '🚗 Auto', name: 'Auto' },
-                      { key: 'ShoppingBag', label: '🛍️ Compras', name: 'Compras' },
-                      { key: 'Plane', label: '✈️ Viajes', name: 'Viajes' },
-                      { key: 'Sparkles', label: '✨ Especial', name: 'Especial' },
-                      { key: 'Heart', label: '❤️ Mascota', name: 'Mascota' },
-                      { key: 'Scissors', label: '✂️ Moda', name: 'Moda' }
+                      { key: 'Home', label: '\u{1F3E0} Vivienda', name: 'Vivienda' },
+                      { key: 'Utensils', label: '\u{1F374} Comida', name: 'Comida' },
+                      { key: 'Car', label: '\u{1F697} Auto', name: 'Auto' },
+                      { key: 'ShoppingBag', label: '\u{1F6CD}\u{FE0F} Compras', name: 'Compras' },
+                      { key: 'Plane', label: '\u{2708}\u{FE0F} Viajes', name: 'Viajes' },
+                      { key: 'Sparkles', label: '\u{2728} Especial', name: 'Especial' },
+                      { key: 'Heart', label: '\u{2764}\u{FE0F} Mascota', name: 'Mascota' },
+                      { key: 'Scissors', label: '\u{2702}\u{FE0F} Moda', name: 'Moda' }
                     ].map((iconData) => {
-                      const isSel = newCatIcon === iconData.key;
+                      const yaExiste = categorias.some(
+                        c => c.nombre.toLowerCase() === iconData.name.toLowerCase()
+                      );
                       return (
                         <button
                           key={iconData.key}
                           type="button"
-                          onClick={() => {
-                            handleTap();
-                            setIconManuallySet(true);
-                            setNewCatIcon(iconData.key);
-                            if (!newCatName.trim()) {
-                              setNewCatName(iconData.name);
-                            }
-                          }}
-                          className={`p-2 rounded-lg border text-xs font-bold flex flex-col items-center justify-center transition-all cursor-pointer ${
-                            isSel ? 'border-indigo-650 bg-indigo-50 text-indigo-700 font-extrabold shadow-3xs' : 'border-slate-150 hover:bg-slate-50 text-slate-600'
+                          disabled={yaExiste}
+                          onClick={() => handleQuickAddCategory(iconData.name, iconData.key)}
+                          className={`p-2 rounded-lg border text-xs font-bold flex flex-col items-center justify-center transition-all ${
+                            yaExiste
+                              ? 'border-slate-150 text-slate-300 opacity-50 cursor-not-allowed'
+                              : 'border-slate-150 hover:bg-slate-50 text-slate-600 cursor-pointer active:scale-95'
                           }`}
                         >
                           <span className="text-sm shrink-0 mb-1">
                             {iconData.label.split(' ')[0]}
                           </span>
                           <span className="text-[8px] font-bold tracking-tight block truncate w-full">
-                            {iconData.label.split(' ').slice(1).join(' ')}
+                            {iconData.label.split(' ').slice(1).join(' ')}{yaExiste ? ' \u2713' : ''}
                           </span>
                         </button>
                       );
