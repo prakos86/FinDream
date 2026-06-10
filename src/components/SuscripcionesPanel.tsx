@@ -190,68 +190,77 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
             </button>
           </div>
         ) : (
-          suscripciones.map(s => {
-            const hasConversion = s.moneda !== monedaPais;
-            const badgeStyle = getSubBadgeColor(s.nombre, s.categoria);
-            return (
-              <div 
-                key={s.id} 
-                className="bg-white rounded-2xl p-4 flex items-center justify-between border border-slate-100 shadow-sm hover:shadow-md transition-shadow"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-bold text-slate-800 truncate">{s.nombre}</p>
-                    {s.categoria && (
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${badgeStyle}`}>
-                        {s.categoria}
-                      </span>
-                    )}
-                  </div>
-                  
-                  <p className="text-xs text-slate-500 mt-1 font-medium flex items-center gap-1 flex-wrap">
-                    <span className="text-slate-800 font-bold">{s.moneda} {s.monto.toLocaleString()}</span>
-                    <span className="text-slate-400">/</span>
-                    <span className="capitalize">{s.frecuencia === "Anual" ? t.yearly : t.monthly}</span>
-                    {s.fechaInicio && (
-                      <>
-                        <span className="text-slate-400">•</span>
-                        <span className="flex items-center gap-0.5 text-slate-400 text-[10px]">
-                          <Calendar className="w-3 h-3" />
-                          {s.fechaInicio}
+          <>
+            {suscripciones.map(s => {
+              const hasConversion = s.moneda !== monedaPais;
+              const badgeStyle = getSubBadgeColor(s.nombre, s.categoria);
+              return (
+                <div 
+                  key={s.id} 
+                  className="bg-white rounded-2xl p-4 flex items-center justify-between border border-slate-100 shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-slate-800 truncate">{s.nombre}</p>
+                      {s.categoria && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold ${badgeStyle}`}>
+                          {s.categoria}
                         </span>
-                      </>
-                    )}
-                  </p>
-                  
-                  {hasConversion && (
-                    <p className="text-[11px] text-teal-600 font-semibold mt-1 bg-teal-50/50 px-2 py-0.5 rounded-lg inline-flex items-center gap-1">
-                      ≈ {currencySymbol} {Math.round(convertir(s.monto, s.moneda, monedaPais)).toLocaleString()} {monedaPais}
-                      {s.frecuencia === 'Anual' && (
-                        <span className="text-slate-400 font-normal">({currencySymbol} {Math.round(convertir(s.monto, s.moneda, monedaPais) / 12).toLocaleString()} / {isEn ? "mo" : "mes"})</span>
+                      )}
+                    </div>
+                    
+                    <p className="text-xs text-slate-500 mt-1 font-medium flex items-center gap-1 flex-wrap">
+                      <span className="text-slate-800 font-bold">{s.moneda} {s.monto.toLocaleString()}</span>
+                      <span className="text-slate-400">/</span>
+                      <span className="capitalize">{s.frecuencia === "Anual" ? t.yearly : t.monthly}</span>
+                      {s.fechaInicio && (
+                        <>
+                          <span className="text-slate-400">•</span>
+                          <span className="flex items-center gap-0.5 text-slate-400 text-[10px]">
+                            <Calendar className="w-3 h-3" />
+                            {s.fechaInicio}
+                          </span>
+                        </>
                       )}
                     </p>
-                  )}
-                </div>
+                    
+                    {hasConversion && (
+                      <p className="text-[11px] text-teal-600 font-semibold mt-1 bg-teal-50/50 px-2 py-0.5 rounded-lg inline-flex items-center gap-1">
+                        ≈ {currencySymbol} {Math.round(convertir(s.monto, s.moneda, monedaPais)).toLocaleString()} {monedaPais}
+                        {s.frecuencia === 'Anual' && (
+                          <span className="text-slate-400 font-normal">({currencySymbol} {Math.round(convertir(s.monto, s.moneda, monedaPais) / 12).toLocaleString()} / {isEn ? "mo" : "mes"})</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
 
-                <div className="flex items-center gap-1 ml-4">
-                  <button 
-                    onClick={() => startEditingSuscripcion(s)}
-                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                    title={t.edit}
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteSuscripcion(s.id)}
-                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                    title={t.delete}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1 ml-4">
+                    <button 
+                      onClick={() => startEditingSuscripcion(s)}
+                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      title={t.edit}
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteSuscripcion(s.id)}
+                      className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                      title={t.delete}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+            <button
+              onClick={handleOpenAdd}
+              className='w-full mt-3 py-3 rounded-2xl border-2 border-dashed border-teal-300 text-teal-600 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-teal-50 active:scale-95 transition-all'
+            >
+              <Plus className='w-4 h-4' />
+              {isEn ? 'Add Subscription' : 'Agregar Suscripción'}
+            </button>
+          </>
         )}
       </div>
 

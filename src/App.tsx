@@ -829,7 +829,7 @@ export default function App() {
     const petKeywords = ['mascota', 'mascotas', 'perro', 'gato', 'animal', 'pet', 'pets', 'dog', 'cat', 'veterinari', 'veterinario', 'veterinaria', 'peludo', 'fiel'];
     const foodKeywords = ['comida', 'restaurante', 'alimento', 'cena', 'almuerzo', 'desayuno', 'bocadillo', 'cafe', 'comidas', 'food', 'market', 'supermercado', 'fruta', 'verdura', 'domicilio', 'domicilios'];
     const travelKeywords = ['viaje', 'vuelo', 'avion', 'hotel', 'aeropuerto', 'pasaje', 'viajes', 'turismo', 'travel', 'trip', 'escapada'];
-    const carKeywords = ['carro', 'transporte', 'auto', 'moto', 'gasolina', 'uber', 'taxi', 'peaje', 'vehiculo', 'gas', 'car', 'mantenimiento', 'taller', 'repuestos'];
+    const carKeywords = ['carro', 'transporte', 'auto', 'moto', 'gasolina', 'uber', 'taxi', 'peaje', 'vehiculo', 'gas', 'car', 'mantenimiento', 'taller', 'repuestos', 'coche', 'combustible', 'bencinera', 'nafta', 'estacionamiento', 'parking', 'lyft', 'cabify', 'beat', 'didi', 'bencina'];
     const shopKeywords = ['compras', 'compra', 'mercado', 'mall', 'shopp', 'shopping', 'regalo', 'regalos', 'tienda', 'retail', 'regalar'];
     const homeKeywords = ['casa', 'arriendo', 'hogar', 'vivienda', 'muebles', 'alquiler', 'luz', 'agua', 'gas', 'servicio', 'servicios', 'home', 'reparaciones'];
     const fashionKeywords = ['moda', 'ropa', 'fashion', 'peluqueria', 'tijeras', 'estilo', 'cortar', 'barbero', 'estilista', 'scissors', 'vestido', 'zapatos', 'corte', 'barba'];
@@ -4150,21 +4150,27 @@ export default function App() {
                   </label>
                   <div className="grid grid-cols-4 gap-2">
                     {[
-                      { key: 'Home', label: '🏠 Vivienda' },
-                      { key: 'Utensils', label: '🍴 Comida' },
-                      { key: 'Car', label: '🚗 Auto' },
-                      { key: 'ShoppingBag', label: '🛍️ Compras' },
-                      { key: 'Plane', label: '✈️ Viajes' },
-                      { key: 'Sparkles', label: '✨ Especial' },
-                      { key: 'Heart', label: '❤️ Mascota' },
-                      { key: 'Scissors', label: '✂️ Moda' }
+                      { key: 'Home', label: '🏠 Vivienda', name: 'Vivienda' },
+                      { key: 'Utensils', label: '🍴 Comida', name: 'Comida' },
+                      { key: 'Car', label: '🚗 Auto', name: 'Auto' },
+                      { key: 'ShoppingBag', label: '🛍️ Compras', name: 'Compras' },
+                      { key: 'Plane', label: '✈️ Viajes', name: 'Viajes' },
+                      { key: 'Sparkles', label: '✨ Especial', name: 'Especial' },
+                      { key: 'Heart', label: '❤️ Mascota', name: 'Mascota' },
+                      { key: 'Scissors', label: '✂️ Moda', name: 'Moda' }
                     ].map((iconData) => {
                       const isSel = newCatIcon === iconData.key;
                       return (
                         <button
                           key={iconData.key}
                           type="button"
-                          onClick={() => { handleTap(); setNewCatIcon(iconData.key); }}
+                          onClick={() => {
+                            handleTap();
+                            setNewCatIcon(iconData.key);
+                            if (!newCatName.trim()) {
+                              setNewCatName(iconData.name);
+                            }
+                          }}
                           className={`p-2 rounded-lg border text-xs font-bold flex flex-col items-center justify-center transition-all cursor-pointer ${
                             isSel ? 'border-indigo-650 bg-indigo-50 text-indigo-700 font-extrabold shadow-3xs' : 'border-slate-150 hover:bg-slate-50 text-slate-600'
                           }`}
