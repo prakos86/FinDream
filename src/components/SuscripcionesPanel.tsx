@@ -167,7 +167,7 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-32">
+    <div className="min-h-full bg-slate-50 pb-36">
       {/* Header con total mensual */}
       <div className="bg-gradient-to-r from-indigo-600 to-teal-600 p-5 rounded-3xl m-4 text-white shadow-lg relative overflow-hidden">
         {/* Abstract background shapes */}

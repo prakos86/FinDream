@@ -2462,6 +2462,17 @@ export default function App() {
 
         {/* --- COUNTRY, LANGUAGE AND USER PROFILE SECTION --- */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          {activeTab === 'suscripciones' && (
+            <button
+              id="header-btn-add-subscription"
+              onClick={() => { handleTap(); setAutoOpenSubModal(true); }}
+              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[11px] font-black uppercase tracking-wider relative z-30 shadow-md border border-indigo-500/10 cursor-pointer active:scale-95 transition-all mr-1"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[3]" />
+              <span>{selectedLanguage === 'ES' ? 'Agregar' : 'Add'}</span>
+            </button>
+          )}
+
           {MULTIPAIS_HABILITADO && (
             <div className="relative flex items-center bg-slate-50 hover:bg-slate-100 border border-slate-200/60 rounded-xl px-1.5 py-1 gap-1 shadow-2xs transition-colors">
               <span className="text-[10px] font-black text-slate-700 flex items-center gap-0.5">
@@ -2508,7 +2519,7 @@ export default function App() {
       </div>
 
       {/* Main Screen Scroll Viewport */}
-      <div id="main-scroll-container" className="flex-1 overflow-y-auto no-scrollbar pb-16 relative">
+      <div id="main-scroll-container" className="flex-1 overflow-y-auto no-scrollbar pb-32 relative">
         {activeTab === 'finance' ? (
           <div className="p-5 space-y-5">
             {/* --- FILTRO DE TIEMPO (Pill Slide iOS - NOW AT THE TOP CONSTRAINING EVERYTHING BELOW) --- */}
