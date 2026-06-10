@@ -299,6 +299,17 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
         )}
       </div>
 
+      {/* Persistent Floating Action Button (FAB) relative to viewport for frictionless entry at any scroll depth */}
+      <div className="fixed bottom-24 right-6 z-40">
+        <button
+          onClick={handleOpenAdd}
+          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-4.5 py-3.5 rounded-full shadow-[0_8px_30px_rgba(79,70,229,0.4)] hover:shadow-[0_8px_30px_rgba(79,70,229,0.65)] active:scale-95 transition-all cursor-pointer border border-white/10"
+        >
+          <Plus className="w-5 h-5 stroke-[3]" />
+          <span className="text-xs uppercase tracking-wider font-black">{isEn ? 'Add' : 'Agregar'}</span>
+        </button>
+      </div>
+
 
 
       {/* Modal Overlay / Drawer styled standard form */}

@@ -1461,6 +1461,7 @@ export default function App() {
   const [startVoiceOnAdd, setStartVoiceOnAdd] = useState(false);
   const [popupInitialChoice, setPopupInitialChoice] = useState<'choice' | 'form' | null>('choice');
   const [prefilledCategory, setPrefilledCategory] = useState<string | null>(null);
+  const [initialTransactionForModal, setInitialTransactionForModal] = useState<any | null>(null);
 
   // Quick Category Add States
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -2594,7 +2595,7 @@ export default function App() {
             </div>
           </motion.div>
         </div>
- 
+
         {/* --- BALANCE GENERAL RESUMEN --- */}
         <div id="balance-resumen" className="bg-white p-4 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-gray-100">
           <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
@@ -3960,6 +3961,14 @@ export default function App() {
           onMouseLeave={cancelPressLong}
           onTouchStart={startPressLong}
           onTouchEnd={(e) => { e.preventDefault(); endPressLong(e); }}
+          onClick={() => {
+            if (!isAddingOpen) {
+              handleTap();
+              setInitialTransactionForModal(null);
+              setPopupInitialChoice('choice');
+              setIsAddingOpen(true);
+            }
+          }}
           className="w-14 h-14 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-[3px] border-white shadow-lg active:scale-95 duration-200 cursor-pointer select-none"
           title="Presiona para elegir; mantén presionado para dictar con voz"
         >
@@ -4501,7 +4510,7 @@ export default function App() {
               ) : (
                               <TransactionForm
                 startWithVoice={startVoiceOnAdd}
-                initialTransaction={prefilledCategory ? { id: '', tipo: 'Gasto', monto: 0, categoria: prefilledCategory, descripcion: '', formaPago: '', fecha: formatLocalYYYYMMDD(new Date()) } : undefined}
+                initialTransaction={initialTransactionForModal || (prefilledCategory ? { id: '', tipo: 'Gasto', monto: 0, categoria: prefilledCategory, descripcion: '', formaPago: '', fecha: formatLocalYYYYMMDD(new Date()) } : undefined)}
                 onSave={(tx) => {
                   saveTransacciones([
                     { ...tx, id: `trx-${Date.now()}` },
@@ -4509,8 +4518,9 @@ export default function App() {
                   ]);
                   setIsAddingOpen(false);
                   setPrefilledCategory(null);
+                  setInitialTransactionForModal(null);
                 }}
-                onCancel={() => { setIsAddingOpen(false); setStartVoiceOnAdd(false); setPrefilledCategory(null); }}
+                onCancel={() => { setIsAddingOpen(false); setStartVoiceOnAdd(false); setPrefilledCategory(null); setInitialTransactionForModal(null); }}
                 getMergedPaymentMethods={getMergedPaymentMethods}
                 CATEGORIAS_PREDEFINIDAS={CATEGORIAS_PREDEFINIDAS}
                 categorias={categorias}
