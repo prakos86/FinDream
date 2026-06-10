@@ -820,11 +820,16 @@ export default function App() {
   const [newCatName, setNewCatName] = useState('');
   const [newCatColor, setNewCatColor] = useState('#008B81');
   const [newCatIcon, setNewCatIcon] = useState('Home');
+  const [iconManuallySet, setIconManuallySet] = useState(false);
 
   // Suggest sensible icon and color automatically based on typed category name
   useEffect(() => {
     const term = newCatName.toLowerCase().trim();
-    if (!term) return;
+    if (!term) {
+      setIconManuallySet(false); // campo vacio: reactivar auto-deteccion
+      return;
+    }
+    if (iconManuallySet) return; // icono elegido a mano: no sobrescribir
 
     const petKeywords = ['mascota', 'mascotas', 'perro', 'gato', 'animal', 'pet', 'pets', 'dog', 'cat', 'veterinari', 'veterinario', 'veterinaria', 'peludo', 'fiel'];
     const foodKeywords = ['comida', 'restaurante', 'alimento', 'cena', 'almuerzo', 'desayuno', 'bocadillo', 'cafe', 'comidas', 'food', 'market', 'supermercado', 'fruta', 'verdura', 'domicilio', 'domicilios'];
@@ -859,8 +864,11 @@ export default function App() {
     } else if (sparklesKeywords.some(kw => term.includes(kw))) {
       setNewCatIcon('Sparkles');
       setNewCatColor('#10B981'); // Emerald
+    } else {
+      setNewCatIcon('MoreHorizontal');
+      setNewCatColor('#6B7280'); // sin coincidencia: icono neutro
     }
-  }, [newCatName]);
+  }, [newCatName, iconManuallySet]);
 
   // Simulator state VS Full Screen State
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -2178,6 +2186,7 @@ export default function App() {
     };
     saveCategorias([...categorias, newCat]);
     setNewCatName('');
+    setIconManuallySet(false);
     triggerDynamicIsland("Añadida", `Categoría "${newCat.nombre}" agregada con éxito`, true);
     playTone('success', isMuted);
     // NO cerrar el modal ni redirigir: el usuario puede seguir agregando
@@ -4166,6 +4175,7 @@ export default function App() {
                           type="button"
                           onClick={() => {
                             handleTap();
+                            setIconManuallySet(true);
                             setNewCatIcon(iconData.key);
                             if (!newCatName.trim()) {
                               setNewCatName(iconData.name);
