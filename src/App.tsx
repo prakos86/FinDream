@@ -1457,6 +1457,7 @@ export default function App() {
   const [ordenSeleccionado, setOrdenSeleccionado] = useState<'MasReciente' | 'MayorGasto'>('MasReciente');
   // Bottom Sheet State
   const [isAddingOpen, setIsAddingOpen] = useState(false);
+  const [autoOpenSubModal, setAutoOpenSubModal] = useState(false);
   const [startVoiceOnAdd, setStartVoiceOnAdd] = useState(false);
   const [popupInitialChoice, setPopupInitialChoice] = useState<'choice' | 'form' | null>('choice');
   const [prefilledCategory, setPrefilledCategory] = useState<string | null>(null);
@@ -2448,7 +2449,11 @@ export default function App() {
                   ? t('tab_sueno') 
                   : activeTab === 'productos' 
                     ? t('tab_productos') 
-                    : t('tab_insights')}
+                    : activeTab === 'portafolios'
+                      ? t('tab_portafolio')
+                      : activeTab === 'suscripciones'
+                        ? t('tab_suscripciones')
+                        : t('tab_insights')}
               <span>{effectiveCountry === 'CO' ? '🇨🇴' : '🇨🇱'}</span>
             </h1>
           </div>
@@ -3937,6 +3942,8 @@ export default function App() {
             saveSuscripcionesList={saveSuscripcionesList}
             selectedCountry={effectiveCountry}
             selectedLanguage={selectedLanguage}
+            autoOpenAdd={autoOpenSubModal}
+            onAddOpened={() => setAutoOpenSubModal(false)}
           />
         ) : null}
       </div>
@@ -4397,6 +4404,33 @@ export default function App() {
                       <span className="text-[9px] text-gray-400 mt-1 block h-8 leading-relaxed">
                         Habla y captura automáticamente el monto y categoría
                       </span>
+                    </button>
+
+                    {/* Subscription Quick Option */}
+                    <button
+                      id="btn-choice-subscription"
+                      type="button"
+                      onClick={() => {
+                        handleTap();
+                        setIsAddingOpen(false);
+                        setActiveTab('suscripciones');
+                        setAutoOpenSubModal(true);
+                      }}
+                      className="col-span-2 p-4 rounded-2xl border border-indigo-100 bg-indigo-50/10 hover:bg-indigo-50/30 flex flex-row items-center justify-center gap-3.5 text-center cursor-pointer transition-all active:scale-[0.99] duration-200"
+                    >
+                      <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-md shrink-0">
+                        <Repeat className="w-5 h-5 text-teal-300" />
+                      </div>
+                      <div className="flex flex-col text-left">
+                        <span className="text-xs font-black text-indigo-900">
+                          {selectedLanguage === 'ES' ? 'Agregar Nueva Suscripción' : 'Add New Subscription'}
+                        </span>
+                        <span className="text-[10px] text-gray-500 mt-0.5 leading-relaxed font-semibold">
+                          {selectedLanguage === 'ES' 
+                            ? 'Controla plataformas (Netflix, Claude, iCloud) con conversión instantánea de monedas.' 
+                            : 'Manage subscriptions with dynamic currency and exchange rates.'}
+                        </span>
+                      </div>
                     </button>
                     
                     {/* Document Upload Choice */}

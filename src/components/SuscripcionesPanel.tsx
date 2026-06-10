@@ -22,13 +22,17 @@ interface SuscripcionesPanelProps {
   saveSuscripcionesList: (updated: Suscripcion[]) => void;
   selectedCountry: 'CO' | 'CL';
   selectedLanguage: string;
+  autoOpenAdd?: boolean;
+  onAddOpened?: () => void;
 }
 
 export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
   suscripciones = [],
   saveSuscripcionesList,
   selectedCountry,
-  selectedLanguage
+  selectedLanguage,
+  autoOpenAdd,
+  onAddOpened
 }) => {
   const isEn = selectedLanguage !== 'ES';
   const { rates, loading: exchangeLoading, convertir } = useExchangeRate();
@@ -45,6 +49,16 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // Auto-open effect
+  React.useEffect(() => {
+    if (autoOpenAdd) {
+      handleOpenAdd();
+      if (onAddOpened) {
+        onAddOpened();
+      }
+    }
+  }, [autoOpenAdd]);
 
   // Translations
   const t = {
@@ -155,30 +169,34 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
   return (
     <div className="min-h-screen bg-slate-50 pb-32">
       {/* Header con total mensual */}
-      <div className="bg-gradient-to-r from-indigo-600 to-teal-600 p-6 text-white shadow-md relative overflow-hidden">
+      <div className="bg-gradient-to-r from-indigo-600 to-teal-600 p-5 rounded-3xl m-4 text-white shadow-lg relative overflow-hidden">
         {/* Abstract background shapes */}
         <div className="absolute right-0 top-0 w-32 h-32 bg-white/5 rounded-full blur-2xl transform translate-x-12 -translate-y-12"></div>
         <div className="absolute bottom-0 right-1/4 w-24 h-24 bg-teal-300/10 rounded-full blur-xl"></div>
         
-        {/* Boton Agregar siempre visible */}
-        <button
-          onClick={handleOpenAdd}
-          className="absolute top-4 right-4 z-20 flex items-center gap-1.5 bg-white/20 hover:bg-white/30 backdrop-blur px-3 py-2 rounded-xl text-white text-xs font-bold active:scale-95 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          {isEn ? 'Add' : 'Agregar'}
-        </button>
+        <div className="flex items-center justify-between relative z-10">
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase tracking-widest opacity-90 font-black">
+              {t.totalEst}
+            </p>
+            <p className="text-2xl font-black tracking-tight flex items-baseline gap-1">
+              {currencySymbol}{Math.round(totalMensual).toLocaleString()}
+              <span className="text-xs font-bold opacity-80">{monedaPais}</span>
+            </p>
+            <p className="text-[11px] opacity-90 flex items-center gap-1.5 font-bold pt-0.5">
+              <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+              {suscripciones.length} {t.activeSubs}
+            </p>
+          </div>
 
-        <p className="text-xs uppercase tracking-wider opacity-85 font-medium">
-          {t.totalEst}
-        </p>
-        <p className="text-3xl font-black mt-2 tracking-tight">
-          {currencySymbol} {Math.round(totalMensual).toLocaleString()} <span className="text-base font-normal opacity-80">{monedaPais}</span>
-        </p>
-        <p className="text-xs opacity-75 mt-2 flex items-center gap-1.5 font-medium">
-          <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
-          {suscripciones.length} {t.activeSubs}
-        </p>
+          <button
+            onClick={handleOpenAdd}
+            className="flex items-center gap-1 bg-white hover:bg-slate-50 text-indigo-700 font-extrabold px-3.5 py-2.5 rounded-2xl text-xs active:scale-95 transition-all shadow-md cursor-pointer flex-shrink-0"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>{isEn ? 'Add' : 'Agregar'}</span>
+          </button>
+        </div>
       </div>
 
       {exchangeLoading && (
