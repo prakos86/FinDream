@@ -145,7 +145,7 @@ const TRANSLATIONS = {
   ES: {
     tab_resumen: "Resumen",
     tab_sueno: "Sueño",
-    tab_insights: "Insights",
+    tab_insights: "Asesor IA",
     ingresar_movimiento: "Ingresar a Finanzas",
     mi_cuenta: "Mi Cuenta",
     ingresos: "Activos / Ingresos",
@@ -222,7 +222,7 @@ const TRANSLATIONS = {
   EN: {
     tab_resumen: "Summary",
     tab_sueno: "Dream",
-    tab_insights: "Insights",
+    tab_insights: "AI Advisor",
     ingresar_movimiento: "Enter Finances",
     mi_cuenta: "My Account",
     ingresos: "Assets / Income",
@@ -3865,7 +3865,7 @@ export default function App() {
                     : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
-                <Sparkles className="w-3.5 h-3.5" /> Asesor IA
+                <Sparkles className="w-3.5 h-3.5" /> Prako IA
               </button>
               <button
                 onClick={() => { handleTap(); setActiveInsightSubTab('insights'); }}
@@ -3875,7 +3875,7 @@ export default function App() {
                     : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
-                💡 Insights
+                💡 Consejos IA
               </button>
             </div>
 
@@ -3950,31 +3950,33 @@ export default function App() {
       </div>
 
       {/* Floating Action Button (Moved to bottom right to avoid overlap with 5 tabs) */}
-      <div className="absolute left-1/2 -translate-x-1/2 z-50"
-        style={{
-          bottom: 'calc(4rem - 11px + env(safe-area-inset-bottom, 0px))'
-        }}>
-        <button
-          id="btn-center-plus"
-          onMouseDown={startPressLong}
-          onMouseUp={endPressLong}
-          onMouseLeave={cancelPressLong}
-          onTouchStart={startPressLong}
-          onTouchEnd={(e) => { e.preventDefault(); endPressLong(e); }}
-          onClick={() => {
-            if (!isAddingOpen) {
-              handleTap();
-              setInitialTransactionForModal(null);
-              setPopupInitialChoice('choice');
-              setIsAddingOpen(true);
-            }
-          }}
-          className="w-14 h-14 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-[3px] border-white shadow-lg active:scale-95 duration-200 cursor-pointer select-none"
-          title="Presiona para elegir; mantén presionado para dictar con voz"
-        >
-          <Plus className="w-7 h-7 stroke-[3px]" />
-        </button>
-      </div>
+      {activeTab !== 'insights' && (
+        <div className="absolute left-1/2 -translate-x-1/2 z-50"
+          style={{
+            bottom: 'calc(4rem - 11px + env(safe-area-inset-bottom, 0px))'
+          }}>
+          <button
+            id="btn-center-plus"
+            onMouseDown={startPressLong}
+            onMouseUp={endPressLong}
+            onMouseLeave={cancelPressLong}
+            onTouchStart={startPressLong}
+            onTouchEnd={(e) => { e.preventDefault(); endPressLong(e); }}
+            onClick={() => {
+              if (!isAddingOpen) {
+                handleTap();
+                setInitialTransactionForModal(null);
+                setPopupInitialChoice('choice');
+                setIsAddingOpen(true);
+              }
+            }}
+            className="w-14 h-14 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-[3px] border-white shadow-lg active:scale-95 duration-200 cursor-pointer select-none"
+            title="Presiona para elegir; mantén presionado para dictar con voz"
+          >
+            <Plus className="w-7 h-7 stroke-[3px]" />
+          </button>
+        </div>
+      )}
 
       {isReorderMode && (
         <div className="absolute bottom-[4rem] inset-x-0 flex justify-center z-50 pb-1 pointer-events-none">
