@@ -174,7 +174,7 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
         <div className="absolute right-0 top-0 w-32 h-32 bg-white/5 rounded-full blur-2xl transform translate-x-12 -translate-y-12"></div>
         <div className="absolute bottom-0 right-1/4 w-24 h-24 bg-teal-300/10 rounded-full blur-xl"></div>
         
-        <div className="flex items-center justify-between relative z-10">
+        <div className="flex items-center justify-between relative z-10 w-full">
           <div className="space-y-1">
             <p className="text-[10px] uppercase tracking-widest opacity-90 font-black">
               {t.totalEst}
@@ -191,10 +191,10 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
 
           <button
             onClick={handleOpenAdd}
-            className="flex items-center gap-1 bg-white hover:bg-slate-50 text-indigo-700 font-extrabold px-3.5 py-2.5 rounded-2xl text-xs active:scale-95 transition-all shadow-md cursor-pointer flex-shrink-0"
+            className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-indigo-700 font-extrabold px-4.5 py-3 rounded-2xl text-xs active:scale-95 transition-all shadow-lg cursor-pointer flex-shrink-0 relative z-20 border border-white/20"
           >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>{isEn ? 'Add' : 'Agregar'}</span>
+            <Plus className="w-3.5 h-3.5 stroke-[3] text-indigo-600" />
+            <span className="font-extrabold uppercase tracking-wide">{isEn ? 'Add' : 'Agregar'}</span>
           </button>
         </div>
       </div>
