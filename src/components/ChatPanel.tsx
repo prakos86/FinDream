@@ -790,13 +790,57 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         if (action.type === 'addTransaction' && action.payload) {
           const p = action.payload;
           const numericMonto = normalizarMontoLocal(p.monto) || 0;
+          const targetFecha = p.fecha || new Date().toISOString().split('T')[0];
+          const targetDesc = p.descripcion || 'Acción desde Prako AI';
+          const targetCat = p.categoria || (p.tipo === 'Ingreso' ? 'Salario' : 'Otros');
+
+          // Helper clean/normalize text for similarity checks
+          const cleanText = (txt: string) => {
+            return txt
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "") // remove accents
+              .replace(/[^a-z0-9 ]/g, "")      // keep only word chars/digits
+              .trim();
+          };
+
+          const isDuplicate = currentTxList.some((tx) => {
+            if (tx.monto !== numericMonto) return false;
+            if (tx.fecha !== targetFecha) return false;
+
+            const txDescClean = cleanText(tx.descripcion || '');
+            const targetDescClean = cleanText(targetDesc);
+            const txCatClean = cleanText(tx.categoria || '');
+            const targetCatClean = cleanText(targetCat);
+
+            // Similarity threshold for description/category (exact match or substring)
+            const descMatch = txDescClean === targetDescClean ||
+              (txDescClean.length > 2 && targetDescClean.length > 2 &&
+                (txDescClean.includes(targetDescClean) || targetDescClean.includes(txDescClean)));
+            const catMatch = txCatClean === targetCatClean ||
+              (txCatClean.length > 2 && targetCatClean.length > 2 &&
+                (txCatClean.includes(targetCatClean) || targetCatClean.includes(txCatClean)));
+
+            return descMatch || catMatch;
+          });
+
+          if (isDuplicate) {
+            console.log("[ChatPanel] Omitiendo duplicado detectado:", p);
+            triggerDynamicIsland(
+              selectedLanguage === "ES" ? "Gasto ya registrado" : "Duplicate Detected",
+              selectedLanguage === "ES" ? "Se omitió el duplicado" : "Duplicate transaction omitted",
+              false
+            );
+            return;
+          }
+
           const newT: Transaccion = {
             id: `trx-${Date.now()}-${Math.random()}`,
             tipo: p.tipo === 'Ingreso' ? 'Ingreso' : 'Gasto',
             monto: numericMonto,
-            categoria: p.categoria || (p.tipo === 'Ingreso' ? 'Salario' : 'Otros'),
-            descripcion: p.descripcion || 'Acción desde Prako AI',
-            fecha: p.fecha || new Date().toISOString().split('T')[0],
+            categoria: targetCat,
+            descripcion: targetDesc,
+            fecha: targetFecha,
             formaPago: p.formaPago || 'Efectivo'
           };
           currentTxList = [newT, ...currentTxList];

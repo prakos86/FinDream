@@ -70,6 +70,7 @@ export interface UserProfile {
   productos: ProductoFinanciero[];
   portafolios?: ActivoPortafolio[];
   suscripciones?: Suscripcion[];
+  ia_feedback?: { [recommendationId: string]: 'util' | 'noutil' };
 }
 
 export interface ChatMessage {

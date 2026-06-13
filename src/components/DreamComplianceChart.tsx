@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Trophy, Calendar, TrendingUp, Plus, Trash2, Check, ArrowRight, X, MoreHorizontal, Expand, History, PlusCircle } from 'lucide-react';
-import { Sueno, Transaccion, HistoricoAvance } from '../types';
+import { Sueno, Transaccion, HistoricoAvance, UserProfile } from '../types';
 
 interface DreamComplianceChartProps {
   suenos: Sueno[];
@@ -16,6 +16,8 @@ interface DreamComplianceChartProps {
   onUpdateSueno: (sueno: Sueno) => void;
   onDeleteSueno: (id: string) => void;
   transacciones: Transaccion[];
+  userProfile?: UserProfile;
+  saveUserProfileData?: (updated: UserProfile) => void;
 }
 
 export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
@@ -31,6 +33,8 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
   onUpdateSueno,
   onDeleteSueno,
   transacciones,
+  userProfile,
+  saveUserProfileData,
 }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingSuenoId, setEditingSuenoId] = useState<string | null>(null);
@@ -53,6 +57,114 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
     bullets?: string[];
   } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // --- INICIO DE DETECTORES Y CÁLCULOS DETERMINISTAS (FASE 1) ---
+  const getMonthsOfHistoryDet = () => {
+    if (!transacciones || transacciones.length === 0) return 0;
+    const uniqueMonths = new Set<string>();
+    transacciones.forEach(t => {
+      if (t.fecha) {
+        const yyyymm = t.fecha.substring(0, 7);
+        if (yyyymm && yyyymm.length === 7) {
+          uniqueMonths.add(yyyymm);
+        }
+      }
+    });
+    return uniqueMonths.size;
+  };
+
+  const calculateDeterministicIntelligence = () => {
+    const historicalMonthsCount = getMonthsOfHistoryDet();
+
+    const monthlySurpluses: { [month: string]: number } = {};
+    const monthlyIngresos: { [month: string]: number } = {};
+    const monthlyGastos: { [month: string]: number } = {};
+    const categoryTotals: { [category: string]: number } = {};
+
+    transacciones.forEach(t => {
+      const date = t.fecha || new Date().toISOString().split('T')[0];
+      const month = date.substring(0, 7);
+      
+      if (!monthlyIngresos[month]) monthlyIngresos[month] = 0;
+      if (!monthlyGastos[month]) monthlyGastos[month] = 0;
+
+      if (t.tipo === 'Ingreso') {
+        monthlyIngresos[month] += t.monto;
+      } else {
+        monthlyGastos[month] += t.monto;
+        if (t.categoria) {
+          const cat = t.categoria;
+          categoryTotals[cat] = (categoryTotals[cat] || 0) + t.monto;
+        }
+      }
+    });
+
+    const uniqueMonths = Object.keys(monthlyIngresos);
+    let totalSurplusSum = 0;
+    uniqueMonths.forEach(m => {
+      totalSurplusSum += (monthlyIngresos[m] - (monthlyGastos[m] || 0));
+    });
+
+    const averageSurplus = uniqueMonths.length > 0 
+      ? Math.round(totalSurplusSum / uniqueMonths.length)
+      : 0;
+
+    let maxCatName = '';
+    let maxCatAmount = 0;
+    Object.entries(categoryTotals).forEach(([cat, amt]) => {
+      if (amt > maxCatAmount) {
+        maxCatAmount = amt;
+        maxCatName = cat;
+      }
+    });
+
+    const monthlyAverageForMaxCat = uniqueMonths.length > 0 
+      ? Math.round(maxCatAmount / uniqueMonths.length)
+      : maxCatAmount;
+
+    const allocationPercentage = 60;
+    const recommendedMonthlyAllocation = Math.max(10, Math.round(averageSurplus * (allocationPercentage / 100)));
+
+    return {
+      historicalMonthsCount,
+      averageSurplus,
+      recommendedMonthlyAllocation,
+      maxCatName: maxCatName || (selectedLanguage === 'ES' ? 'Gastos Varios' : 'General Expenses'),
+      monthlyAverageForMaxCat,
+      allocationPercentage
+    };
+  };
+
+  const getProjectedDateStr = (months: number) => {
+    if (months === Infinity || isNaN(months) || months <= 0) return '';
+    const date = new Date();
+    date.setMonth(date.getMonth() + months);
+    const monthsNamesEs = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    const monthsNamesEn = [
+      'January', 'February', 'March', 'April', 'May', 'June', 
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const isEs = selectedLanguage === 'ES';
+    const monthName = isEs ? monthsNamesEs[date.getMonth()] : monthsNamesEn[date.getMonth()];
+    return `${monthName} ${date.getFullYear()}`;
+  };
+
+  const handleSuggestFeedback = (recommendationId: string, feedbackType: 'util' | 'noutil') => {
+    if (!saveUserProfileData || !userProfile) return;
+    const currentFeedback = userProfile.ia_feedback || {};
+    const updatedFeedback = {
+      ...currentFeedback,
+      [recommendationId]: feedbackType
+    };
+    saveUserProfileData({
+      ...userProfile,
+      ia_feedback: updatedFeedback
+    });
+  };
+  // --- FIN DE DETECTORES Y CÁLCULOS DETERMINISTAS (FASE 1) ---
 
   // Manual inputs for the "Insufficient Info" path (Camino 2)
   const [manualIncomeInput, setManualIncomeInput] = useState<string>('');
@@ -842,6 +954,134 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
           )}
         </AnimatePresence>
       </div>
+
+      {/* CARD DE METAS DE AHORRO INTELIGENTES (FASE 1) */}
+      {(() => {
+        const isEs = selectedLanguage === 'ES';
+        const intel = calculateDeterministicIntelligence();
+        const remainingMeta = activeSueno ? Math.max(0, activeSueno.meta - (activeSueno.ahorroAcumulado || 0)) : 0;
+        const monthsToAchieve = intel.recommendedMonthlyAllocation > 0 ? Math.ceil(remainingMeta / intel.recommendedMonthlyAllocation) : 0;
+        const projectedDate = getProjectedDateStr(monthsToAchieve);
+        
+        // Calculate "palanca de ahorro" (e.g. cutting 20% of dominant spending category)
+        const extraMonthlySavings = Math.round(intel.monthlyAverageForMaxCat * 0.20);
+        const newAllocation = intel.recommendedMonthlyAllocation + extraMonthlySavings;
+        const newMonthsToAchieve = newAllocation > 0 ? Math.ceil(remainingMeta / newAllocation) : 0;
+        const monthsFaster = Math.max(1, monthsToAchieve - newMonthsToAchieve);
+
+        const recId = activeSueno ? `recommend-sueno-${activeSueno.id}` : 'general';
+        const existingFeedback = userProfile?.ia_feedback?.[recId];
+
+        // Format localized strings and messages
+        let badgeText = '';
+        let badgeStyle = '';
+        let descText = '';
+
+        if (intel.historicalMonthsCount === 0) {
+          badgeText = isEs ? "Sigue registrando para metas personalizadas" : "Record more for personalized goals";
+          badgeStyle = "bg-amber-50 text-amber-800 border-amber-200/50";
+          descText = isEs 
+            ? "Aún no posees transacciones suficientes registradas en el mes actual. Registra tus ingresos y gastos para que Prako IA calcule tu superávit mensual real." 
+            : "You don't have enough transactions registered yet. Record your income and expenses to unlock real-time monthly surplus calculations.";
+        } else if (intel.historicalMonthsCount >= 1 && intel.historicalMonthsCount <= 2) {
+          badgeText = isEs ? "⚡ Estimación Preliminar" : "⚡ Preliminary Estimate";
+          badgeStyle = "bg-indigo-50 text-indigo-800 border-indigo-200/50";
+          const savingsPercent = intel.averageSurplus > 0 ? Math.round((intel.recommendedMonthlyAllocation / intel.averageSurplus) * 100) : 0;
+          descText = isEs
+            ? `¡Hola! Con base en una estimación preliminar de tus finanzas (${intel.historicalMonthsCount} mes/es registrados), tu superávit promedio mensual estimado es de $${intel.averageSurplus.toLocaleString('es-ES')}. Te propongo ahorrar $${intel.recommendedMonthlyAllocation.toLocaleString('es-ES')} al mes (un ${savingsPercent}% de tu superávit). Siguiendo este plan preliminar, lograrás '${activeSueno?.nombre || ''}' en ${monthsToAchieve} meses (${projectedDate || 'pronto'}).`
+            : `Hello! Based on a preliminary scan of your finances (${intel.historicalMonthsCount} month(s) recorded), your estimated average monthly surplus is $${intel.averageSurplus.toLocaleString('es-ES')}. I suggest allocating $${intel.recommendedMonthlyAllocation.toLocaleString('es-ES')} monthly (around ${savingsPercent}% of your surplus). Under this plan, you will reach '${activeSueno?.nombre || ''}' in ${monthsToAchieve} months (${projectedDate || 'soon'}).`;
+        } else {
+          badgeText = isEs ? "🏆 Recomendación Firme" : "🏆 Firm Recommendation";
+          badgeStyle = "bg-teal-50 text-teal-800 border-teal-200/50";
+          const savingsPercent = intel.averageSurplus > 0 ? Math.round((intel.recommendedMonthlyAllocation / intel.averageSurplus) * 100) : 0;
+          descText = isEs
+            ? `¡Hola! Tras analizar con detalle tu historial completo de ${intel.historicalMonthsCount} meses, tu superávit real promedio mensual es de $${intel.averageSurplus.toLocaleString('es-ES')}. Te sugiero asignar con firmeza una cuota mensual de $${intel.recommendedMonthlyAllocation.toLocaleString('es-ES')} (60% de tu superávit). Alcanzarás '${activeSueno?.nombre || ''}' en ${monthsToAchieve} meses, proyectado para ${projectedDate}.`
+            : `Hello! After thoroughly analyzing your complete historical data of ${intel.historicalMonthsCount} months, your real average monthly surplus stands at $${intel.averageSurplus.toLocaleString('es-ES')}. I strongly suggest setting a monthly savings quota of $${intel.recommendedMonthlyAllocation.toLocaleString('es-ES')} (60% of your surplus). You'll reach '${activeSueno?.nombre || ''}' in ${monthsToAchieve} months, projected for ${projectedDate}.`;
+        }
+
+        const reductionActionText = isEs
+          ? `Al recortar un 20% de tu gasto mensual en '${intel.maxCatName}' (un ahorro adicional de $${extraMonthlySavings.toLocaleString('es-ES')}/mes), ¡lo lograrás ${monthsFaster} ${monthsFaster === 1 ? 'mes' : 'meses'} antes!`
+          : `By trimming 20% of your monthly spend on '${intel.maxCatName}' (saving an extra $${extraMonthlySavings.toLocaleString('es-ES')}/mo), you'll reach it ${monthsFaster} ${monthsFaster === 1 ? 'month' : 'months'} sooner!`;
+
+        return (
+          <div className="bg-gradient-to-br from-slate-50 to-indigo-50/30 rounded-3xl p-5 border border-indigo-200/60 shadow-xs text-left space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-indigo-100 border-dashed">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-gradient-to-tr from-teal-500 to-indigo-600 rounded-xl text-white">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <span className="text-[12px] font-black text-slate-800 uppercase tracking-widest">
+                  {isEs ? "Meta de Ahorro Inteligente" : "Smart Savings advice"}
+                </span>
+              </div>
+              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border self-start ${badgeStyle}`}>
+                {badgeText}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[11.5px] text-slate-700 leading-relaxed font-bold">
+                {descText}
+              </p>
+
+              {intel.historicalMonthsCount > 0 && intel.monthlyAverageForMaxCat > 0 && monthsToAchieve > 1 && (
+                <div className="p-3 bg-teal-50/60 border border-teal-150 rounded-2xl flex items-start gap-2">
+                  <span className="text-[#008B81] text-xs font-black mt-0.5">💡</span>
+                  <div className="space-y-0.5">
+                    <span className="text-[9.5px] uppercase tracking-wider font-extrabold text-[#00695C] block">
+                      {isEs ? "Palanca de Ahorro Activa" : "Savings leverage tool"}
+                    </span>
+                    <span className="text-[11.5px] text-[#004D40] font-bold leading-normal">
+                      {reductionActionText}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Voting Feedback Buttons under users/{userId} persistence */}
+            <div className="pt-2 border-t border-indigo-100 flex items-center justify-between gap-3 flex-wrap">
+              <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">
+                {isEs ? "¿Te fue útil esta meta?" : "Was this target helpful?"}
+              </span>
+              
+              {existingFeedback ? (
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1 bg-white px-3 py-1 rounded-full border border-slate-250">
+                  {existingFeedback === 'util' ? (
+                    <>👍 <span className="text-teal-600 font-black">{isEs ? "Marcada como útil" : "Marked as helpful"}</span></>
+                  ) : (
+                    <>👎 <span className="text-rose-500 font-black">{isEs ? "Descartada por no útil" : "Marked as not helpful"}</span></>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleSuggestFeedback(recId, existingFeedback === 'util' ? 'noutil' : 'util')}
+                    className="text-[9px] underline text-slate-400 ml-1.5 hover:text-slate-600 font-extrabold"
+                  >
+                    {isEs ? "(Cambiar)" : "(Change)"}
+                  </button>
+                </span>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSuggestFeedback(recId, 'util')}
+                    className="px-3 py-1.5 bg-white hover:bg-slate-100 text-teal-700 hover:text-teal-850 text-xs font-black rounded-xl border border-slate-200 transition active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <span>👍 {isEs ? "Sí, útil" : "Yes, helpful"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSuggestFeedback(recId, 'noutil')}
+                    className="px-3 py-1.5 bg-white hover:bg-slate-100 text-rose-500 hover:text-rose-650 text-xs font-black rounded-xl border border-slate-200 transition active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <span>👎 {isEs ? "No me sirve" : "Not helpful"}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* --- CURVA DE CUMPLIMIENTO CHART --- */}
       <div className="bg-white rounded-[25px] p-5 shadow-[0_4px_16px_rgba(0,0,0,0.02)] border border-gray-100 flex flex-col items-center">

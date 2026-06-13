@@ -3041,6 +3041,8 @@ export default function App() {
                 onUpdateSueno={handleUpdateSueno}
                 onDeleteSueno={handleDeleteSueno}
                 transacciones={transacciones}
+                userProfile={userProfile}
+                saveUserProfileData={saveUserProfileData}
               />
             </div>
 
