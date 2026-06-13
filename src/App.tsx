@@ -1458,6 +1458,12 @@ export default function App() {
   const [rangoInicio, setRangoInicio] = useState<string>(''); // 'YYYY-MM-DD'
   const [rangoFin, setRangoFin] = useState<string>(''); // 'YYYY-MM-DD'
   const [ordenSeleccionado, setOrdenSeleccionado] = useState<'MasReciente' | 'MayorGasto'>('MasReciente');
+
+  // Duplicate detection state
+  const [duplicatesPending, setDuplicatesPending] = useState<Transaccion[]>([]);
+  const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
+  const [isReviewingDetail, setIsReviewingDetail] = useState(false);
+  const [selectedDuplicateIds, setSelectedDuplicateIds] = useState<string[]>([]);
   // Bottom Sheet State
   const [isAddingOpen, setIsAddingOpen] = useState(false);
   const [autoOpenSubModal, setAutoOpenSubModal] = useState(false);
@@ -1678,9 +1684,21 @@ export default function App() {
             ? `Se encontraron ${newTxList.length} movimientos en el video por un total de $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. ¿Deseas agregarlos?` 
             : `Found ${newTxList.length} transactions in video totaling $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. Do you want to add them?`,
           () => {
-            saveTransacciones([...newTxList, ...transacciones]);
-            triggerDynamicIsland("Completado", selectedLanguage === 'ES' ? `Se agregaron ${newTxList.length} movimientos.` : `${newTxList.length} transactions added.`, true);
+            const esDup = (nt: Transaccion) =>
+              transacciones.some(tx => tx.monto === nt.monto && tx.fecha === nt.fecha);
+            const dups = newTxList.filter(esDup);
+            const nuevos = newTxList.filter(nt => !esDup(nt));
+            if (nuevos.length > 0) {
+              saveTransacciones([...nuevos, ...transacciones]);
+            }
+            triggerDynamicIsland("Completado",
+              selectedLanguage === 'ES' ? `Se agregaron ${nuevos.length} movimientos.` : `${nuevos.length} transactions added.`,
+              true
+            );
             playTone('success', isMuted);
+            if (dups.length > 0) {
+              triggerDuplicatesModal(dups);
+            }
           }
         );
 
@@ -1795,9 +1813,21 @@ export default function App() {
           ? `Se encontraron ${newTxList.length} movimientos por un total de $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. ¿Deseas agregarlos?` 
           : `Found ${newTxList.length} transactions totaling $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. Do you want to add them?`,
         () => {
-          saveTransacciones([...newTxList, ...transacciones]);
-          triggerDynamicIsland("Completado", selectedLanguage === 'ES' ? `Se agregaron ${newTxList.length} movimientos.` : `${newTxList.length} transactions added.`, true);
+          const esDup = (nt: Transaccion) =>
+            transacciones.some(tx => tx.monto === nt.monto && tx.fecha === nt.fecha);
+          const dups = newTxList.filter(esDup);
+          const nuevos = newTxList.filter(nt => !esDup(nt));
+          if (nuevos.length > 0) {
+            saveTransacciones([...nuevos, ...transacciones]);
+          }
+          triggerDynamicIsland("Completado",
+            selectedLanguage === 'ES' ? `Se agregaron ${nuevos.length} movimientos.` : `${nuevos.length} transactions added.`,
+            true
+          );
           playTone('success', isMuted);
+          if (dups.length > 0) {
+            triggerDuplicatesModal(dups);
+          }
         }
       );
     } catch (error) {
@@ -1870,6 +1900,64 @@ export default function App() {
   const saveTransacciones = (novas: Transaccion[]) => {
     setTransacciones(novas);
     pushToFirestore(undefined, novas, undefined, undefined, undefined);
+  };
+
+  useEffect(() => {
+    if (showDuplicatesModal && duplicatesPending.length > 0) {
+      setSelectedDuplicateIds(duplicatesPending.map(d => d.id));
+      setIsReviewingDetail(false);
+    }
+  }, [showDuplicatesModal, duplicatesPending]);
+
+  const handleAddAllDuplicates = () => {
+    saveTransacciones([...duplicatesPending, ...transacciones]);
+    triggerDynamicIsland(
+      selectedLanguage === "ES" ? "Gastos agregados" : "Expenses added",
+      selectedLanguage === "ES" ? `Agregaste ${duplicatesPending.length} gastos` : `Added ${duplicatesPending.length} expenses`,
+      true
+    );
+    setDuplicatesPending([]);
+    setShowDuplicatesModal(false);
+  };
+
+  const handleDiscardDuplicates = () => {
+    setDuplicatesPending([]);
+    setShowDuplicatesModal(false);
+  };
+
+  const handleAddSelectedDuplicates = () => {
+    const chosen = duplicatesPending.filter(d => selectedDuplicateIds.includes(d.id));
+    if (chosen.length > 0) {
+      saveTransacciones([...chosen, ...transacciones]);
+      triggerDynamicIsland(
+        selectedLanguage === "ES" ? "Gastos agregados" : "Expenses added",
+        selectedLanguage === "ES" ? `Agregaste ${chosen.length} gastos` : `Added ${chosen.length} expenses`,
+        true
+      );
+    }
+    setDuplicatesPending([]);
+    setShowDuplicatesModal(false);
+  };
+
+  const handleToggleSelectDuplicate = (id: string) => {
+    setSelectedDuplicateIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectAllDuplicates = () => {
+    if (selectedDuplicateIds.length === duplicatesPending.length) {
+      setSelectedDuplicateIds([]);
+    } else {
+      setSelectedDuplicateIds(duplicatesPending.map(d => d.id));
+    }
+  };
+
+  const triggerDuplicatesModal = (dups: Transaccion[]) => {
+    setDuplicatesPending(dups);
+    setSelectedDuplicateIds([]);
+    setIsReviewingDetail(false);
+    setShowDuplicatesModal(true);
   };
 
   // Clock Update for iOS top tier
@@ -3976,6 +4064,7 @@ export default function App() {
                 setChatMessages={setChatMessages}
                 categorias={categorias}
                 getMergedPaymentMethods={getMergedPaymentMethods}
+                onDuplicatesFound={triggerDuplicatesModal}
               />
             ) : (
               /* --- B) INSIGHTS VIEW (Moved from Sueño tab) --- */
@@ -5236,6 +5325,137 @@ export default function App() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {showDuplicatesModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md p-5 shadow-2xl border border-slate-100 flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <h3 className="text-base font-black text-slate-800 tracking-tight leading-snug">
+                {selectedLanguage === 'ES' 
+                  ? `Tienes ${duplicatesPending.length} ${duplicatesPending.length === 1 ? 'gasto duplicado' : 'gastos duplicados'}`
+                  : `You have ${duplicatesPending.length} duplicate ${duplicatesPending.length === 1 ? 'expense' : 'expenses'}`}
+              </h3>
+              <button 
+                onClick={handleDiscardDuplicates}
+                className="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg hover:bg-slate-50"
+              >
+                <span className="text-lg font-bold">✕</span>
+              </button>
+            </div>
+            
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              {selectedLanguage === 'ES'
+                ? "Detectamos gastos que parecen ya registrados en tu historial. Elige qué acción tomar."
+                : "We detected transactions that seem to already exist in your history. Choose an action."}
+            </p>
+
+            {isReviewingDetail ? (
+              <div className="flex-1 flex flex-col min-h-0 space-y-3 font-sans">
+                <div className="flex items-center justify-between py-1 px-1 border-b border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handleToggleSelectAllDuplicates}
+                    className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>
+                      {selectedDuplicateIds.length === duplicatesPending.length
+                        ? (selectedLanguage === 'ES' ? 'Desmarcar todos' : 'Unselect all')
+                        : (selectedLanguage === 'ES' ? 'Seleccionar todos' : 'Select all')}
+                    </span>
+                  </button>
+                  <span className="text-[10px] text-slate-400 font-bold">
+                    {selectedLanguage === 'ES' 
+                      ? `${selectedDuplicateIds.length} seleccionados`
+                      : `${selectedDuplicateIds.length} selected`}
+                  </span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2 max-h-[40vh] pr-1 scrollbar-thin">
+                  {duplicatesPending.map((dup) => {
+                    const isChecked = selectedDuplicateIds.includes(dup.id);
+                    return (
+                      <div 
+                        key={dup.id} 
+                        onClick={() => handleToggleSelectDuplicate(dup.id)}
+                        className={`flex items-start gap-3 p-3 rounded-2xl border transition duration-150 cursor-pointer ${
+                          isChecked 
+                            ? 'border-indigo-200 bg-indigo-50/20 shadow-xs' 
+                            : 'border-slate-100 hover:border-slate-200 bg-slate-50/40'
+                        }`}
+                      >
+                        <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                          <input 
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleToggleSelectDuplicate(dup.id)}
+                            className="w-4 h-4 text-indigo-600 border-slate-300 rounded-sm focus:ring-indigo-500 cursor-pointer"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0 text-left">
+                          <p className="text-[11.5px] font-bold text-slate-800 truncate">
+                            {dup.descripcion}
+                          </p>
+                          <div className="flex items-center gap-1.5 text-[9.5px] text-slate-400 font-semibold uppercase mt-0.5">
+                            <span>{dup.categoria}</span>
+                            <span>•</span>
+                            <span>{dup.fecha}</span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className={`text-xs font-black ${
+                            dup.tipo === 'Ingreso' ? 'text-teal-600' : 'text-slate-800'
+                          }`}>
+                            {dup.tipo === 'Ingreso' ? '+' : '-'}${dup.monto.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    onClick={() => setIsReviewingDetail(false)}
+                    className="flex-1 py-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition active:scale-98 cursor-pointer animate-none"
+                  >
+                    {selectedLanguage === 'ES' ? 'Regresar' : 'Go Back'}
+                  </button>
+                  <button
+                    onClick={handleAddSelectedDuplicates}
+                    disabled={selectedDuplicateIds.length === 0}
+                    className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-bold text-xs shadow-md shadow-indigo-100 transition active:scale-98 cursor-pointer"
+                  >
+                    {selectedLanguage === 'ES' ? 'Agregar seleccionados' : 'Add Selected'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 font-sans">
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={handleAddAllDuplicates}
+                    className="w-full py-3 px-4 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl font-black text-xs shadow-md shadow-teal-100 transition active:scale-98 hover:shadow-lg cursor-pointer"
+                  >
+                    {selectedLanguage === 'ES' ? 'Agregar todos' : 'Add All'}
+                  </button>
+                  <button
+                    onClick={() => setIsReviewingDetail(true)}
+                    className="w-full py-3 px-4 bg-indigo-50/50 hover:bg-indigo-50 text-indigo-600 hover:text-indigo-700 rounded-2xl font-black text-xs border border-indigo-100/30 transition active:scale-98 cursor-pointer"
+                  >
+                    {selectedLanguage === 'ES' ? 'Revisar' : 'Review One by One'}
+                  </button>
+                  <button
+                    onClick={handleDiscardDuplicates}
+                    className="w-full py-3 px-4 bg-white border border-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-2xl font-bold text-xs transition active:scale-98 cursor-pointer"
+                  >
+                    {selectedLanguage === 'ES' ? 'No agregar' : 'Do Not Add Any'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
