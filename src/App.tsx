@@ -1491,6 +1491,13 @@ export default function App() {
   const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
   const [isReviewingDetail, setIsReviewingDetail] = useState(false);
   const [selectedDuplicateIds, setSelectedDuplicateIds] = useState<string[]>([]);
+  const [showMixedImportModal, setShowMixedImportModal] = useState(false);
+  const [mixedImportState, setMixedImportState] = useState<{
+    nuevos: Transaccion[];
+    duplicados: Transaccion[];
+    totalNuevos: number;
+    totalDuplicados: number;
+  } | null>(null);
   // Bottom Sheet State
   const [isAddingOpen, setIsAddingOpen] = useState(false);
   const [autoOpenSubModal, setAutoOpenSubModal] = useState(false);
@@ -1603,6 +1610,56 @@ export default function App() {
     setSelectedDuplicateIds([]);
     setIsReviewingDetail(false);
     setShowDuplicatesModal(true);
+  };
+
+  const handleMixedImportAddAll = () => {
+    if (!mixedImportState) return;
+    const allToAdd = [...mixedImportState.nuevos, ...mixedImportState.duplicados];
+    saveTransacciones([...allToAdd, ...transacciones]);
+    triggerDynamicIsland(
+      selectedLanguage === 'ES' ? 'Completado' : 'Done',
+      selectedLanguage === 'ES'
+        ? `Se agregaron ${allToAdd.length} movimientos (${mixedImportState.totalNuevos} nuevos + ${mixedImportState.totalDuplicados} duplicados).`
+        : `${allToAdd.length} transactions added (${mixedImportState.totalNuevos} new + ${mixedImportState.totalDuplicados} duplicates).`,
+      true
+    );
+    playTone('success', isMuted);
+    setShowMixedImportModal(false);
+    setMixedImportState(null);
+  };
+
+  const handleMixedImportOnlyNew = () => {
+    if (!mixedImportState) return;
+    saveTransacciones([...mixedImportState.nuevos, ...transacciones]);
+    triggerDynamicIsland(
+      selectedLanguage === 'ES' ? 'Completado' : 'Done',
+      selectedLanguage === 'ES'
+        ? `Se agregaron ${mixedImportState.totalNuevos} movimientos (${mixedImportState.totalDuplicados} omitidos por estar duplicados).`
+        : `${mixedImportState.totalNuevos} new transactions added (${mixedImportState.totalDuplicados} duplicates skipped).`,
+      true
+    );
+    playTone('success', isMuted);
+    setShowMixedImportModal(false);
+    setMixedImportState(null);
+  };
+
+  const handleMixedImportReviewDuplicates = () => {
+    if (!mixedImportState) return;
+    // Primero agregar los nuevos
+    saveTransacciones([...mixedImportState.nuevos, ...transacciones]);
+    triggerDynamicIsland(
+      selectedLanguage === 'ES' ? 'Completado' : 'Done',
+      selectedLanguage === 'ES'
+        ? `Se agregaron ${mixedImportState.totalNuevos} movimientos nuevos.`
+        : `${mixedImportState.totalNuevos} new transactions added.`,
+      true
+    );
+    playTone('success', isMuted);
+    // Luego mostrar el modal de duplicados para que el usuario decida
+    const originalDups = mixedImportState.duplicados;
+    setShowMixedImportModal(false);
+    setMixedImportState(null);
+    triggerDuplicatesModal(originalDups);
   };
 
   const extractTransactionsFromFile = async (file: File): Promise<Transaccion[]> => {
@@ -1832,19 +1889,31 @@ export default function App() {
           transacciones.some(tx => tx.monto === nt.monto && tx.fecha === nt.fecha);
         const dups = allNewTxList.filter(esDup);
         const nuevos = allNewTxList.filter(nt => !esDup(nt));
-        if (nuevos.length > 0) {
-          saveTransacciones([...nuevos, ...transacciones]);
-        }
-        triggerDynamicIsland(
-          selectedLanguage === 'ES' ? 'Completado' : 'Done',
-          selectedLanguage === 'ES'
-            ? `Se agregaron ${nuevos.length} movimientos.`
-            : `${nuevos.length} transactions added.`,
-          true
-        );
-        playTone('success', isMuted);
-        if (dups.length > 0) {
+
+        // OPCION C - Logica condicional
+        if (nuevos.length === 0 && dups.length > 0) {
+          // CASO 1: SOLO DUPLICADOS -> directo al modal de duplicados
           triggerDuplicatesModal(dups);
+        } else if (nuevos.length > 0 && dups.length === 0) {
+          // CASO 2: SOLO NUEVOS -> agregar y confirmar (flujo normal)
+          saveTransacciones([...nuevos, ...transacciones]);
+          triggerDynamicIsland(
+            selectedLanguage === 'ES' ? 'Completado' : 'Done',
+            selectedLanguage === 'ES'
+              ? `Se agregaron ${nuevos.length} movimientos.`
+              : `${nuevos.length} transactions added.`,
+            true
+          );
+          playTone('success', isMuted);
+        } else if (nuevos.length > 0 && dups.length > 0) {
+          // CASO 3: NUEVOS + DUPLICADOS -> mostrar pestaña intermedia
+          setMixedImportState({
+            nuevos: nuevos,
+            duplicados: dups,
+            totalNuevos: nuevos.length,
+            totalDuplicados: dups.length
+          });
+          setShowMixedImportModal(true);
         }
       }
     );
@@ -5321,6 +5390,61 @@ export default function App() {
                   </span>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMixedImportModal && mixedImportState && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-md p-5 shadow-2xl border border-slate-100 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h3 className="text-base font-black text-slate-800 tracking-tight leading-snug">
+                {selectedLanguage === 'ES' ? 'Importación mixta detectada' : 'Mixed import detected'}
+              </h3>
+              <button 
+                onClick={() => { setShowMixedImportModal(false); setMixedImportState(null); }} 
+                className="text-slate-400 hover:text-slate-600 transition p-1 rounded-lg hover:bg-slate-50"
+              >
+                <span className="text-lg font-bold">✕</span>
+              </button>
+            </div>
+            
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              {selectedLanguage === 'ES'
+                ? `Detectamos ${mixedImportState.totalNuevos} movimientos nuevos y ${mixedImportState.totalDuplicados} repetidos en tu historial.`
+                : `We found ${mixedImportState.totalNuevos} new transactions and ${mixedImportState.totalDuplicados} duplicate transactions.`}
+            </p>
+            
+            <div className="bg-blue-50/50 border border-blue-100/30 rounded-2xl p-3 mb-4 text-left">
+              <p className="text-xs text-blue-700 font-semibold leading-relaxed">
+                {selectedLanguage === 'ES'
+                  ? `✓ Los ${mixedImportState.totalNuevos} nuevos se agregarán automáticamente.`
+                  : `✓ The ${mixedImportState.totalNuevos} new ones will be added automatically.`}
+              </p>
+            </div>
+            
+            <div className="flex flex-col gap-2 font-sans">
+              <button
+                onClick={handleMixedImportAddAll}
+                className="w-full py-3 px-4 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl font-black text-xs shadow-md shadow-teal-100 transition active:scale-98 hover:shadow-lg cursor-pointer text-center"
+              >
+                {selectedLanguage === 'ES' ? 'Agregar todos' : 'Add all'}
+              </button>
+              
+              <button
+                onClick={handleMixedImportReviewDuplicates}
+                className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs shadow-md shadow-indigo-100 transition active:scale-98 hover:shadow-lg cursor-pointer text-center"
+              >
+                {selectedLanguage === 'ES' ? 'Revisar duplicados' : 'Review duplicates'}
+              </button>
+
+              <button
+                onClick={handleMixedImportOnlyNew}
+                className="w-full py-3 px-4 bg-white border border-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-2xl font-bold text-xs transition active:scale-98 cursor-pointer text-center"
+              >
+                {selectedLanguage === 'ES' ? 'Solo nuevos' : 'Only new'}
+              </button>
             </div>
           </div>
         </div>
