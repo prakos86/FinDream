@@ -1571,7 +1571,14 @@ export default function App() {
     } catch (e) {}
   }, [hideBalances]);
 
-  const processDocumentFile = async (file: File) => {
+  const triggerDuplicatesModal = (dups: Transaccion[]) => {
+    setDuplicatesPending(dups);
+    setSelectedDuplicateIds([]);
+    setIsReviewingDetail(false);
+    setShowDuplicatesModal(true);
+  };
+
+  const extractTransactionsFromFile = async (file: File): Promise<Transaccion[]> => {
     const isVideo = (file.type && file.type.startsWith('video/')) || 
                     file.name.toLowerCase().endsWith('.mp4') || 
                     file.name.toLowerCase().endsWith('.mov') || 
@@ -1579,8 +1586,7 @@ export default function App() {
                     file.name.toLowerCase().endsWith('.mkv') ||
                     file.name.toLowerCase().endsWith('.3gp');
     if (isVideo) {
-      setIsUploadingDocument(true);
-      triggerDynamicIsland("Procesando", selectedLanguage === 'ES' ? "Analizando video con IA..." : "Analyzing video with AI...", true);
+      triggerDynamicIsland("Procesando", selectedLanguage === 'ES' ? `Analizando video con IA: ${file.name}...` : `Analyzing video with AI: ${file.name}...`, true);
       try {
         const videoUrl = URL.createObjectURL(file);
         const videoEl = document.createElement('video');
@@ -1627,9 +1633,8 @@ export default function App() {
         const txs = data.transacciones || [];
         
         if (txs.length === 0) {
-          triggerDynamicIsland("Error", selectedLanguage === 'ES' ? "No se encontraron transacciones en el video." : "No transactions found in the video.", false);
-          setIsUploadingDocument(false);
-          return;
+          triggerDynamicIsland("Error", selectedLanguage === 'ES' ? `No se encontraron transacciones en el video: ${file.name}.` : `No transactions found in video: ${file.name}.`, false);
+          return [];
         }
 
         const newTxList = txs.map((data: any) => {
@@ -1676,174 +1681,160 @@ export default function App() {
           return tx;
         });
 
-        setIsAddingOpen(false);
-        
-        requestConfirmation(
-          selectedLanguage === 'ES' ? "Confirmar importación de Video" : "Confirm Video Import",
-          selectedLanguage === 'ES' 
-            ? `Se encontraron ${newTxList.length} movimientos en el video por un total de $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. ¿Deseas agregarlos?` 
-            : `Found ${newTxList.length} transactions in video totaling $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. Do you want to add them?`,
-          () => {
-            const esDup = (nt: Transaccion) =>
-              transacciones.some(tx => tx.monto === nt.monto && tx.fecha === nt.fecha);
-            const dups = newTxList.filter(esDup);
-            const nuevos = newTxList.filter(nt => !esDup(nt));
-            if (nuevos.length > 0) {
-              saveTransacciones([...nuevos, ...transacciones]);
-            }
-            triggerDynamicIsland("Completado",
-              selectedLanguage === 'ES' ? `Se agregaron ${nuevos.length} movimientos.` : `${nuevos.length} transactions added.`,
-              true
-            );
-            playTone('success', isMuted);
-            if (dups.length > 0) {
-              triggerDuplicatesModal(dups);
-            }
-          }
-        );
-
+        return newTxList;
       } catch (error) {
         console.error(error);
-        triggerDynamicIsland("Error", selectedLanguage === 'ES' ? "No se pudo extraer información del video" : "Could not extract info from video", false);
-      } finally {
-        setIsUploadingDocument(false);
+        triggerDynamicIsland("Error", selectedLanguage === 'ES' ? `No se pudo extraer información del video: ${file.name}` : `Could not extract info from video: ${file.name}`, false);
+        return [];
       }
-      return;
-    }
+    } else {
+      triggerDynamicIsland("Procesando", selectedLanguage === 'ES' ? `Analizando documento con IA: ${file.name}...` : `Analyzing document with AI: ${file.name}...`, true);
+      try {
+        let fileBase64 = '';
+        let mimeType = file.type;
+        let textContent = '';
 
-    setIsUploadingDocument(true);
-    triggerDynamicIsland("Procesando", selectedLanguage === 'ES' ? "Analizando documento con IA..." : "Analyzing document with AI...", true);
-
-    try {
-      let fileBase64 = '';
-      let mimeType = file.type;
-      let textContent = '';
-
-      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-        const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        textContent = XLSX.utils.sheet_to_csv(worksheet);
-        mimeType = 'text/csv';
-      } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-        textContent = await file.text();
-        mimeType = 'text/csv';
-      } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-        try {
-          textContent = await extractPdfText(file);
-          mimeType = 'text/plain';
-        } catch (err: any) {
-          if (err?.name === 'PasswordException') {
-            try {
-              const password = await askPdfPassword(file);
-              textContent = await extractPdfText(file, password);
-              mimeType = 'text/plain';
-            } catch (wrongPassErr: any) {
-              if (wrongPassErr?.name === 'PasswordException') {
-                triggerDynamicIsland('Error',
-                  selectedLanguage === 'ES'
-                    ? 'Contrase\u00f1a incorrecta. El PDF no pudo abrirse.'
-                    : 'Wrong password. Could not open the PDF.',
-                  false);
-                return;
+        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+          const data = await file.arrayBuffer();
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          textContent = XLSX.utils.sheet_to_csv(worksheet);
+          mimeType = 'text/csv';
+        } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+          textContent = await file.text();
+          mimeType = 'text/csv';
+        } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+          try {
+            textContent = await extractPdfText(file);
+            mimeType = 'text/plain';
+          } catch (err: any) {
+            if (err?.name === 'PasswordException') {
+              try {
+                const password = await askPdfPassword(file);
+                textContent = await extractPdfText(file, password);
+                mimeType = 'text/plain';
+              } catch (wrongPassErr: any) {
+                if (wrongPassErr?.name === 'PasswordException') {
+                  triggerDynamicIsland('Error',
+                    selectedLanguage === 'ES'
+                      ? 'Contraseña incorrecta. El PDF no pudo abrirse.'
+                      : 'Wrong password. Could not open the PDF.',
+                    false);
+                  return [];
+                }
+                throw wrongPassErr;
               }
-              throw wrongPassErr;
+            } else {
+              throw err;
             }
-          } else {
-            throw err;
           }
+        } else {
+          const buffer = await file.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) {
+              binary += String.fromCharCode(bytes[i]);
+          }
+          fileBase64 = window.btoa(binary);
         }
-      } else {
-        const buffer = await file.arrayBuffer();
-        const bytes = new Uint8Array(buffer);
-        let binary = '';
-        for (let i = 0; i < bytes.byteLength; i++) {
-            binary += String.fromCharCode(bytes[i]);
-        }
-        fileBase64 = window.btoa(binary);
+
+        const response = await fetch('/api/gemini/extract-document', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileBase64, mimeType, textContent })
+        });
+
+        if (!response.ok) throw new Error('Error en el servidor');
+        const dataArray = await response.json();
+        
+        const parsedArray = Array.isArray(dataArray) ? dataArray : [dataArray];
+        
+        const newTxList = parsedArray.map(data => {
+          let cat = 'Otros';
+          if (data.categoria) {
+            let matchedCat = categorias.find(c => c.nombre.toLowerCase() === data.categoria.toLowerCase());
+            if (!matchedCat) {
+              matchedCat = categorias.find(c => data.categoria.toLowerCase().includes(c.nombre.toLowerCase()) || 
+                                               c.nombre.toLowerCase().includes(data.categoria.toLowerCase()));
+            }
+            if (matchedCat) cat = matchedCat.nombre;
+          }
+          
+          let forma = getMergedPaymentMethods()[0];
+          if (data.banco) {
+            const pms = getMergedPaymentMethods();
+            let matchedPm = pms.find(pm => pm.toLowerCase().includes(data.banco.toLowerCase()) || data.banco.toLowerCase().includes(pm.toLowerCase()));
+            if (matchedPm) forma = matchedPm;
+          }
+          
+          const tx: Transaccion = {
+            id: Math.random().toString(36).substring(2, 9),
+            tipo: 'Gasto', // Safest logic for uploaded receipts
+            monto: normalizarMonto(data.monto) || 0,
+            categoria: cat,
+            fecha: data.fecha || formatLocalYYYYMMDD(new Date()),
+            descripcion: data.nombre || `Gasto en ${cat}`,
+            formaPago: forma
+          };
+          return tx;
+        });
+        
+        return newTxList;
+      } catch (error) {
+        console.error(error);
+        triggerDynamicIsland("Error", selectedLanguage === 'ES' ? `No se pudo extraer información del documento: ${file.name}` : `Could not extract info from document: ${file.name}`, false);
+        return [];
       }
-
-      const response = await fetch('/api/gemini/extract-document', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileBase64, mimeType, textContent })
-      });
-
-      if (!response.ok) throw new Error('Error en el servidor');
-      const dataArray = await response.json();
-      
-      const parsedArray = Array.isArray(dataArray) ? dataArray : [dataArray];
-      
-      const newTxList = parsedArray.map(data => {
-        let cat = 'Otros';
-        if (data.categoria) {
-          let matchedCat = categorias.find(c => c.nombre.toLowerCase() === data.categoria.toLowerCase());
-          if (!matchedCat) {
-            matchedCat = categorias.find(c => data.categoria.toLowerCase().includes(c.nombre.toLowerCase()) || 
-                                             c.nombre.toLowerCase().includes(data.categoria.toLowerCase()));
-          }
-          if (matchedCat) cat = matchedCat.nombre;
-        }
-        
-        let forma = getMergedPaymentMethods()[0];
-        if (data.banco) {
-          const pms = getMergedPaymentMethods();
-          let matchedPm = pms.find(pm => pm.toLowerCase().includes(data.banco.toLowerCase()) || data.banco.toLowerCase().includes(pm.toLowerCase()));
-          if (matchedPm) forma = matchedPm;
-        }
-        
-        const tx: Transaccion = {
-          id: Math.random().toString(36).substring(2, 9),
-          tipo: 'Gasto', // Safest logic for uploaded receipts
-          monto: normalizarMonto(data.monto) || 0,
-          categoria: cat,
-          fecha: data.fecha || formatLocalYYYYMMDD(new Date()),
-          descripcion: data.nombre || `Gasto en ${cat}`,
-          formaPago: forma
-        };
-        return tx;
-      });
-      
-      setIsAddingOpen(false);
-      
-      requestConfirmation(
-        selectedLanguage === 'ES' ? "Confirmar importación" : "Confirm import",
-        selectedLanguage === 'ES' 
-          ? `Se encontraron ${newTxList.length} movimientos por un total de $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. ¿Deseas agregarlos?` 
-          : `Found ${newTxList.length} transactions totaling $${newTxList.reduce((acc, t) => acc + t.monto, 0).toLocaleString()}. Do you want to add them?`,
-        () => {
-          const esDup = (nt: Transaccion) =>
-            transacciones.some(tx => tx.monto === nt.monto && tx.fecha === nt.fecha);
-          const dups = newTxList.filter(esDup);
-          const nuevos = newTxList.filter(nt => !esDup(nt));
-          if (nuevos.length > 0) {
-            saveTransacciones([...nuevos, ...transacciones]);
-          }
-          triggerDynamicIsland("Completado",
-            selectedLanguage === 'ES' ? `Se agregaron ${nuevos.length} movimientos.` : `${nuevos.length} transactions added.`,
-            true
-          );
-          playTone('success', isMuted);
-          if (dups.length > 0) {
-            triggerDuplicatesModal(dups);
-          }
-        }
-      );
-    } catch (error) {
-      console.error(error);
-      triggerDynamicIsland("Error", selectedLanguage === 'ES' ? "No se pudo extraer información del documento" : "Could not extract info from document", false);
-    } finally {
-      setIsUploadingDocument(false);
     }
   };
 
   const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []) as File[];
     if (files.length === 0) return;
-    for (const file of files) {
-      await processDocumentFile(file);
+    setIsUploadingDocument(true);
+    let allNewTxList: Transaccion[] = [];
+    try {
+      for (const file of files) {
+        const txList = await extractTransactionsFromFile(file);
+        allNewTxList = [...allNewTxList, ...txList];
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsUploadingDocument(false);
     }
+
+    if (allNewTxList.length === 0) return;
+
+    setIsAddingOpen(false);
+
+    requestConfirmation(
+      selectedLanguage === 'ES' ? 'Confirmar importación' : 'Confirm Import',
+      selectedLanguage === 'ES'
+        ? `Se encontraron ${allNewTxList.length} movimientos por un total de $${allNewTxList.reduce((sum, t) => sum + t.monto, 0).toLocaleString()}. ¿Deseas agregarlos?`
+        : `Found ${allNewTxList.length} transactions totaling $${allNewTxList.reduce((sum, t) => sum + t.monto, 0).toLocaleString()}. Do you want to add them?`,
+      () => {
+        const esDup = (nt: Transaccion) =>
+          transacciones.some(tx => tx.monto === nt.monto && tx.fecha === nt.fecha);
+        const dups = allNewTxList.filter(esDup);
+        const nuevos = allNewTxList.filter(nt => !esDup(nt));
+        if (nuevos.length > 0) {
+          saveTransacciones([...nuevos, ...transacciones]);
+        }
+        triggerDynamicIsland(
+          selectedLanguage === 'ES' ? 'Completado' : 'Done',
+          selectedLanguage === 'ES'
+            ? `Se agregaron ${nuevos.length} movimientos.`
+            : `${nuevos.length} transactions added.`,
+          true
+        );
+        playTone('success', isMuted);
+        if (dups.length > 0) {
+          triggerDuplicatesModal(dups);
+        }
+      }
+    );
     e.target.value = '';
   };
 
@@ -1951,13 +1942,6 @@ export default function App() {
     } else {
       setSelectedDuplicateIds(duplicatesPending.map(d => d.id));
     }
-  };
-
-  const triggerDuplicatesModal = (dups: Transaccion[]) => {
-    setDuplicatesPending(dups);
-    setSelectedDuplicateIds([]);
-    setIsReviewingDetail(false);
-    setShowDuplicatesModal(true);
   };
 
   // Clock Update for iOS top tier
