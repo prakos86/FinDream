@@ -1238,9 +1238,36 @@ export default function App() {
   };
 
   // Create local YYYY-MM-DD string to feed into <input type="date">
-  const formatLocalYYYYMMDD = (d: Date) => {
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const formatLocalYYYYMMDD = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const normalizarFecha = (fechaStr: string): string => {
+    if (!fechaStr || fechaStr.trim() === '') {
+      return formatLocalYYYYMMDD(new Date());
+    }
+    
+    // Intentar parsear fecha ISO YYYY-MM-DD
+    const isoMatch = fechaStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      const year = parseInt(isoMatch[1]);
+      const month = isoMatch[2];
+      const day = isoMatch[3];
+      const today = new Date();
+      
+      // Si el año es menor al actual, asumir año actual
+      if (year < today.getFullYear()) {
+        return `${today.getFullYear()}-${month}-${day}`;
+      }
+      return `${year}-${month}-${day}`;
+    }
+    
+    // Si no es ISO, intentar parsear con parsedate o devolver hoy
+    // (Gemini a veces extrae "5 jun" sin año, en ese caso usar hoy)
+    return formatLocalYYYYMMDD(new Date());
   };
 
   const startEditingPortafolio = (p: any) => {
@@ -1655,26 +1682,12 @@ export default function App() {
             if (matchedPm) forma = matchedPm;
           }
           
-          const corregirFechaApp = (fVal: string): string => {
-            if (!fVal) return formatLocalYYYYMMDD(new Date());
-            const match = fVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
-            if (match) {
-              const year = parseInt(match[1]);
-              const today = new Date();
-              if (year < today.getFullYear()) {
-                return `${today.getFullYear()}-${match[2]}-${match[3]}`;
-              }
-              return fVal;
-            }
-            return formatLocalYYYYMMDD(new Date());
-          };
-
           const tx: Transaccion = {
             id: Math.random().toString(36).substring(2, 9),
             tipo: data.tipo === 'Ingreso' ? 'Ingreso' : 'Gasto',
             monto: Math.abs(normalizarMonto(data.monto)) || 0,
             categoria: cat,
-            fecha: corregirFechaApp(data.fecha || ''),
+            fecha: normalizarFecha(data.fecha || ''),
             descripcion: data.descripcion || `Transacción en ${cat}`,
             formaPago: forma
           };
@@ -1773,7 +1786,7 @@ export default function App() {
             tipo: 'Gasto', // Safest logic for uploaded receipts
             monto: normalizarMonto(data.monto) || 0,
             categoria: cat,
-            fecha: data.fecha || formatLocalYYYYMMDD(new Date()),
+            fecha: normalizarFecha(data.fecha || ''),
             descripcion: data.nombre || `Gasto en ${cat}`,
             formaPago: forma
           };
