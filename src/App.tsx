@@ -143,7 +143,7 @@ import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Tooltip }
 
 const TRANSLATIONS = {
   ES: {
-    tab_resumen: "Resumen",
+    tab_resumen: "Balance",
     tab_sueno: "Sueño",
     tab_insights: "Asesor IA",
     ingresar_movimiento: "Ingresar a Finanzas",
@@ -220,7 +220,7 @@ const TRANSLATIONS = {
     beneficios: "Beneficios",
   },
   EN: {
-    tab_resumen: "Summary",
+    tab_resumen: "Balance",
     tab_sueno: "Dream",
     tab_insights: "AI Advisor",
     ingresar_movimiento: "Enter Finances",
@@ -1454,6 +1454,8 @@ export default function App() {
   // Core Financial State
   const [transacciones, setTransacciones] = useState<Transaccion[]>([]);
   const [filtroSeleccionado, setFiltroSeleccionado] = useState<FiltroTiempo>("Mes");
+  const [rangoInicio, setRangoInicio] = useState<string>(''); // 'YYYY-MM-DD'
+  const [rangoFin, setRangoFin] = useState<string>(''); // 'YYYY-MM-DD'
   const [ordenSeleccionado, setOrdenSeleccionado] = useState<'MasReciente' | 'MayorGasto'>('MasReciente');
   // Bottom Sheet State
   const [isAddingOpen, setIsAddingOpen] = useState(false);
@@ -1562,10 +1564,7 @@ export default function App() {
     } catch (e) {}
   }, [hideBalances]);
 
-  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processDocumentFile = async (file: File) => {
     const isVideo = (file.type && file.type.startsWith('video/')) || 
                     file.name.toLowerCase().endsWith('.mp4') || 
                     file.name.toLowerCase().endsWith('.mov') || 
@@ -1623,7 +1622,6 @@ export default function App() {
         if (txs.length === 0) {
           triggerDynamicIsland("Error", selectedLanguage === 'ES' ? "No se encontraron transacciones en el video." : "No transactions found in the video.", false);
           setIsUploadingDocument(false);
-          if (e.target) e.target.value = '';
           return;
         }
 
@@ -1690,7 +1688,6 @@ export default function App() {
         triggerDynamicIsland("Error", selectedLanguage === 'ES' ? "No se pudo extraer información del video" : "Could not extract info from video", false);
       } finally {
         setIsUploadingDocument(false);
-        if (e.target) e.target.value = '';
       }
       return;
     }
@@ -1807,8 +1804,16 @@ export default function App() {
       triggerDynamicIsland("Error", selectedLanguage === 'ES' ? "No se pudo extraer información del documento" : "Could not extract info from document", false);
     } finally {
       setIsUploadingDocument(false);
-      if (e.target) e.target.value = '';
     }
+  };
+
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []) as File[];
+    if (files.length === 0) return;
+    for (const file of files) {
+      await processDocumentFile(file);
+    }
+    e.target.value = '';
   };
 
   const importFromSheetsRef = useRef<(() => Promise<void>) | null>(null);
@@ -1977,6 +1982,12 @@ export default function App() {
           return itemTime >= startOfMonth;
         case 'Año':
           return itemTime >= startOfYear;
+        case 'Personalizado': {
+          if (!rangoInicio || !rangoFin) return true; // sin rango aun: mostrar todo
+          const ini = formatSafeDateString(rangoInicio).getTime();
+          const fin = formatSafeDateString(rangoFin).getTime() + (24*3600*1000 - 1); // incluye el dia final completo
+          return itemTime >= ini && itemTime <= fin;
+        }
         case 'Histórico':
         default:
           return true;
@@ -2514,7 +2525,7 @@ export default function App() {
             {/* --- FILTRO DE TIEMPO (Pill Slide iOS - NOW AT THE TOP CONSTRAINING EVERYTHING BELOW) --- */}
             <div id="filtro-tiempo" className="overflow-x-auto no-scrollbar pt-1">
               <div className="flex bg-gray-100 p-1 rounded-xl relative">
-                {(['Día', 'Semana', 'Mes', 'Año', 'Histórico'] as FiltroTiempo[]).map((f) => {
+                {(['Día', 'Semana', 'Mes', 'Año', 'Histórico', 'Personalizado'] as FiltroTiempo[]).map((f) => {
                   const sel = filtroSeleccionado === f;
                   return (
                     <button
@@ -2531,12 +2542,41 @@ export default function App() {
                           transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                         />
                       )}
-                      {f}
+                      {f === 'Personalizado' ? (selectedLanguage === 'ES' ? 'Rango' : 'Range') : f}
                     </button>
                   );
                 })}
               </div>
             </div>
+
+            {filtroSeleccionado === 'Personalizado' && (
+              <div className="flex items-end gap-2 mt-2 px-1">
+                <div className="flex-1 text-left">
+                  <label className="block text-[9px] font-black uppercase text-slate-400 mb-1">
+                    {selectedLanguage === 'ES' ? 'Desde' : 'From'}
+                  </label>
+                  <input
+                    type="date"
+                    value={rangoInicio}
+                    max={rangoFin || undefined}
+                    onChange={(e) => setRangoInicio(e.target.value)}
+                    className="w-full text-xs font-semibold border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700"
+                  />
+                </div>
+                <div className="flex-1 text-left">
+                  <label className="block text-[9px] font-black uppercase text-slate-400 mb-1">
+                    {selectedLanguage === 'ES' ? 'Hasta' : 'To'}
+                  </label>
+                  <input
+                    type="date"
+                    value={rangoFin}
+                    min={rangoInicio || undefined}
+                    onChange={(e) => setRangoFin(e.target.value)}
+                    className="w-full text-xs font-semibold border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* --- HEADER DE TOTALES (Solo una fila / iOS layout premium) --- */}
         <div id="totales-container" className="grid grid-cols-2 gap-3.5">
@@ -4449,6 +4489,7 @@ export default function App() {
                     {/* Document Upload Choice */}
                     <input 
                       type="file" 
+                      multiple
                       accept="video/*,image/*,application/pdf,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.mp4,.mov"
                       style={{ display: 'none' }}
                       id="file-upload-input"

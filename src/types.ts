@@ -17,7 +17,7 @@ export interface Transaccion {
   formaPago?: string; // Forma de pago vinculada
 }
 
-export type FiltroTiempo = 'Día' | 'Semana' | 'Mes' | 'Año' | 'Histórico';
+export type FiltroTiempo = 'Día' | 'Semana' | 'Mes' | 'Año' | 'Histórico' | 'Personalizado';
 
 export interface HistoricoAvance {
   id: string;

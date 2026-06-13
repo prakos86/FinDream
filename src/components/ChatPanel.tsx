@@ -163,10 +163,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     });
   };
 
-  const handleChatFileAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processChatFile = async (file: File) => {
     const isVideo = (file.type && file.type.startsWith('video/')) || 
                     file.name.toLowerCase().endsWith('.mp4') || 
                     file.name.toLowerCase().endsWith('.mov') || 
@@ -244,7 +241,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           m.id === processingMsg.id ? { ...m,
             text: 'Error procesando el video: ' + (err.message || 'intenta de nuevo.') } : m));
       }
-      if (e.target) e.target.value = '';
       return;
     }
 
@@ -279,8 +275,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         false);
     } finally {
       setIsProcessingFile(false);
-      if (e.target) e.target.value = '';
     }
+  };
+
+  const handleChatFileAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []) as File[];
+    if (files.length === 0) return;
+    for (const file of files) {
+      await processChatFile(file);
+    }
+    e.target.value = '';
   };
 
   const executeDangerousActions = (actionsList: any[]) => {
@@ -851,34 +855,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           const targetDesc = p.descripcion || 'Acción desde Prako AI';
           const targetCat = p.categoria || (p.tipo === 'Ingreso' ? 'Salario' : 'Otros');
 
-          // Helper clean/normalize text for similarity checks
-          const cleanText = (txt: string) => {
-            return txt
-              .toLowerCase()
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "") // remove accents
-              .replace(/[^a-z0-9 ]/g, "")      // keep only word chars/digits
-              .trim();
-          };
-
           const isDuplicate = currentTxList.some((tx) => {
-            if (tx.monto !== numericMonto) return false;
-            if (tx.fecha !== targetFecha) return false;
-
-            const txDescClean = cleanText(tx.descripcion || '');
-            const targetDescClean = cleanText(targetDesc);
-            const txCatClean = cleanText(tx.categoria || '');
-            const targetCatClean = cleanText(targetCat);
-
-            // Similarity threshold for description/category (exact match or substring)
-            const descMatch = txDescClean === targetDescClean ||
-              (txDescClean.length > 2 && targetDescClean.length > 2 &&
-                (txDescClean.includes(targetDescClean) || targetDescClean.includes(txDescClean)));
-            const catMatch = txCatClean === targetCatClean ||
-              (txCatClean.length > 2 && targetCatClean.length > 2 &&
-                (txCatClean.includes(targetCatClean) || targetCatClean.includes(txCatClean)));
-
-            return descMatch;
+            return tx.monto === numericMonto && tx.fecha === targetFecha;
           });
 
           if (isDuplicate) {
@@ -1223,6 +1201,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           <input
             ref={attachInputRef}
             type="file"
+            multiple
             accept=".pdf,.csv,.xlsx,.xls,.png,.jpg,.jpeg,.webp,video/*"
             onChange={handleChatFileAttach}
             className="hidden"
