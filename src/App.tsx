@@ -1454,6 +1454,7 @@ export default function App() {
   // Core Financial State
   const [transacciones, setTransacciones] = useState<Transaccion[]>([]);
   const [filtroSeleccionado, setFiltroSeleccionado] = useState<FiltroTiempo>("Mes");
+  const [busquedaGasto, setBusquedaGasto] = useState<string>('');
   const [rangoInicio, setRangoInicio] = useState<string>(''); // 'YYYY-MM-DD'
   const [rangoFin, setRangoFin] = useState<string>(''); // 'YYYY-MM-DD'
   const [ordenSeleccionado, setOrdenSeleccionado] = useState<'MasReciente' | 'MayorGasto'>('MasReciente');
@@ -1995,14 +1996,26 @@ export default function App() {
     });
   };
 
-  const transaccionesFiltradasLista = [...filterTransactions(transacciones)].sort((a, b) => {
-    if (ordenSeleccionado === 'MayorGasto') {
-      return b.monto - a.monto;
-    } else {
-      // MasReciente
-      return new Date(b.fecha).getTime() - new Date(a.fecha).getTime();
-    }
-  });
+  const q = busquedaGasto.trim().toLowerCase();
+  const qNum = q.replace(/[^0-9]/g, ''); // solo digitos, para buscar por monto
+  const baseLista = q ? transacciones : filterTransactions(transacciones);
+  const transaccionesFiltradasLista = [...baseLista]
+    .filter((t) => {
+      if (!q) return true;
+      const enTexto =
+        (t.descripcion || '').toLowerCase().includes(q) ||
+        (t.categoria || '').toLowerCase().includes(q) ||
+        (t.formaPago || '').toLowerCase().includes(q);
+      const enMonto = qNum !== '' && String(t.monto).includes(qNum);
+      return enTexto || enMonto;
+    })
+    .sort((a, b) => {
+      if (ordenSeleccionado === 'MayorGasto') {
+        return b.monto - a.monto;
+      } else {
+        return new Date(b.fecha).getTime() - new Date(a.fecha).getTime();
+      }
+    });
 
   const transaccionesFiltradas = filterTransactions(transacciones);
 
@@ -2525,7 +2538,7 @@ export default function App() {
             {/* --- FILTRO DE TIEMPO (Pill Slide iOS - NOW AT THE TOP CONSTRAINING EVERYTHING BELOW) --- */}
             <div id="filtro-tiempo" className="overflow-x-auto no-scrollbar pt-1">
               <div className="flex bg-gray-100 p-1 rounded-xl relative">
-                {(['Día', 'Semana', 'Mes', 'Año', 'Histórico', 'Personalizado'] as FiltroTiempo[]).map((f) => {
+                {(['Día', 'Semana', 'Mes', 'Año', 'Personalizado'] as FiltroTiempo[]).map((f) => {
                   const sel = filtroSeleccionado === f;
                   return (
                     <button
@@ -2939,6 +2952,25 @@ export default function App() {
                 {selectedLanguage === 'ES' ? 'Mayor a menor' : 'Highest Amount'}
               </button>
             </div>
+          </div>
+
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={busquedaGasto}
+              onChange={(e) => setBusquedaGasto(e.target.value)}
+              placeholder={selectedLanguage === 'ES' ? 'Buscar por nombre o monto...' : 'Search by name or amount...'}
+              className="w-full pl-9 pr-9 py-2.5 rounded-xl border border-slate-200 text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+            {busquedaGasto && (
+              <button
+                onClick={() => setBusquedaGasto('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           <div id="lista-transacciones" className="space-y-2.5">
