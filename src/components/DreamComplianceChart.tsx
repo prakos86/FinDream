@@ -37,6 +37,57 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
   userProfile,
   saveUserProfileData,
 }) => {
+  const [distribucion, setDistribucion] =
+    React.useState<{ [id: string]: number }>(() => {
+      if (suenos.length === 0) return {};
+      const base = Math.floor(100 / suenos.length);
+      const resto = 100 - base * suenos.length;
+      return suenos.reduce((acc, s, i) => ({
+        ...acc,
+        [s.id]: base + (i === 0 ? resto : 0),
+      }), {});
+    });
+
+  React.useEffect(() => {
+    setDistribucion(prev => {
+      const next: { [id: string]: number } = {};
+      const ids = suenos.map(s => s.id);
+      let asignado = 0;
+      ids.forEach((id, i) => {
+        if (i < ids.length - 1) {
+          next[id] = prev[id] ?? Math.floor(100 / ids.length);
+          asignado += next[id];
+        } else {
+          next[id] = Math.max(0, 100 - asignado);
+        }
+      });
+      return next;
+    });
+  }, [suenos.length]);
+
+  const handleDistribucionChange = (idCambiado: string, nuevoPct: number) => {
+    const pct = Math.min(100, Math.max(0, Math.round(nuevoPct)));
+    const otrosIds = suenos.map(s => s.id).filter(id => id !== idCambiado);
+    if (otrosIds.length === 0) return;
+    const restante = 100 - pct;
+    const totalOtros = otrosIds.reduce(
+      (sum, id) => sum + (distribucion[id] || 0), 0
+    );
+    const next: { [id: string]: number } = { [idCambiado]: pct };
+    otrosIds.forEach((id, i) => {
+      if (i < otrosIds.length - 1) {
+        const prop = totalOtros > 0
+          ? Math.round((distribucion[id] / totalOtros) * restante)
+          : Math.floor(restante / otrosIds.length);
+        next[id] = prop;
+      } else {
+        const yaAsignado = Object.keys(next).reduce((sum, key) => sum + (next[key] || 0), 0);
+        next[id] = Math.max(0, 100 - yaAsignado);
+      }
+    });
+    setDistribucion(next);
+  };
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingSuenoId, setEditingSuenoId] = useState<string | null>(null);
   const [aporteInputs, setAporteInputs] = useState<{ [key: string]: string }>({});
@@ -631,6 +682,9 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
     setShowAddForm(false);
   };
 
+  const intelGlobal = calculateDeterministicIntelligence();
+  const ahorroPotencialGlobal = intelGlobal.averageSurplus;
+
   return (
     <div className="space-y-5">
       {/* --- SUEÑOS SELECTOR RAIL --- */}
@@ -647,9 +701,80 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
           </div>
         </div>
 
+        {suenos.length > 1 && ahorroPotencialGlobal > 0 && (
+          <div className="bg-white rounded-2xl p-4 border border-teal-100 shadow-xs mb-4 text-left">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📊</span>
+                <p className="text-[11px] font-black uppercase text-slate-800 tracking-wider">
+                  {selectedLanguage === 'ES' ? 'Distribuye tu ahorro' : 'Distribute savings'}
+                </p>
+              </div>
+              <span className="text-sm font-black text-teal-600">
+                ${ahorroPotencialGlobal.toLocaleString(
+                  selectedLanguage === 'ES' ? 'es-CO' : 'en-US'
+                )}/mes
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {suenos.map((s) => {
+                const pct = distribucion[s.id] ?? Math.floor(100 / suenos.length);
+                const monto = Math.round(ahorroPotencialGlobal * pct / 100);
+                return (
+                  <div key={s.id} className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-700 w-24 truncate text-left">
+                        {s.nombre}
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={pct}
+                        onChange={e => handleDistribucionChange(s.id, Number(e.target.value))}
+                        className="w-14 text-center text-[12px] font-black border border-slate-200 rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                      />
+                      <span className="text-[11px] text-slate-400 font-bold">%</span>
+                      <span className="ml-auto text-[11px] font-black text-teal-600 font-mono">
+                        ${monto.toLocaleString(
+                          selectedLanguage === 'ES' ? 'es-CO' : 'en-US'
+                        )}/mes
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={pct}
+                      onChange={e => handleDistribucionChange(s.id, Number(e.target.value))}
+                      className="w-full accent-teal-500 h-1.5 cursor-pointer"
+                    />
+                  </div>
+                );
+              })}
+
+              <div className="flex justify-end pt-1">
+                {(() => {
+                  const total = Object.keys(distribucion).reduce((sum, key) => sum + (distribucion[key] || 0), 0);
+                  return (
+                    <span className={`text-[10px] font-black ${
+                      total === 100 ? 'text-emerald-600' : 'text-rose-500'
+                    }`}>
+                      Total: {total}% {total === 100 ? '✓' : '⚠️'}
+                    </span>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Existing dreams list selection with quick status */}
         <div className="space-y-4 max-h-[480px] overflow-y-auto pr-1 no-scrollbar">
           {suenos.map((s) => {
+            const pctSueno = distribucion[s.id] ?? Math.floor(100 / suenos.length);
+            const ahorroPotencialSueno = Math.round(ahorroPotencialGlobal * pctSueno / 100);
             const isSelected = s.id === activeSueno.id;
             const sAhorro = s.usarReal ? Math.max(0, realAhorroNeto) : s.ahorroManual;
             const progressPct = Math.min(100, Math.round(((s.ahorroAcumulado || 0) / s.meta) * 100));
@@ -849,7 +974,8 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
                 <DreamSavingsInsights
                   dream={s}
                   transacciones={transacciones}
-                  selectedLanguage={selectedLanguage}
+                  selectedLanguage={selectedLanguage === 'ES' ? 'ES' : 'EN'}
+                  ahorroPotencial={ahorroPotencialSueno}
                 />
               </div>
             );

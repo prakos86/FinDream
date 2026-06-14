@@ -5,42 +5,22 @@ interface DreamSavingsInsightsProps {
   dream: Sueno;
   transacciones: Transaccion[];
   selectedLanguage: 'ES' | 'EN';
+  ahorroPotencial: number;
 }
 
 export const DreamSavingsInsights: React.FC<DreamSavingsInsightsProps> = ({
   dream,
   transacciones,
   selectedLanguage,
+  ahorroPotencial,
 }) => {
-  // 1. Calcular superavit mensual (ingresos - gastos promedio)
-  const now = new Date();
-  const hace30dias = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const txUltimos30 = transacciones.filter((tx) => {
-    if (!tx.fecha) return false;
-    try {
-      return new Date(tx.fecha) >= hace30dias;
-    } catch {
-      return false;
-    }
-  });
-
-  const ingresos = txUltimos30
-    .filter((tx) => tx.tipo === 'Ingreso')
-    .reduce((sum, tx) => sum + tx.monto, 0);
-
-  const gastos = txUltimos30
-    .filter((tx) => tx.tipo === 'Gasto')
-    .reduce((sum, tx) => sum + Math.abs(tx.monto), 0);
-
-  const superavitMensual = ingresos - gastos;
-
   // 2. Proyectar fecha para alcanzar objetivo
   const objetivo = dream.meta;
   const ahorrado = dream.ahorroAcumulado || 0;
   const faltaAhorrar = Math.max(0, objetivo - ahorrado);
 
-  const mesesFaltantes = superavitMensual > 0 
-    ? Math.ceil(faltaAhorrar / superavitMensual) 
+  const mesesFaltantes = ahorroPotencial > 0 
+    ? Math.ceil(faltaAhorrar / ahorroPotencial) 
     : 999;
 
   const fechaProyectada = new Date();
@@ -49,7 +29,7 @@ export const DreamSavingsInsights: React.FC<DreamSavingsInsightsProps> = ({
   }
 
   // 3. Evaluar si esta en buen camino
-  const estaEnBuenCamino = superavitMensual > 0 && mesesFaltantes <= 12;
+  const estaEnBuenCamino = ahorroPotencial > 0 && mesesFaltantes <= 12;
 
   const getFormattedMonth = (d: Date) => {
     return d.toLocaleDateString(selectedLanguage === 'ES' ? 'es-CO' : 'en-US', {
@@ -69,10 +49,10 @@ export const DreamSavingsInsights: React.FC<DreamSavingsInsightsProps> = ({
         {/* Tarjeta de Superavit */}
         <div className="bg-white rounded-xl p-3 border-l-4 border-teal-500 shadow-xs">
           <p className="text-[10px] font-bold text-slate-500 mb-0.5">
-            {selectedLanguage === 'ES' ? 'Superávit mensual' : 'Monthly surplus'}
+            {selectedLanguage === 'ES' ? 'Ahorro potencial' : 'Monthly savings potential'}
           </p>
           <p className="text-lg font-black text-teal-600">
-            ${superavitMensual.toLocaleString(selectedLanguage === 'ES' ? 'es-CO' : 'en-US')}
+            ${ahorroPotencial.toLocaleString(selectedLanguage === 'ES' ? 'es-CO' : 'en-US')}
           </p>
         </div>
 
@@ -88,7 +68,7 @@ export const DreamSavingsInsights: React.FC<DreamSavingsInsightsProps> = ({
           </p>
           <p className="text-[9px] font-semibold text-slate-400 mt-0.5">
             {mesesFaltantes === 999
-              ? (selectedLanguage === 'ES' ? 'Superávit requerido' : 'Surplus required')
+              ? (selectedLanguage === 'ES' ? 'Ahorro requerido' : 'Savings required')
               : (selectedLanguage === 'ES'
                   ? `En aprox. ${mesesFaltantes} ${mesesFaltantes === 1 ? 'mes' : 'meses'}`
                   : `In approx. ${mesesFaltantes} ${mesesFaltantes === 1 ? 'month' : 'months'}`)}
