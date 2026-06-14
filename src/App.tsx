@@ -1433,12 +1433,14 @@ export default function App() {
   };
 
   const handleAddSueno = (nombre: string, meta: number, manualRate: number, usarReal: boolean) => {
+    const paisMoneda = effectiveCountry === 'CL' ? 'CLP' : 'COP';
     const newSueno: Sueno = {
       id: `sueno-${Date.now()}`,
       nombre,
       meta,
       ahorroManual: manualRate,
-      usarReal
+      usarReal,
+      paisMoneda, // <-- NUEVO
     };
     const updated = [...suenos, newSueno];
     saveSuenosList(updated);

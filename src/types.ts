@@ -40,6 +40,7 @@ export interface Sueno {
   ahorroAcumulado?: number;
   historialAvances?: HistoricoAvance[];
   usarReal: boolean;
+  paisMoneda?: 'CLP' | 'COP'; // <-- NUEVO: pais del sueno
 
   // NUEVOS CAMPOS PARA IA
   fechaObjetivoProyectada?: string; // Fecha estimada para alcanzar meta
