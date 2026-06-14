@@ -1885,8 +1885,30 @@ export default function App() {
         ? `Se encontraron ${allNewTxList.length} movimientos por un total de $${allNewTxList.reduce((sum, t) => sum + t.monto, 0).toLocaleString()}. ¿Deseas agregarlos?`
         : `Found ${allNewTxList.length} transactions totaling $${allNewTxList.reduce((sum, t) => sum + t.monto, 0).toLocaleString()}. Do you want to add them?`,
       () => {
+        // Normaliza texto: minusculas, sin tildes, sin espacios extra
+        const normalizar = (s: string) =>
+          (s || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        // Diferencia en dias entre dos fechas
+        // (acepta Date, timestamp o string ISO)
+        const difDias = (a: any, b: any) => {
+          const fa = new Date(a).getTime();
+          const fb = new Date(b).getTime();
+          if (isNaN(fa) || isNaN(fb)) return Infinity;
+          return Math.abs(fa - fb) / 86400000; // ms por dia
+        };
+
         const esDup = (nt: Transaccion) =>
-          transacciones.some(tx => tx.monto === nt.monto && tx.fecha === nt.fecha);
+          transacciones.some(tx =>
+            tx.monto === nt.monto &&
+            normalizar(tx.descripcion) === normalizar(nt.descripcion) &&
+            difDias(tx.fecha, nt.fecha) <= 2
+          );
         const dups = allNewTxList.filter(esDup);
         const nuevos = allNewTxList.filter(nt => !esDup(nt));
 
@@ -3187,6 +3209,13 @@ export default function App() {
                                 {t.formaPago && (
                                   <span className="px-1.5 py-0.5 rounded-md text-[8.5px] font-black bg-slate-100 text-slate-800 border border-slate-200 uppercase tracking-tight">
                                     💳 {t.formaPago}
+                                  </span>
+                                )}
+                                {t.cuotasTotal && t.cuotaActual && (
+                                  <span className="px-1.5 py-0.5 rounded-md text-[8.5px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase tracking-tight">
+                                    🔁 {selectedLanguage === 'ES' 
+                                      ? `Cuota ${t.cuotaActual}/${t.cuotasTotal} ${t.esAutomatica ? '(Auto)' : ''}`
+                                      : `Installment ${t.cuotaActual}/${t.cuotasTotal} ${t.esAutomatica ? '(Auto)' : ''}`}
                                   </span>
                                 )}
                               </>
@@ -4744,8 +4773,40 @@ export default function App() {
                 startWithVoice={startVoiceOnAdd}
                 initialTransaction={initialTransactionForModal || (prefilledCategory ? { id: '', tipo: 'Gasto', monto: 0, categoria: prefilledCategory, descripcion: '', formaPago: '', fecha: formatLocalYYYYMMDD(new Date()) } : undefined)}
                 onSave={(tx) => {
+                  const txToSave: Transaccion[] = [];
+                  if (tx.cuotasTotal && tx.cuotasTotal > 1 && tx.esAutomatica) {
+                    const montoParaCuota = tx.monto / tx.cuotasTotal;
+                    const dateParts = tx.fecha.split('-');
+                    const year = dateParts[0];
+                    const month = dateParts[1];
+                    const day = dateParts[2];
+                    
+                    const timestampId = Date.now();
+                    for (let i = 1; i <= tx.cuotasTotal; i++) {
+                      const futureDate = new Date(
+                        parseInt(year),
+                        parseInt(month) - 1 + i - 1,
+                        parseInt(day)
+                      );
+                      txToSave.push({
+                        ...tx,
+                        id: `cuota-${timestampId}-${i}`,
+                        fecha: futureDate.toISOString().substring(0, 10),
+                        cuotaActual: i,
+                        monto: montoParaCuota,
+                        montoOriginal: montoParaCuota,
+                        idCuotaPrincipal: `cuota-${timestampId}`
+                      });
+                    }
+                  } else {
+                    txToSave.push({
+                      ...tx,
+                      id: `trx-${Date.now()}`
+                    });
+                  }
+
                   saveTransacciones([
-                    { ...tx, id: `trx-${Date.now()}` },
+                    ...txToSave,
                     ...transacciones
                   ]);
                   setIsAddingOpen(false);

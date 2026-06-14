@@ -2,7 +2,7 @@
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, setPersistence, inMemoryPersistence, browserLocalPersistence, indexedDBLocalPersistence, GoogleAuthProvider, signInWithPopup, signInWithRedirect, User } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore } from 'firebase/firestore';
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -13,7 +13,9 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+});
 export const auth = getAuth(app);
 
 // Prevent third-party cookie/IndexedDB blocks in Sandbox Iframes (e.g. Chrome)

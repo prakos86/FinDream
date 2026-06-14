@@ -15,6 +15,13 @@ export interface Transaccion {
   fecha: string; // ISO String
   descripcion: string;
   formaPago?: string; // Forma de pago vinculada
+
+  // NUEVOS CAMPOS PARA CUOTAS
+  cuotasTotal?: number;
+  cuotaActual?: number;
+  montoOriginal?: number;
+  esAutomatica?: boolean;
+  idCuotaPrincipal?: string;
 }
 
 export type FiltroTiempo = 'Día' | 'Semana' | 'Mes' | 'Año' | 'Histórico' | 'Personalizado';
@@ -33,6 +40,11 @@ export interface Sueno {
   ahorroAcumulado?: number;
   historialAvances?: HistoricoAvance[];
   usarReal: boolean;
+
+  // NUEVOS CAMPOS PARA IA
+  fechaObjetivoProyectada?: string; // Fecha estimada para alcanzar meta
+  superavitMensual?: number; // Promedio ahorro mensual
+  estaEnBuenCamino?: boolean; // true si va al ritmo esperado
 }
 
 export interface ProductoFinanciero {

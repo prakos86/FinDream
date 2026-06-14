@@ -1,4 +1,4 @@
-const CACHE_NAME = 'findream-cache-v4';
+const CACHE_NAME = 'findream-cache-v5';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -32,6 +32,20 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   // Only intercept GET requests
   if (event.request.method !== 'GET') return;
+
+  // --- NUEVO: no interceptar Firestore / APIs de Google ---
+  // Deja pasar estas peticiones directo a la red (sin cache,
+  // sin volver). Evita romper el canal Listen de Firestore.
+  const url = event.request.url;
+  if (
+    url.includes('firestore.googleapis.com') ||
+    url.includes('googleapis.com') ||
+    url.includes('firebaseio.com') ||
+    url.includes('google.com/log')
+  ) {
+    return; // el navegador maneja la peticion normalmente
+  }
+  // --- FIN NUEVO ---
 
   // Network-First with cache fallback strategy
   event.respondWith(

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Trophy, Calendar, TrendingUp, Plus, Trash2, Check, ArrowRight, X, MoreHorizontal, Expand, History, PlusCircle } from 'lucide-react';
 import { Sueno, Transaccion, HistoricoAvance, UserProfile } from '../types';
+import { DreamSavingsInsights } from './DreamSavingsInsights';
 
 interface DreamComplianceChartProps {
   suenos: Sueno[];
@@ -647,21 +648,21 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
         </div>
 
         {/* Existing dreams list selection with quick status */}
-        <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1 no-scrollbar">
+        <div className="space-y-4 max-h-[480px] overflow-y-auto pr-1 no-scrollbar">
           {suenos.map((s) => {
             const isSelected = s.id === activeSueno.id;
             const sAhorro = s.usarReal ? Math.max(0, realAhorroNeto) : s.ahorroManual;
             const progressPct = Math.min(100, Math.round(((s.ahorroAcumulado || 0) / s.meta) * 100));
             return (
-              <div
-                key={s.id}
-                onClick={() => onSelectSueno(s.id)}
-                className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col gap-2 relative group hover:scale-[1.01] ${
-                  isSelected
-                    ? 'bg-gradient-to-tr from-[#1E1B4B] to-[#312E81] text-white border-transparent shadow-md shadow-indigo-150/50'
-                    : 'bg-slate-50 text-slate-800 border-slate-200/80 hover:bg-slate-100/90'
-                }`}
-              >
+              <div key={s.id} className="p-0.5 border border-transparent space-y-2">
+                <div
+                  onClick={() => onSelectSueno(s.id)}
+                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col gap-2 relative group hover:scale-[1.01] ${
+                    isSelected
+                      ? 'bg-gradient-to-tr from-[#1E1B4B] to-[#312E81] text-white border-transparent shadow-md shadow-indigo-150/50'
+                      : 'bg-slate-50 text-slate-800 border-slate-200/80 hover:bg-slate-100/90'
+                  }`}
+                >
                 <div className="flex justify-between items-center w-full">
                   <div className="flex items-center gap-2">
                     <div className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-teal-400 animate-pulse' : 'bg-slate-400'}`} />
@@ -844,6 +845,12 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
                     </motion.div>
                   )}
                 </AnimatePresence>
+                </div>
+                <DreamSavingsInsights
+                  dream={s}
+                  transacciones={transacciones}
+                  selectedLanguage={selectedLanguage}
+                />
               </div>
             );
           })}

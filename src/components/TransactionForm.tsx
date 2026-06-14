@@ -37,6 +37,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     return new Date().toISOString().substring(0, 10);
   });
   
+  const [popupCuotasTotal, setPopupCuotasTotal] = useState<number | undefined>(initialTransaction?.cuotasTotal);
+  const [popupEsAutomatica, setPopupEsAutomatica] = useState<boolean>(initialTransaction?.esAutomatica || false);
+  
   const [isListening, setIsListening] = useState(false);
   const [recognitionError, setRecognitionError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -158,13 +161,15 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       }
     }
 
-    const nueva: Omit<Transaccion, "id"> = {
+    const nueva: Omit<Transaccion, "id"> & { cuotasTotal?: number; esAutomatica?: boolean } = {
       tipo: popupTipo,
       monto: num,
       categoria: popupTipo === 'Gasto' ? finalCategory : undefined,
       fecha: popupFecha || formatLocalYYYYMMDD(new Date()),
       descripcion: popupDescripcion.trim() || (popupTipo === 'Gasto' ? `Gasto en ${finalCategory}` : 'Ingreso manual'),
-      formaPago: popupFormaPago || (popupTipo === 'Ingreso' ? 'Efectivo' : getMergedPaymentMethods()[0]) || 'Efectivo'
+      formaPago: popupFormaPago || (popupTipo === 'Ingreso' ? 'Efectivo' : getMergedPaymentMethods()[0]) || 'Efectivo',
+      cuotasTotal: popupTipo === 'Gasto' ? popupCuotasTotal : undefined,
+      esAutomatica: popupTipo === 'Gasto' ? popupEsAutomatica : undefined,
     };
 
     playTone('success', isMuted);
@@ -181,6 +186,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     setPopupDescripcion('');
     setPopupCategoria(categorias.length > 0 ? categorias[0].nombre : 'Otros');
     setPopupFecha(new Date().toISOString().substring(0, 10));
+    setPopupCuotasTotal(undefined);
+    setPopupEsAutomatica(false);
   };
 
   return (
@@ -359,6 +366,46 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
           />
         </div>
+
+        {popupTipo === 'Gasto' && (
+          <div className="space-y-3.5 pt-1.5 border-t border-dashed border-slate-250">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-wider text-slate-800 mb-1 block">
+                {selectedLanguage === 'ES' ? 'Cuotas totales (Opcional)' : 'Total Installments (Optional)'}
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="24"
+                placeholder={selectedLanguage === 'ES' ? 'Ej: 3 (Sin cuotas si vacío)' : 'e.g. 3 (Leave empty for no installments)'}
+                value={popupCuotasTotal || ''}
+                onChange={(e) => {
+                  handleTap();
+                  setPopupCuotasTotal(e.target.value ? parseInt(e.target.value) : undefined);
+                }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+
+            {popupCuotasTotal !== undefined && popupCuotasTotal > 1 && (
+              <div className="flex items-center gap-2.5 bg-indigo-50/50 p-3 border border-indigo-100/30 rounded-xl">
+                <input
+                  type="checkbox"
+                  id="chk-es-automatica"
+                  checked={popupEsAutomatica}
+                  onChange={(e) => {
+                    handleTap();
+                    setPopupEsAutomatica(e.target.checked);
+                  }}
+                  className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                />
+                <label htmlFor="chk-es-automatica" className="text-[10.5px] font-black text-slate-700 cursor-pointer select-none">
+                  {selectedLanguage === 'ES' ? '¿Carga automática mes a mes?' : 'Automatic charge month to month?'}
+                </label>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2.5 pt-3 border-t border-slate-100 bg-white shadow-[0_-4px_10px_rgba(0,0,0,0.02)] mt-auto flex-shrink-0">
