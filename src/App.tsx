@@ -1903,6 +1903,24 @@ export default function App() {
           return Math.abs(fa - fb) / 86400000; // ms por dia
         };
 
+        // --- NUEVO: deduplicar DENTRO de la tanda entrante ---
+        // Evita que el mismo gasto repetido en varias fotos/videos
+        // se guarde dos veces (esDup solo mira contra lo ya guardado).
+        const dedupInterno = (lista: Transaccion[]): Transaccion[] => {
+          const unicos: Transaccion[] = [];
+          for (const nt of lista) {
+            const yaEsta = unicos.some(u =>
+              u.monto === nt.monto &&
+              normalizar(u.descripcion) === normalizar(nt.descripcion) &&
+              difDias(u.fecha, nt.fecha) <= 2
+            );
+            if (!yaEsta) unicos.push(nt);
+          }
+          return unicos;
+        };
+        allNewTxList = dedupInterno(allNewTxList);
+        // --- FIN NUEVO ---
+
         const esDup = (nt: Transaccion) =>
           transacciones.some(tx =>
             tx.monto === nt.monto &&
