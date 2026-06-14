@@ -967,8 +967,16 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
         const isEs = selectedLanguage === 'ES';
         const intel = calculateDeterministicIntelligence();
         const remainingMeta = activeSueno ? Math.max(0, activeSueno.meta - (activeSueno.ahorroAcumulado || 0)) : 0;
-        const monthsToAchieve = intel.recommendedMonthlyAllocation > 0 ? Math.ceil(remainingMeta / intel.recommendedMonthlyAllocation) : 0;
-        const projectedDate = getProjectedDateStr(monthsToAchieve);
+        
+        // --- FIX BUG 2: acotar meses cuando superavit <= 0 ---
+        const surplusEsNegativo = intel.averageSurplus <= 0;
+        const monthsToAchieve = (!surplusEsNegativo && intel.recommendedMonthlyAllocation > 0)
+          ? Math.ceil(remainingMeta / intel.recommendedMonthlyAllocation)
+          : 0;
+        const projectedDate = monthsToAchieve > 0
+          ? getProjectedDateStr(monthsToAchieve)
+          : '';
+        // --- FIN FIX BUG 2 ---
         
         // Calculate "palanca de ahorro" (e.g. cutting 20% of dominant spending category)
         const extraMonthlySavings = Math.round(intel.monthlyAverageForMaxCat * 0.20);
@@ -984,6 +992,34 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
         let badgeStyle = '';
         let descText = '';
 
+        // --- FIX: superavit negativo = sin ingresos registrados ---
+        if (surplusEsNegativo && intel.historicalMonthsCount >= 1) {
+          badgeText = isEs ? '⚠️ Estimación Preliminar' : '⚠️ Preliminary Estimate';
+          badgeStyle = 'bg-indigo-50 text-indigo-800 border-indigo-200/50';
+          descText = isEs
+            ? `Tus gastos superan tus ingresos registrados este periodo — tu superávit actual es $${intel.averageSurplus.toLocaleString('es-CO')}. Registra tus ingresos reales para obtener una proyección precisa.`
+            : `Your expenses exceed your recorded income this period — current surplus is $${intel.averageSurplus.toLocaleString('en-US')}. Add your real income to unlock an accurate projection.`;
+          // No mostrar proyeccion ni palanca de ahorro
+          return (
+            <div className="bg-gradient-to-br from-slate-50 to-indigo-50/30 rounded-3xl p-5 border border-indigo-200/60 shadow-xs text-left space-y-4 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-indigo-100 border-dashed">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-gradient-to-tr from-teal-500 to-indigo-600 rounded-xl text-white">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <span className="text-[12px] font-black text-slate-800 uppercase tracking-widest">
+                    {isEs ? "Meta de Ahorro Inteligente" : "Smart Savings advice"}
+                  </span>
+                </div>
+                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border self-start ${badgeStyle}`}>
+                  {badgeText}
+                </span>
+              </div>
+              <p className="text-[11.5px] text-slate-700 leading-relaxed font-bold">{descText}</p>
+            </div>
+          );
+        }
+
         if (intel.historicalMonthsCount === 0) {
           badgeText = isEs ? "Sigue registrando para metas personalizadas" : "Record more for personalized goals";
           badgeStyle = "bg-amber-50 text-amber-800 border-amber-200/50";
@@ -995,20 +1031,20 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
           badgeStyle = "bg-indigo-50 text-indigo-800 border-indigo-200/50";
           const savingsPercent = intel.averageSurplus > 0 ? Math.round((intel.recommendedMonthlyAllocation / intel.averageSurplus) * 100) : 0;
           descText = isEs
-            ? `¡Hola! Con base en una estimación preliminar de tus finanzas (${intel.historicalMonthsCount} mes/es registrados), tu superávit promedio mensual estimado es de $${intel.averageSurplus.toLocaleString('es-ES')}. Te propongo ahorrar $${intel.recommendedMonthlyAllocation.toLocaleString('es-ES')} al mes (un ${savingsPercent}% de tu superávit). Siguiendo este plan preliminar, lograrás '${activeSueno?.nombre || ''}' en ${monthsToAchieve} meses (${projectedDate || 'pronto'}).`
-            : `Hello! Based on a preliminary scan of your finances (${intel.historicalMonthsCount} month(s) recorded), your estimated average monthly surplus is $${intel.averageSurplus.toLocaleString('es-ES')}. I suggest allocating $${intel.recommendedMonthlyAllocation.toLocaleString('es-ES')} monthly (around ${savingsPercent}% of your surplus). Under this plan, you will reach '${activeSueno?.nombre || ''}' in ${monthsToAchieve} months (${projectedDate || 'soon'}).`;
+            ? `¡Hola! Con base en una estimación preliminar de tus finanzas (${intel.historicalMonthsCount} mes/es registrados), tu superávit promedio mensual estimado es de $${intel.averageSurplus.toLocaleString('es-CO')}. Te propongo ahorrar $${intel.recommendedMonthlyAllocation.toLocaleString('es-CO')} al mes (un ${savingsPercent}% de tu superávit). Siguiendo este plan preliminar, lograrás '${activeSueno?.nombre || ''}' en ${monthsToAchieve} meses (${projectedDate || 'pronto'}).`
+            : `Hello! Based on a preliminary scan of your finances (${intel.historicalMonthsCount} month(s) recorded), your estimated average monthly surplus is $${intel.averageSurplus.toLocaleString('en-US')}. I suggest allocating $${intel.recommendedMonthlyAllocation.toLocaleString('en-US')} monthly (around ${savingsPercent}% of your surplus). Under this plan, you will reach '${activeSueno?.nombre || ''}' in ${monthsToAchieve} months (${projectedDate || 'soon'}).`;
         } else {
           badgeText = isEs ? "🏆 Recomendación Firme" : "🏆 Firm Recommendation";
           badgeStyle = "bg-teal-50 text-teal-800 border-teal-200/50";
           const savingsPercent = intel.averageSurplus > 0 ? Math.round((intel.recommendedMonthlyAllocation / intel.averageSurplus) * 100) : 0;
           descText = isEs
-            ? `¡Hola! Tras analizar con detalle tu historial completo de ${intel.historicalMonthsCount} meses, tu superávit real promedio mensual es de $${intel.averageSurplus.toLocaleString('es-ES')}. Te sugiero asignar con firmeza una cuota mensual de $${intel.recommendedMonthlyAllocation.toLocaleString('es-ES')} (60% de tu superávit). Alcanzarás '${activeSueno?.nombre || ''}' en ${monthsToAchieve} meses, proyectado para ${projectedDate}.`
-            : `Hello! After thoroughly analyzing your complete historical data of ${intel.historicalMonthsCount} months, your real average monthly surplus stands at $${intel.averageSurplus.toLocaleString('es-ES')}. I strongly suggest setting a monthly savings quota of $${intel.recommendedMonthlyAllocation.toLocaleString('es-ES')} (60% of your surplus). You'll reach '${activeSueno?.nombre || ''}' in ${monthsToAchieve} months, projected for ${projectedDate}.`;
+            ? `¡Hola! Tras analizar con detalle tu historial completo de ${intel.historicalMonthsCount} meses, tu superávit real promedio mensual es de $${intel.averageSurplus.toLocaleString('es-CO')}. Te sugiero asignar con firmeza una cuota mensual de $${intel.recommendedMonthlyAllocation.toLocaleString('es-CO')} (60% de tu superávit). Alcanzarás '${activeSueno?.nombre || ''}' en ${monthsToAchieve} meses, proyectado para ${projectedDate}.`
+            : `Hello! After thoroughly analyzing your complete historical data of ${intel.historicalMonthsCount} months, your real average monthly surplus stands at $${intel.averageSurplus.toLocaleString('en-US')}. I strongly suggest setting a monthly savings quota of $${intel.recommendedMonthlyAllocation.toLocaleString('en-US')} (60% of your surplus). You'll reach '${activeSueno?.nombre || ''}' in ${monthsToAchieve} months, projected for ${projectedDate}.`;
         }
 
         const reductionActionText = isEs
-          ? `Al recortar un 20% de tu gasto mensual en '${intel.maxCatName}' (un ahorro adicional de $${extraMonthlySavings.toLocaleString('es-ES')}/mes), ¡lo lograrás ${monthsFaster} ${monthsFaster === 1 ? 'mes' : 'meses'} antes!`
-          : `By trimming 20% of your monthly spend on '${intel.maxCatName}' (saving an extra $${extraMonthlySavings.toLocaleString('es-ES')}/mo), you'll reach it ${monthsFaster} ${monthsFaster === 1 ? 'month' : 'months'} sooner!`;
+          ? `Al recortar un 20% de tu gasto mensual en '${intel.maxCatName}' (un ahorro adicional de $${extraMonthlySavings.toLocaleString('es-CO')}/mes), ¡lo lograrás ${monthsFaster} ${monthsFaster === 1 ? 'mes' : 'meses'} antes!`
+          : `By trimming 20% of your monthly spend on '${intel.maxCatName}' (saving an extra $${extraMonthlySavings.toLocaleString('en-US')}/mo), you'll reach it ${monthsFaster} ${monthsFaster === 1 ? 'month' : 'months'} sooner!`;
 
         return (
           <div className="bg-gradient-to-br from-slate-50 to-indigo-50/30 rounded-3xl p-5 border border-indigo-200/60 shadow-xs text-left space-y-4">

@@ -72,7 +72,7 @@ export const DreamSavingsInsights: React.FC<DreamSavingsInsightsProps> = ({
             {selectedLanguage === 'ES' ? 'Superávit mensual' : 'Monthly surplus'}
           </p>
           <p className="text-lg font-black text-teal-600">
-            ${superavitMensual.toLocaleString()}
+            ${superavitMensual.toLocaleString(selectedLanguage === 'ES' ? 'es-CO' : 'en-US')}
           </p>
         </div>
 
@@ -104,8 +104,8 @@ export const DreamSavingsInsights: React.FC<DreamSavingsInsightsProps> = ({
       }`}>
         <p className="text-xs font-black mb-1 flex items-center gap-1.5">
           {estaEnBuenCamino
-            ? (selectedLanguage === 'ES' ? '✓ Util' : '✓ On track')
-            : (selectedLanguage === 'ES' ? '■ No util' : '■ Needs adjustment')}
+            ? (selectedLanguage === 'ES' ? '✅ útil' : '✅ On track')
+            : (selectedLanguage === 'ES' ? '⚠️ No útil' : '⚠️ Needs adjustment')}
         </p>
         <p className="text-[10px] font-bold leading-relaxed opacity-95">
           {estaEnBuenCamino
