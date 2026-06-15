@@ -22,6 +22,10 @@ export interface Transaccion {
   montoOriginal?: number;
   esAutomatica?: boolean;
   idCuotaPrincipal?: string;
+
+  // NUEVOS CAMPOS PARA GASTOS RECURRENTES
+  esRecurrente?: boolean;
+  idRecurrente?: string;
 }
 
 export type FiltroTiempo = 'Día' | 'Semana' | 'Mes' | 'Año' | 'Histórico' | 'Personalizado';
@@ -98,5 +102,24 @@ export interface ChatMessage {
     descripcion: string;
     tipo: 'Gasto' | 'Ingreso';
   }>;
+}
+
+export type FrecuenciaRecurrente = 'Semanal' | 'Quincenal' | 'Mensual' | 'Bimestral';
+
+export interface GastoRecurrente {
+  id: string;
+  nombre: string; // 'Empleada del hogar'
+  monto: number; // 600000
+  categoria: string; // 'Hogar'
+  metodoPago: string; // 'Efectivo'
+  frecuencia: FrecuenciaRecurrente;
+  diasPago: number[]; // [14, 28] para quincenal
+  paisMoneda: 'CLP' | 'COP'; // pais del gasto
+  activo: boolean; // se puede pausar
+  autoRegistrar: boolean; // crea tx automaticamente
+  notificacionActiva: boolean; // notificacion push/badge
+  avisoPrevio: boolean; // notificar 1 dia antes
+  ultimoRegistro?: string; // ISO YYYY-MM-DD ultimo auto-registro
+  fechaCreacion: string; // ISO YYYY-MM-DD
 }
 

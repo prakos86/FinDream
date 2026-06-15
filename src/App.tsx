@@ -127,7 +127,7 @@ export const normalizarMonto = (valor: any): number => {
   if (esNegativo) n = -Math.abs(n);
   return n;
 };
-import { Categoria, TipoMovimiento, Transaccion, FiltroTiempo, Sueno, UserProfile, ProductoFinanciero, ChatMessage, Suscripcion } from './types';
+import { Categoria, TipoMovimiento, Transaccion, FiltroTiempo, Sueno, UserProfile, ProductoFinanciero, ChatMessage, Suscripcion, GastoRecurrente, FrecuenciaRecurrente } from './types';
 import { useFirestore } from './hooks/useFirestore';
 import { useGoogleSheets } from './hooks/useGoogleSheets';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
@@ -136,6 +136,7 @@ import { DreamComplianceChart } from './components/DreamComplianceChart';
 import { ChatPanel } from './components/ChatPanel';
 import { TransactionForm } from './components/TransactionForm';
 import { SuscripcionesPanel } from './components/SuscripcionesPanel';
+import { GastosRecurrentes } from './components/GastosRecurrentes';
 import { SplashIntro } from './components/SplashIntro';
 import { FinDreamLogo } from './components/FinDreamLogo';
 import { ProfileModal } from './components/ProfileModal';
@@ -212,6 +213,7 @@ const TRANSLATIONS = {
     tab_productos: "Producto",
     tab_portafolio: "Portafolio",
     tab_suscripciones: "Suscripciones",
+    tab_recurrentes: "Recurrentes",
     productos_actuales: "Mis Productos",
     recomendaciones_ai: "Recomendaciones AI",
     sincronizado_ai: "Sincronizado automáticamente con tus gastos",
@@ -289,6 +291,7 @@ const TRANSLATIONS = {
     tab_productos: "Product",
     tab_portafolio: "Portfolio",
     tab_suscripciones: "Subscriptions",
+    tab_recurrentes: "Recurring",
     productos_actuales: "My Products",
     recomendaciones_ai: "AI Recommendations",
     sincronizado_ai: "Automatically synced with your expenses",
@@ -790,6 +793,7 @@ const ALL_TABS = [
   { id: "productos",     label: "tab_productos",     icon: "CreditCard", tabKey: "productos" },
   { id: "portafolios",   label: "tab_portafolio",    icon: "Briefcase",  tabKey: "portafolios" },
   { id: "suscripciones", label: "tab_suscripciones", icon: "Repeat",     tabKey: "suscripciones" },
+  { id: "recurrentes",   label: "tab_recurrentes",   icon: "Repeat",     tabKey: "recurrentes" },
   { id: "insights",      label: "tab_insights",      icon: "Sparkles",   tabKey: "insights" },
 ];
 
@@ -964,7 +968,7 @@ export default function App() {
   };
 
   // Navigation tabs state
-  const [activeTab, setActiveTab] = useState<'finance' | 'cloud' | 'productos' | 'portafolios' | 'insights' | 'suscripciones'>('finance');
+  const [activeTab, setActiveTab] = useState<'finance' | 'cloud' | 'productos' | 'portafolios' | 'insights' | 'suscripciones' | 'recurrentes'>('finance');
   
   // Estado del orden, persistido en localStorage
   const [tabOrder, setTabOrder] = useState<string[]>(() => {
@@ -1559,6 +1563,16 @@ export default function App() {
     pushToFirestore(undefined, undefined, undefined, undefined, undefined, updated);
   };
 
+  // Gastos Recurrentes state and persistence handler
+  const [gastosRecurrentes, setGastosRecurrentes] = useState<GastoRecurrente[]>([]);
+  const saveGastosRecurrentes = (updated: GastoRecurrente[]) => {
+    setGastosRecurrentes(updated);
+    pushToFirestore(
+      undefined, undefined, undefined, undefined,
+      undefined, undefined, updated
+    );
+  };
+
   const { rates, loading: exchangeLoading, convertir } = useExchangeRate();
   const totalSuscripcionesMes = useMemo(() => {
     return (suscripciones || []).reduce((sum, s) => {
@@ -1575,6 +1589,7 @@ export default function App() {
     categorias, setCategorias,
     paymentMethods, setPaymentMethods,
     suscripciones, setSuscripciones,
+    gastosRecurrentes, setGastosRecurrentes,
     setNotchAlert,
     selectedLanguage,
     effectiveCountry
@@ -1586,6 +1601,73 @@ export default function App() {
       setHasShownCountrySelector(true);
     }
   }, [availableCountries, showSplash, hasShownCountrySelector]);
+
+  // C2 — Auto-registro diario
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (showSplash || !user) return;
+    const hoy = new Date();
+    const diaHoy = hoy.getDate();
+    const fechaHoyISO = hoy.toISOString().split('T')[0];
+    const monedaActiva = effectiveCountry === 'CL' ? 'CLP' : 'COP';
+    const nuevasTx: Transaccion[] = [];
+    const gastosActualizados = gastosRecurrentes.map(g => {
+      // Solo procesar si: activo + autoRegistrar + mismo pais
+      // + dia de pago coincide + no registrado hoy ya
+      if (
+        !g.activo ||
+        !g.autoRegistrar ||
+        g.paisMoneda !== monedaActiva ||
+        !g.diasPago.includes(diaHoy) ||
+        g.ultimoRegistro === fechaHoyISO
+      ) return g;
+      // Crear la transaccion automaticamente
+      const nuevaTx: Transaccion = {
+        id: `rec-${g.id}-${fechaHoyISO}`,
+        descripcion: g.nombre,
+        monto: -Math.abs(g.monto),
+        fecha: fechaHoyISO,
+        categoria: g.categoria,
+        formaPago: g.metodoPago,
+        tipo: 'Gasto',
+        esRecurrente: true, // marcar origen
+        idRecurrente: g.id,
+      };
+      nuevasTx.push(nuevaTx);
+
+      // Trigger user push/PWA notification if enabled
+      if (g.notificacionActiva && typeof Notification !== 'undefined') {
+        if (Notification.permission === 'granted') {
+          try {
+            new Notification(selectedLanguage === 'ES' ? 'Gasto Recurrente Registrado' : 'Recurring Expense Registered', {
+              body: selectedLanguage === 'ES'
+                ? `Se registró automáticamente: ${g.nombre} por $${g.monto.toLocaleString()}`
+                : `Automatically registered: ${g.nombre} for $${g.monto.toLocaleString()}`,
+            });
+          } catch (e) {
+            console.warn("Browser notification blocked:", e);
+          }
+        }
+      }
+
+      return { ...g, ultimoRegistro: fechaHoyISO };
+    });
+    if (nuevasTx.length > 0) {
+      const txActualizadas = [...transacciones, ...nuevasTx];
+      setTransacciones(txActualizadas);
+      pushToFirestore(undefined, txActualizadas);
+      saveGastosRecurrentes(gastosActualizados);
+      setNotchAlert({
+        text: selectedLanguage === 'ES'
+          ? `Se registraron ${nuevasTx.length} gasto(s) recurrente(s) automáticamente`
+          : `Automatically registered ${nuevasTx.length} recurring expense(s)`,
+        subtext: selectedLanguage === 'ES'
+          ? `Se han creado los registros en tu balance`
+          : `They have been registered in your balance`,
+        isPositive: true
+      });
+    }
+  }, [showSplash, effectiveCountry, gastosRecurrentes, transacciones, selectedLanguage]);
 
   // Handlers
 
@@ -2674,7 +2756,9 @@ export default function App() {
                       ? t('tab_portafolio')
                       : activeTab === 'suscripciones'
                         ? t('tab_suscripciones')
-                        : t('tab_insights')}
+                        : activeTab === 'recurrentes'
+                          ? (selectedLanguage === 'ES' ? 'Recurrentes' : 'Recurring')
+                          : t('tab_insights')}
               <span>{effectiveCountry === 'CO' ? '🇨🇴' : '🇨🇱'}</span>
             </h1>
           </div>
@@ -4224,6 +4308,17 @@ export default function App() {
             autoOpenAdd={autoOpenSubModal}
             onAddOpened={() => setAutoOpenSubModal(false)}
           />
+        ) : activeTab === 'recurrentes' ? (
+          <GastosRecurrentes
+            gastosRecurrentes={gastosRecurrentes.filter(
+              g => g.paisMoneda === (effectiveCountry === 'CL' ? 'CLP' : 'COP')
+            )}
+            onSave={saveGastosRecurrentes}
+            todosLosGastos={gastosRecurrentes}
+            transacciones={transacciones}
+            selectedLanguage={selectedLanguage}
+            effectiveCountry={effectiveCountry}
+          />
         ) : null}
       </div>
 
@@ -4266,7 +4361,7 @@ export default function App() {
         </div>
       )}
 
-      <div id="bottom-nav-scroll" className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 grid grid-cols-7 items-center justify-items-center z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] px-1 overflow-hidden">
+      <div id="bottom-nav-scroll" className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 grid grid-cols-8 items-center justify-items-center z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] px-1 overflow-hidden">
         {tabOrder.slice(0, 3).map((tabId) => {
           const tab = ALL_TABS.find(t => t.id === tabId);
           if (!tab) return null;

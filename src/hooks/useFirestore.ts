@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { UserProfile, Transaccion, Sueno, Categoria, Suscripcion } from '../types';
+import { UserProfile, Transaccion, Sueno, Categoria, Suscripcion, GastoRecurrente } from '../types';
 
 export const useFirestore = (
   showSplash: boolean,
@@ -16,6 +16,8 @@ export const useFirestore = (
   setPaymentMethods: React.Dispatch<React.SetStateAction<string[]>>,
   suscripciones: Suscripcion[],
   setSuscripciones: React.Dispatch<React.SetStateAction<Suscripcion[]>>,
+  gastosRecurrentes: GastoRecurrente[],
+  setGastosRecurrentes: React.Dispatch<React.SetStateAction<GastoRecurrente[]>>,
   setNotchAlert: (alert: { text: string; subtext: string; isPositive: boolean } | null) => void,
   selectedLanguage: string,
   selectedCountry: 'CO' | 'CL'
@@ -61,7 +63,8 @@ export const useFirestore = (
     updatedSuenos?: Sueno[],
     updatedCategorias?: any[],
     updatedPaymentMethods?: string[],
-    updatedSuscripciones?: Suscripcion[]
+    updatedSuscripciones?: Suscripcion[],
+    updatedGastosRecurrentes?: GastoRecurrente[]
   ) => {
     try {
       const { auth } = await import('../firebase');
@@ -89,6 +92,7 @@ export const useFirestore = (
           payload.productos = updatedProfile.productos || [];
           payload.portafolios = updatedProfile.portafolios || [];
           payload.suscripciones = updatedProfile.suscripciones || suscripciones;
+          payload.gastosRecurrentes = gastosRecurrentes.map(g => ({ ...g }));
         }
         
         if (updatedTransacciones) payload.transacciones = updatedTransacciones;
@@ -96,6 +100,7 @@ export const useFirestore = (
         if (updatedCategorias) payload.categorias = updatedCategorias;
         if (updatedPaymentMethods) payload.paymentMethods = updatedPaymentMethods;
         if (updatedSuscripciones) payload.suscripciones = updatedSuscripciones;
+        if (updatedGastosRecurrentes) payload.gastosRecurrentes = updatedGastosRecurrentes.map(g => ({ ...g }));
         
         setIsSyncing(true);
         await setDoc(userDocRef, JSON.parse(JSON.stringify(payload)), { merge: true });
@@ -113,6 +118,7 @@ export const useFirestore = (
         userPayload.correo = updatedProfile.correo || (user?.email) || '';
         userPayload.celular = updatedProfile.celular;
         userPayload.suscripciones = updatedProfile.suscripciones || suscripciones;
+        userPayload.gastosRecurrentes = gastosRecurrentes.map(g => ({ ...g }));
         if (updatedProfile.productos) financialPayload.productos = updatedProfile.productos;
         if (updatedProfile.portafolios) financialPayload.portafolios = updatedProfile.portafolios;
       }
@@ -122,6 +128,7 @@ export const useFirestore = (
       if (updatedCategorias) financialPayload.categorias = updatedCategorias;
       if (updatedPaymentMethods) financialPayload.paymentMethods = updatedPaymentMethods;
       if (updatedSuscripciones) userPayload.suscripciones = updatedSuscripciones;
+      if (updatedGastosRecurrentes) userPayload.gastosRecurrentes = updatedGastosRecurrentes.map(g => ({ ...g }));
       
       setIsSyncing(true);
       await Promise.all([
@@ -198,6 +205,9 @@ export const useFirestore = (
             if (Array.isArray(data.paymentMethods)) setPaymentMethods(data.paymentMethods);
             if (Array.isArray(data.suscripciones)) setSuscripciones(data.suscripciones);
             
+            const gastosRec = data.gastosRecurrentes || [];
+            setGastosRecurrentes(gastosRec);
+            
             setLastSyncedTime(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
             setIsSyncing(false);
           } else {
@@ -208,6 +218,7 @@ export const useFirestore = (
               celular: userProfile.celular || '',
               productos: userProfile.productos || [],
               transacciones, suenos, categorias, paymentMethods, suscripciones,
+              gastosRecurrentes: gastosRecurrentes.map(g => ({ ...g })),
               updatedAt: new Date().toISOString()
             };
             setDoc(userDocRef, payload).catch(e => console.error(e));
@@ -275,6 +286,9 @@ export const useFirestore = (
           if (Array.isArray(financialData.paymentMethods)) setPaymentMethods(financialData.paymentMethods);
           if (Array.isArray(userData.suscripciones)) setSuscripciones(userData.suscripciones);
           
+          const gastosRec = userData.gastosRecurrentes || [];
+          setGastosRecurrentes(gastosRec);
+          
           setLastSyncedTime(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
           setIsSyncing(false);
         } else {
@@ -302,6 +316,7 @@ export const useFirestore = (
             correo: userProfile.correo || userData.correo || (user?.email) || '',
             celular: userProfile.celular || userData.celular || '',
             suscripciones: suscripciones,
+            gastosRecurrentes: gastosRecurrentes.map(g => ({ ...g })),
             updatedAt: new Date().toISOString()
           };
           
