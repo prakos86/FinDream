@@ -10,7 +10,7 @@ interface DreamComplianceChartProps {
   realAhorroNeto: number;
   totalActivos: number;
   totalPasivos: number;
-  selectedCountry: 'CO' | 'US' | 'ES' | 'MX';
+  selectedCountry: 'CO' | 'CL' | 'US' | 'ES' | 'MX';
   selectedLanguage: string;
   onSelectSueno: (id: string) => void;
   onAddSueno: (nombre: string, meta: number, manualRate: number, usarReal: boolean) => void;
@@ -38,7 +38,12 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
   saveUserProfileData,
 }) => {
   // --- NUEVO: filtrar suenos por pais activo ---
-  const monedaActiva = selectedCountry === 'CL' ? 'CLP' : 'COP';
+  const monedaMap: Record<string, 'CLP' | 'COP'> = {
+    CL: 'CLP',
+    CO: 'COP',
+  };
+  const monedaActiva: 'CLP' | 'COP' =
+    monedaMap[selectedCountry] ?? 'COP';
   const suenosPais = suenos.filter(s =>
     !s.paisMoneda || // legado: mostrar en pais activo
     s.paisMoneda === monedaActiva

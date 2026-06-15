@@ -793,7 +793,6 @@ const ALL_TABS = [
   { id: "productos",     label: "tab_productos",     icon: "CreditCard", tabKey: "productos" },
   { id: "portafolios",   label: "tab_portafolio",    icon: "Briefcase",  tabKey: "portafolios" },
   { id: "suscripciones", label: "tab_suscripciones", icon: "Repeat",     tabKey: "suscripciones" },
-  { id: "recurrentes",   label: "tab_recurrentes",   icon: "Repeat",     tabKey: "recurrentes" },
   { id: "insights",      label: "tab_insights",      icon: "Sparkles",   tabKey: "insights" },
 ];
 
@@ -1056,6 +1055,7 @@ export default function App() {
   const [nuevoPortafolio, setNuevoPortafolio] = useState({ nombre: '', valor: '', plataforma: '' });
   const [activeProductSubTab, setActiveProductSubTab] = useState<'actuales' | 'recomendaciones'>('actuales');
   const [activeInsightSubTab, setActiveInsightSubTab] = useState<'asesor' | 'insights'>('asesor');
+  const [activeBalanceSubTab, setActiveBalanceSubTab] = useState<'movimientos' | 'recurrentes'>('movimientos');
   const [portfolioFilter, setPortfolioFilter] = useState<'all' | 'debit' | 'credit' | 'credits'>('all');
   
   // States for Hidden Product Forms (Toggle with + button)
@@ -2310,6 +2310,25 @@ export default function App() {
 
   // Calculate dynamic categorial sum on-the-fly for pristine precision
   const getCategoriaMonto = (catNombre: string) => {
+    // Nombres de todas las categorias conocidas
+    const nombresCategorias = categorias.map(c => c.nombre);
+
+    if (catNombre === 'Otros') {
+      // 'Otros' acumula tambien los gastos sin categoria
+      // o con categoria desconocida (undefined, null, '')
+      return transaccionesFiltradas
+        .filter(t =>
+          t.tipo === 'Gasto' &&
+          (
+            t.categoria === 'Otros' ||
+            !t.categoria ||
+            !nombresCategorias.includes(t.categoria)
+          )
+        )
+        .reduce((sum, t) => sum + t.monto, 0);
+    }
+
+    // Para el resto de categorias: comparacion exacta (sin cambios)
     return transaccionesFiltradas
       .filter(t => t.tipo === 'Gasto' && t.categoria === catNombre)
       .reduce((sum, t) => sum + t.monto, 0);
@@ -3183,8 +3202,52 @@ export default function App() {
           </div>
         </div>
 
-        {/* --- RECENT TRANSACTIONS LOG (Highly polished list, swipeable deletion) --- */}
-        <div className="space-y-3 pt-2">
+        {/* Subtabs Balance: Movimientos / Recurrentes */}
+        <div className="bg-slate-100 p-1 rounded-2xl flex items-center justify-between border border-slate-200 shrink-0 mx-4 mb-3">
+          <button
+            onClick={() => {
+              handleTap();
+              setActiveBalanceSubTab('movimientos');
+            }}
+            className={`flex-1 text-center py-2 text-xs font-black rounded-xl transition flex items-center justify-center gap-1 cursor-pointer ${
+              activeBalanceSubTab === 'movimientos'
+                ? 'bg-white text-[#00897B] shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            ■ {selectedLanguage === 'ES' ? 'Movimientos' : 'Transactions'}
+          </button>
+          <button
+            onClick={() => {
+              handleTap();
+              setActiveBalanceSubTab('recurrentes');
+            }}
+            className={`flex-1 text-center py-2 text-xs font-black rounded-xl transition flex items-center justify-center gap-1 cursor-pointer ${
+              activeBalanceSubTab === 'recurrentes'
+                ? 'bg-white text-[#00897B] shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            ■ {selectedLanguage === 'ES' ? 'Recurrentes' : 'Recurring'}
+          </button>
+        </div>
+
+        {/* Contenido segun subtab activo */}
+        {activeBalanceSubTab === 'recurrentes' ? (
+          <GastosRecurrentes
+            gastosRecurrentes={gastosRecurrentes.filter(
+              g => g.paisMoneda === (effectiveCountry === 'CL' ? 'CLP' : 'COP')
+            )}
+            onSave={saveGastosRecurrentes}
+            todosLosGastos={gastosRecurrentes}
+            transacciones={transacciones}
+            selectedLanguage={selectedLanguage}
+            effectiveCountry={effectiveCountry}
+          />
+        ) : (
+          <>
+            {/* --- RECENT TRANSACTIONS LOG (Highly polished list, swipeable deletion) --- */}
+            <div className="space-y-3 pt-2">
           <div className="flex flex-col gap-3">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-black text-slate-800 tracking-wider block uppercase">Historial de Movimientos</h3>
@@ -3298,8 +3361,13 @@ export default function App() {
 
                         {/* Title & category / date */}
                         <div>
-                          <div className="text-xs font-black text-slate-800 block line-clamp-1">
-                            {t.descripcion}
+                          <div className="text-xs font-black text-slate-800 flex items-center flex-wrap gap-1">
+                            <span>{t.descripcion}</span>
+                            {t.esRecurrente && (
+                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-teal-50 text-teal-600 border border-teal-200 ml-1">
+                                ■ Recurrente
+                              </span>
+                            )}
                           </div>
                           <span className="text-[9.5px] text-slate-800 flex flex-wrap items-center gap-1.5 mt-1 font-extrabold">
                             {isExpense ? (
@@ -3383,8 +3451,10 @@ export default function App() {
                 Reconocimiento de Inteligencia por <span className="font-semibold text-[#00897B]">Google Gemini API Workspace</span>
               </p>
             </div>
-          </div>
-        ) : activeTab === 'cloud' ? (
+          </>
+        )}
+      </div>
+    ) : activeTab === 'cloud' ? (
           <div id="dream-tab-content" className="p-5 space-y-5 text-left flex-1 flex flex-col justify-between">
             <div className="space-y-5">
               <DreamComplianceChart
@@ -4308,17 +4378,6 @@ export default function App() {
             autoOpenAdd={autoOpenSubModal}
             onAddOpened={() => setAutoOpenSubModal(false)}
           />
-        ) : activeTab === 'recurrentes' ? (
-          <GastosRecurrentes
-            gastosRecurrentes={gastosRecurrentes.filter(
-              g => g.paisMoneda === (effectiveCountry === 'CL' ? 'CLP' : 'COP')
-            )}
-            onSave={saveGastosRecurrentes}
-            todosLosGastos={gastosRecurrentes}
-            transacciones={transacciones}
-            selectedLanguage={selectedLanguage}
-            effectiveCountry={effectiveCountry}
-          />
         ) : null}
       </div>
 
@@ -4361,7 +4420,7 @@ export default function App() {
         </div>
       )}
 
-      <div id="bottom-nav-scroll" className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 grid grid-cols-8 items-center justify-items-center z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] px-1 overflow-hidden">
+      <div id="bottom-nav-scroll" className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 grid grid-cols-7 items-center justify-items-center z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] px-1 overflow-hidden">
         {tabOrder.slice(0, 3).map((tabId) => {
           const tab = ALL_TABS.find(t => t.id === tabId);
           if (!tab) return null;
