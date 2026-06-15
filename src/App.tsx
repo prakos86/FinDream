@@ -1632,6 +1632,7 @@ export default function App() {
         tipo: 'Gasto',
         esRecurrente: true, // marcar origen
         idRecurrente: g.id,
+        paisMoneda: g.paisMoneda,
       };
       nuevasTx.push(nuevaTx);
 
@@ -1830,7 +1831,8 @@ export default function App() {
             categoria: cat,
             fecha: normalizarFecha(data.fecha || ''),
             descripcion: data.descripcion || `Transacción en ${cat}`,
-            formaPago: forma
+            formaPago: forma,
+            paisMoneda: effectiveCountry === 'CL' ? 'CLP' : 'COP',
           };
           return tx;
         });
@@ -1929,7 +1931,8 @@ export default function App() {
             categoria: cat,
             fecha: normalizarFecha(data.fecha || ''),
             descripcion: data.nombre || `Gasto en ${cat}`,
-            formaPago: forma
+            formaPago: forma,
+            paisMoneda: effectiveCountry === 'CL' ? 'CLP' : 'COP',
           };
           return tx;
         });
@@ -2250,7 +2253,13 @@ export default function App() {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
     const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
 
+    const monedaActiva = effectiveCountry === 'CL' ? 'CLP' : 'COP';
+
     return items.filter(item => {
+      // Filtrar por pais: incluir si coincide o si no tiene paisMoneda (legado)
+      const matchPais = !item.paisMoneda || item.paisMoneda === monedaActiva;
+      if (!matchPais) return false;
+
       const itemTime = formatSafeDateString(item.fecha).getTime();
       switch (filtroSeleccionado) {
         case 'Día':
@@ -4947,23 +4956,25 @@ export default function App() {
                 startWithVoice={startVoiceOnAdd}
                 initialTransaction={initialTransactionForModal || (prefilledCategory ? { id: '', tipo: 'Gasto', monto: 0, categoria: prefilledCategory, descripcion: '', formaPago: '', fecha: formatLocalYYYYMMDD(new Date()) } : undefined)}
                 onSave={(tx) => {
+                  const paisMoneda = effectiveCountry === 'CL' ? 'CLP' : 'COP';
+                  const txConPais = { ...tx, paisMoneda };
                   const txToSave: Transaccion[] = [];
-                  if (tx.cuotasTotal && tx.cuotasTotal > 1 && tx.esAutomatica) {
-                    const montoParaCuota = tx.monto / tx.cuotasTotal;
-                    const dateParts = tx.fecha.split('-');
+                  if (txConPais.cuotasTotal && txConPais.cuotasTotal > 1 && txConPais.esAutomatica) {
+                    const montoParaCuota = txConPais.monto / txConPais.cuotasTotal;
+                    const dateParts = txConPais.fecha.split('-');
                     const year = dateParts[0];
                     const month = dateParts[1];
                     const day = dateParts[2];
                     
                     const timestampId = Date.now();
-                    for (let i = 1; i <= tx.cuotasTotal; i++) {
+                    for (let i = 1; i <= txConPais.cuotasTotal; i++) {
                       const futureDate = new Date(
                         parseInt(year),
                         parseInt(month) - 1 + i - 1,
                         parseInt(day)
                       );
                       txToSave.push({
-                        ...tx,
+                        ...txConPais,
                         id: `cuota-${timestampId}-${i}`,
                         fecha: futureDate.toISOString().substring(0, 10),
                         cuotaActual: i,
@@ -4974,7 +4985,7 @@ export default function App() {
                     }
                   } else {
                     txToSave.push({
-                      ...tx,
+                      ...txConPais,
                       id: `trx-${Date.now()}`
                     });
                   }
@@ -5047,7 +5058,8 @@ export default function App() {
                 onSave={(updatedTx) => {
                   const updated: Transaccion = {
                     ...editingTransaction,
-                    ...updatedTx
+                    ...updatedTx,
+                    paisMoneda: editingTransaction.paisMoneda || (effectiveCountry === 'CL' ? 'CLP' : 'COP')
                   };
                   const updatedList = transacciones.map(t => t.id === editingTransaction.id ? updated : t);
                   saveTransacciones(updatedList);

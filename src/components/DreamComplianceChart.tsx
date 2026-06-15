@@ -37,25 +37,14 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
   userProfile,
   saveUserProfileData,
 }) => {
-  // --- NUEVO: filtrar suenos por pais activo ---
-  const monedaMap: Record<string, 'CLP' | 'COP'> = {
-    CL: 'CLP',
-    CO: 'COP',
-  };
-  const monedaActiva: 'CLP' | 'COP' =
-    monedaMap[selectedCountry] ?? 'COP';
-  const suenosPais = suenos.filter(s =>
-    !s.paisMoneda || // legado: mostrar en pais activo
-    s.paisMoneda === monedaActiva
-  );
-  // --- FIN NUEVO ---
+  // Sueños son globales – visibles en todos los países
 
   const [distribucion, setDistribucion] =
     React.useState<{ [id: string]: number }>(() => {
-      if (suenosPais.length === 0) return {};
-      const base = Math.floor(100 / suenosPais.length);
-      const resto = 100 - base * suenosPais.length;
-      return suenosPais.reduce((acc, s, i) => ({
+      if (suenos.length === 0) return {};
+      const base = Math.floor(100 / suenos.length);
+      const resto = 100 - base * suenos.length;
+      return suenos.reduce((acc, s, i) => ({
         ...acc,
         [s.id]: base + (i === 0 ? resto : 0),
       }), {});
@@ -64,7 +53,7 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
   React.useEffect(() => {
     setDistribucion(prev => {
       const next: { [id: string]: number } = {};
-      const ids = suenosPais.map(s => s.id);
+      const ids = suenos.map(s => s.id);
       let asignado = 0;
       ids.forEach((id, i) => {
         if (i < ids.length - 1) {
@@ -76,11 +65,11 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
       });
       return next;
     });
-  }, [suenosPais.length]);
+  }, [suenos.length]);
 
   const handleDistribucionChange = (idCambiado: string, nuevoPct: number) => {
     const pct = Math.min(100, Math.max(0, Math.round(nuevoPct)));
-    const otrosIds = suenosPais.map(s => s.id).filter(id => id !== idCambiado);
+    const otrosIds = suenos.map(s => s.id).filter(id => id !== idCambiado);
     if (otrosIds.length === 0) return;
     const restante = 100 - pct;
     const totalOtros = otrosIds.reduce(
@@ -358,7 +347,7 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
   };
 
   // Find the selected dream or default to the first one
-  const activeSueno = suenosPais.find(s => s.id === activeSuenoId) || suenosPais[0];
+  const activeSueno = suenos.find(s => s.id === activeSuenoId) || suenos[0];
 
   if (!activeSueno) {
     return (
@@ -616,7 +605,7 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
   // Calculate scaling factors
   const computeXMax = () => {
     let maxMonths = 12; // Minimum 1 year view length
-    const dreamsToChart = chartViewMode === 'selected' ? [activeSueno] : suenosPais;
+    const dreamsToChart = chartViewMode === 'selected' ? [activeSueno] : suenos;
     dreamsToChart.forEach(s => {
       const sAhorro = s.usarReal ? Math.max(0, realAhorroNeto) : s.ahorroManual;
       const sRemaining = Math.max(0, s.meta - (s.ahorroAcumulado || 0));
@@ -637,7 +626,7 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
       return Math.max(activeSueno.meta, (activeSueno.ahorroAcumulado || 0) + (activeAhorro * xMax), 100);
     } else {
       let maxVal = 100;
-      suenosPais.forEach(s => {
+      suenos.forEach(s => {
         const sAhorro = s.usarReal ? Math.max(0, realAhorroNeto) : s.ahorroManual;
         maxVal = Math.max(maxVal, s.meta, (s.ahorroAcumulado || 0) + (sAhorro * xMax));
       });
@@ -718,12 +707,12 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
             </div>
             <div className="text-left">
               <h4 className="text-[13px] font-black text-slate-800 uppercase tracking-widest block">Mis Sueños Activos</h4>
-              <p className="text-[10px] text-slate-400 font-semibold leading-tight mt-0.5">({suenosPais.length}) registrados</p>
+              <p className="text-[10px] text-slate-400 font-semibold leading-tight mt-0.5">({suenos.length}) registrados</p>
             </div>
           </div>
         </div>
 
-        {suenosPais.length > 1 && ahorroPotencialGlobal > 0 && (
+        {suenos.length > 1 && ahorroPotencialGlobal > 0 && (
           <div className="bg-white rounded-2xl p-4 border border-teal-100 shadow-xs mb-4 text-left">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -786,8 +775,8 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
             </div>
 
             <div className="space-y-3">
-              {suenosPais.map((s) => {
-                const pct = distribucion[s.id] ?? Math.floor(100 / suenosPais.length);
+              {suenos.map((s) => {
+                const pct = distribucion[s.id] ?? Math.floor(100 / suenos.length);
                 const monto = Math.round(ahorroPotencialEfectivo * pct / 100);
                 return (
                   <div key={s.id} className="space-y-1">
@@ -840,8 +829,8 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
 
         {/* Existing dreams list selection with quick status */}
         <div className="space-y-4 max-h-[480px] overflow-y-auto pr-1 no-scrollbar">
-          {suenosPais.map((s) => {
-            const pctSueno = distribucion[s.id] ?? Math.floor(100 / suenosPais.length);
+          {suenos.map((s) => {
+            const pctSueno = distribucion[s.id] ?? Math.floor(100 / suenos.length);
             const ahorroPotencialSueno = Math.round(ahorroPotencialEfectivo * pctSueno / 100);
             const isSelected = s.id === activeSueno.id;
             const sAhorro = s.usarReal ? Math.max(0, realAhorroNeto) : s.ahorroManual;
@@ -1339,7 +1328,7 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Todos los sueños ({suenosPais.length}) 📊
+            Todos los sueños ({suenos.length}) 📊
           </button>
           <button
             type="button"
@@ -1437,7 +1426,7 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
             )}
 
             {/* DRAW ALL VISIBLE DREAMS PROJECTION CURVES & COMPLIANCE DOTS */}
-            {(chartViewMode === 'selected' ? [activeSueno] : suenosPais).map((s) => {
+            {(chartViewMode === 'selected' ? [activeSueno] : suenos).map((s) => {
               const isSelected = s.id === activeSueno.id;
               const sAhorro = s.usarReal ? Math.max(0, realAhorroNeto) : s.ahorroManual;
               const sAccumulated = s.ahorroAcumulado || 0;

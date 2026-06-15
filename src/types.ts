@@ -26,6 +26,7 @@ export interface Transaccion {
   // NUEVOS CAMPOS PARA GASTOS RECURRENTES
   esRecurrente?: boolean;
   idRecurrente?: string;
+  paisMoneda?: 'CLP' | 'COP'; // pais donde se registro la transaccion
 }
 
 export type FiltroTiempo = 'Día' | 'Semana' | 'Mes' | 'Año' | 'Histórico' | 'Personalizado';
