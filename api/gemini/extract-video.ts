@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       + 'monto (STRING exacto como aparece en pantalla, ej: "146.637", "$2.378.260"), '
       + 'descripcion (nombre del comercio o descripcion), '
       + 'tipo (Gasto o Ingreso), '
-      + 'categoria (Una categoria sugerida, ej: Alimentación, Transporte, Servicios, Suscripciones, Compras, Entretenimiento, Salud, Educación, Transferencias, Otros), '
+      + 'categoria (DEBES usar EXACTAMENTE uno de estos nombres, respetando tildes y mayúsculas/minúsculas: Vivienda, Alimentación, Transporte, Compras, Viajes, Cuidado Personal y Entretenimiento, Mascotas, Moda y Estilo, Otros. Si ninguno aplica exactamente, usa Otros), '
       + 'banco (El nombre del banco o emisor, ej: CMR, Falabella, Bancolombia, etc.). '
       + 'El año actual es 2026. Usa siempre 2026 en las fechas. '
       + 'La fecha de cada transaccion es la que aparece '

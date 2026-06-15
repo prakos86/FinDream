@@ -43,7 +43,7 @@ Extract the following information for each transaction:
   * You MUST extract the raw characters of the local currency amount (like "291.313" or "5.070") EXACTLY as a string. Do NOT convert them to float or standard integers yourself, and do NOT truncate trailing zeros (e.g. keep "5.070" exactly, do NOT output "5.07").
   * Output exactly what you see in the text/document for the local currency billed amount.
 - nombre: A short description/name of the transaction.
-- categoria: Infer the best logical category for the transaction (e.g., Alimentación, Transporte, Compras, Vivienda, Viajes, Mascotas, etc).
+- categoria: You MUST use EXACTLY one of these category names (copy the exact string, preserving accents and casing): Vivienda, Alimentación, Transporte, Compras, Viajes, Cuidado Personal y Entretenimiento, Mascotas, Moda y Estilo, Otros. If none fits precisely, use Otros.
 - banco: If the document shows a bank logo, entity name, or payment platform, extract its name.
 
 When the document is a CREDIT CARD or BANK STATEMENT:

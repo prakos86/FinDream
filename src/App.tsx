@@ -2317,29 +2317,29 @@ export default function App() {
 
   const realAhorroNeto = totalActivos - totalPasivos;
 
-  // Calculate dynamic categorial sum on-the-fly for pristine precision
   const getCategoriaMonto = (catNombre: string) => {
-    // Nombres de todas las categorias conocidas
-    const nombresCategorias = categorias.map(c => c.nombre);
+    const catNombreLow = catNombre.toLowerCase();
+    const nombresCatLow = categorias.map(c => c.nombre.toLowerCase());
 
-    if (catNombre === 'Otros') {
-      // 'Otros' acumula tambien los gastos sin categoria
-      // o con categoria desconocida (undefined, null, '')
+    if (catNombreLow === 'otros') {
       return transaccionesFiltradas
-        .filter(t =>
-          t.tipo === 'Gasto' &&
-          (
-            t.categoria === 'Otros' ||
+        .filter(t => {
+          if (t.tipo !== 'Gasto') return false;
+          const catLow = (t.categoria || '').toLowerCase();
+          return (
+            catLow === 'otros' ||
             !t.categoria ||
-            !nombresCategorias.includes(t.categoria)
-          )
-        )
+            !nombresCatLow.includes(catLow)
+          );
+        })
         .reduce((sum, t) => sum + t.monto, 0);
     }
 
-    // Para el resto de categorias: comparacion exacta (sin cambios)
     return transaccionesFiltradas
-      .filter(t => t.tipo === 'Gasto' && t.categoria === catNombre)
+      .filter(t =>
+        t.tipo === 'Gasto' &&
+        (t.categoria || '').toLowerCase() === catNombreLow
+      )
       .reduce((sum, t) => sum + t.monto, 0);
   };
 
