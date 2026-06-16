@@ -298,16 +298,7 @@ export const useFirestore = (
             portafolios: selectedCountry === 'CO' ? (userProfile.portafolios || []) : [],
             transacciones: selectedCountry === 'CO' ? transacciones : [],
             suenos: selectedCountry === 'CO' ? suenos : [],
-            categorias: selectedCountry === 'CO' ? categorias : [
-              { nombre: 'Vivienda', icon: 'Home', color: '#8B5A2B' },
-              { nombre: 'Transporte', icon: 'Car', color: '#EF4444' },
-              { nombre: 'Alimentación', icon: 'Utensils', color: '#F97316' },
-              { nombre: 'Servicios', icon: 'Zap', color: '#FBBF24' },
-              { nombre: 'Salud', icon: 'Heart', color: '#F43F5E' },
-              { nombre: 'Educación', icon: 'BookOpen', color: '#3B82F6' },
-              { nombre: 'Entretenimiento', icon: 'Sparkles', color: '#10B981' },
-              { nombre: 'Ahorro', icon: 'PieChart', color: '#8B5CF6' }
-            ],
+            categorias: categorias,
             paymentMethods: selectedCountry === 'CO' ? paymentMethods : ['Efectivo', 'Tarjeta de Débito', 'Tarjeta de Crédito', 'Transferencia Bancaria'],
             updatedAt: new Date().toISOString()
           };
