@@ -1756,6 +1756,16 @@ export default function App() {
                     file.name.toLowerCase().endsWith('.3gp');
     if (isVideo) {
       triggerDynamicIsland("Procesando", selectedLanguage === 'ES' ? `Analizando video con IA: ${file.name}...` : `Analyzing video with AI: ${file.name}...`, true);
+      
+      let wakeLock: any = null;
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await (navigator as any).wakeLock.request('screen');
+        }
+      } catch (e) {
+        console.warn('Wake Lock no disponible:', e);
+      }
+
       try {
         const videoUrl = URL.createObjectURL(file);
         const videoEl = document.createElement('video');
@@ -1774,23 +1784,25 @@ export default function App() {
           720 * (videoEl.videoHeight / (videoEl.videoWidth || 720)));
         const ctx = canvas.getContext('2d')!;
         
-        // Capturar 1 frame por segundo (maximo 20 frames)
-        // Esto garantiza que no se pierda ninguna transaccion
-        // en un scroll normal de extracto bancario
-        const INTERVALO_SEG = 1.0; // 1 frame por segundo
-        const MAX_FRAMES = 20; // tope para no saturar la API
+        // 1 frame por segundo, maximo 60 frames
+        // Gemini 2.5 Flash soporta hasta 100 imagenes por llamada
+        const MAX_FRAMES = 60;
         const NUM_FRAMES = Math.min(
-          Math.ceil(duration / INTERVALO_SEG),
+          Math.ceil(duration) + 1, // 1 frame x segundo + frame inicial
           MAX_FRAMES
         );
         const frames: string[] = [];
         for (let i = 0; i < NUM_FRAMES; i++) {
-          // Distribuir uniformemente si hay mas de MAX_FRAMES segundos
-          const seekTime = NUM_FRAMES < Math.ceil(duration / INTERVALO_SEG)
-            ? (duration / (NUM_FRAMES + 1)) * (i + 1)
-            : INTERVALO_SEG * i + INTERVALO_SEG / 2;
+          // Distribuir de 0 a duration inclusive
+          // i=0 -> segundo 0 (inicio exacto)
+          // i=NUM_FRAMES-1 -> segundo final
+          const seekTime = NUM_FRAMES === 1
+            ? 0
+            : (duration / (NUM_FRAMES - 1)) * i;
+          // Proteger contra valores que excedan la duracion
+          const seekTimeSafe = Math.min(seekTime, duration - 0.05);
           await new Promise<void>((resolve) => {
-            videoEl.currentTime = seekTime;
+            videoEl.currentTime = seekTimeSafe;
             videoEl.onseeked = () => {
               ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
               const frameBase64 = canvas.toDataURL('image/jpeg', 0.85) // mejor calidad
@@ -1868,6 +1880,15 @@ export default function App() {
         console.error(error);
         triggerDynamicIsland("Error", selectedLanguage === 'ES' ? `No se pudo extraer información del video: ${file.name}` : `Could not extract info from video: ${file.name}`, false);
         return [];
+      } finally {
+        if (wakeLock) {
+          try {
+            await wakeLock.release();
+          } catch (err) {
+            console.error('Error releasing wake lock:', err);
+          }
+          wakeLock = null;
+        }
       }
     } else {
       triggerDynamicIsland("Procesando", selectedLanguage === 'ES' ? `Analizando documento con IA: ${file.name}...` : `Analyzing document with AI: ${file.name}...`, true);
@@ -2597,11 +2618,17 @@ export default function App() {
       (t.categoria || '').toLowerCase() === nombre.toLowerCase()
     ).length;
     if (gastosAsociados > 0) {
-      triggerDynamicIsland(
-        "No permitido",
-        `No puedes eliminar "${nombre}" porque tiene ${gastosAsociados} gasto(s) asociado(s). Reasigna los gastos primero.`,
-        false
-      );
+      // Cerrar modal primero para que la notificacion sea visible
+      setShowManageCategories(false);
+      setTimeout(() => {
+        triggerDynamicIsland(
+          selectedLanguage === 'ES' ? 'No permitido' : 'Not allowed',
+          selectedLanguage === 'ES'
+            ? `No puedes eliminar "${nombre}" porque tiene ${gastosAsociados} gasto(s) asociado(s). Reasigna los gastos primero.`
+            : `Cannot delete "${nombre}" — it has ${gastosAsociados} associated expense(s). Reassign them first.`,
+          false
+        );
+      }, 300); // esperar a que cierre el modal
       return;
     }
     // --- FIN NUEVO ---
@@ -4447,7 +4474,7 @@ export default function App() {
       </div>
 
       {/* Floating Action Button (Moved to bottom right to avoid overlap with 5 tabs) */}
-      {activeTab !== 'insights' && (
+      {activeTab !== 'insights' && (activeTab !== 'finance' || activeBalanceSubTab !== 'recurrentes') && (
         <div className="absolute left-1/2 -translate-x-1/2 z-50"
           style={{
             bottom: 'calc(4rem - 11px + env(safe-area-inset-bottom, 0px))'

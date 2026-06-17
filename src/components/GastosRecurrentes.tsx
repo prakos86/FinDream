@@ -328,12 +328,6 @@ export const GastosRecurrentes: React.FC<GastosRecurrentesProps> = ({
                 ? 'Agrega gastos fijos (arriendo, gimnasio, empleada doméstica) para que se registren automáticamente.' 
                 : 'Add fixed bills (rent, gym, housekeepers) to keep them recorded automatically.'}
             </p>
-            <button
-              onClick={handleOpenCreate}
-              className="mt-2 px-4 py-2 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-white rounded-xl text-xxs font-black uppercase tracking-widest cursor-pointer transition active:scale-95"
-            >
-              {isES ? '+ Registrar Primer Gasto' : '+ Record First Gasto'}
-            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
