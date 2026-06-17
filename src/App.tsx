@@ -1533,6 +1533,16 @@ export default function App() {
     onConfirm: () => {}
   });
 
+  const [errorDialog, setErrorDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+  });
+
   const requestConfirmation = (title: string, message: string, onConfirm: () => void) => {
     setConfirmDialog({
       isOpen: true,
@@ -1822,7 +1832,19 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ frames, country: selectedCountry })
         });
-        if (!resp.ok) throw new Error('Error en el servidor');
+        if (!resp.ok) {
+          if (resp.status === 413) {
+            setErrorDialog({
+              isOpen: true,
+              title: selectedLanguage === 'ES' ? 'Archivo demasiado grande' : 'File too large',
+              message: selectedLanguage === 'ES'
+                ? 'El video es demasiado grande para procesarse. Intenta con un video más corto o de menor peso.'
+                : 'The video is too large to process. Try a shorter or smaller video.',
+            });
+            return [];
+          }
+          throw new Error('Error en el servidor');
+        }
         const data = await resp.json();
         const txs = data.transacciones || [];
         
@@ -5493,6 +5515,49 @@ export default function App() {
                     className="py-3 px-4 text-sm font-bold text-rose-600 hover:bg-rose-50 active:bg-rose-100 transition-colors cursor-pointer"
                   >
                     Confirmar
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* --- ERROR DIALOG (un solo botón, sin confirmación) --- */}
+      <AnimatePresence>
+        {errorDialog.isOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setErrorDialog(prev => ({ ...prev, isOpen: false }))}
+              className="fixed inset-0 bg-black/60 z-[999] backdrop-blur-[2px] flex items-center justify-center p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white/95 backdrop-blur-md rounded-2xl max-w-[270px] w-full text-center shadow-2xl border border-gray-150 overflow-hidden"
+              >
+                <div className="p-5">
+                  <div className="text-3xl mb-2">⚠️</div>
+                  <h4 className="text-[16px] font-extrabold text-slate-900 leading-tight">
+                    {errorDialog.title}
+                  </h4>
+                  <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                    {errorDialog.message}
+                  </p>
+                </div>
+                <div className="border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => { handleTap(); setErrorDialog(prev => ({ ...prev, isOpen: false })); }}
+                    className="w-full py-3 px-4 text-sm font-bold text-indigo-600 hover:bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer"
+                  >
+                    {selectedLanguage === 'ES' ? 'Entendido' : 'Got it'}
                   </button>
                 </div>
               </motion.div>
