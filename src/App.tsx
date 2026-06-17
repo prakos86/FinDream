@@ -2065,7 +2065,7 @@ export default function App() {
             const yaEsta = unicos.some(u =>
               u.monto === nt.monto &&
               normalizar(u.descripcion) === normalizar(nt.descripcion) &&
-              difDias(u.fecha, nt.fecha) <= 2
+              difDias(u.fecha, nt.fecha) === 0
             );
             if (!yaEsta) unicos.push(nt);
           }
