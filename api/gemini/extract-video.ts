@@ -28,7 +28,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const prompt =
       'Estas son capturas de un video de movimientos bancarios en '
       + moneda + '. '
-      + 'Extrae TODAS las transacciones visibles. '
+      + 'Analiza CADA imagen con maxima atencion. '
+      + 'Extrae ABSOLUTAMENTE TODAS las transacciones que aparezcan, '
+      + 'incluso las que se ven parcialmente o por poco tiempo. '
+      + 'Si el mismo comercio aparece en varias imagenes con el mismo monto '
+      + 'y fecha, registralo UNA SOLA VEZ. '
+      + 'Si aparece con montos o fechas diferentes, registra cada uno por separado. '
       + 'Para cada una: fecha (YYYY-MM-DD, si no aparece usa hoy), '
       + 'monto (STRING exacto como aparece en pantalla, ej: "146.637", "$2.378.260"), '
       + 'descripcion (nombre del comercio o descripcion), '

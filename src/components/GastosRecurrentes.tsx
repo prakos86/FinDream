@@ -465,7 +465,7 @@ export const GastosRecurrentes: React.FC<GastosRecurrentesProps> = ({
                 </button>
               </div>
 
-              <form onSubmit={handleSave} className="space-y-5">
+              <div className="space-y-5">
                 {/* Nombre de Gasto */}
                 <div>
                   <label className="block text-[10px] font-black uppercase text-slate-400 mb-2">
@@ -686,12 +686,13 @@ export const GastosRecurrentes: React.FC<GastosRecurrentesProps> = ({
 
                 {/* Botón Guardar */}
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleSave}
                   className="w-full py-3 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-white font-black text-xs uppercase tracking-widest rounded-xl transition cursor-pointer active:scale-98 shadow-sm"
                 >
                   {isES ? 'Guardar Gasto Recurrente' : 'Save Gasto Recurrente'}
                 </button>
-              </form>
+              </div>
             </motion.div>
           </div>
         )}

@@ -1774,16 +1774,26 @@ export default function App() {
           720 * (videoEl.videoHeight / (videoEl.videoWidth || 720)));
         const ctx = canvas.getContext('2d')!;
         
-        // Capturar 6 frames distribuidos en el video
-        const NUM_FRAMES = 6;
+        // Capturar 1 frame por segundo (maximo 20 frames)
+        // Esto garantiza que no se pierda ninguna transaccion
+        // en un scroll normal de extracto bancario
+        const INTERVALO_SEG = 1.0; // 1 frame por segundo
+        const MAX_FRAMES = 20; // tope para no saturar la API
+        const NUM_FRAMES = Math.min(
+          Math.ceil(duration / INTERVALO_SEG),
+          MAX_FRAMES
+        );
         const frames: string[] = [];
         for (let i = 0; i < NUM_FRAMES; i++) {
-          const seekTime = (duration / (NUM_FRAMES + 1)) * (i + 1);
+          // Distribuir uniformemente si hay mas de MAX_FRAMES segundos
+          const seekTime = NUM_FRAMES < Math.ceil(duration / INTERVALO_SEG)
+            ? (duration / (NUM_FRAMES + 1)) * (i + 1)
+            : INTERVALO_SEG * i + INTERVALO_SEG / 2;
           await new Promise<void>((resolve) => {
             videoEl.currentTime = seekTime;
             videoEl.onseeked = () => {
               ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-              const frameBase64 = canvas.toDataURL('image/jpeg', 0.7)
+              const frameBase64 = canvas.toDataURL('image/jpeg', 0.85) // mejor calidad
                 .split(',')[1];
               frames.push(frameBase64);
               resolve();
@@ -1806,15 +1816,31 @@ export default function App() {
           return [];
         }
 
+        let currentCatsVideo = [...categorias];
         const newTxList = txs.map((data: any) => {
           let cat = 'Otros';
           if (data.categoria) {
-            let matchedCat = categorias.find(c => c.nombre.toLowerCase() === data.categoria.toLowerCase());
+            let matchedCat = currentCatsVideo.find(c => c.nombre.toLowerCase() === data.categoria.toLowerCase());
             if (!matchedCat) {
-              matchedCat = categorias.find(c => data.categoria.toLowerCase().includes(c.nombre.toLowerCase()) || 
+              matchedCat = currentCatsVideo.find(c => data.categoria.toLowerCase().includes(c.nombre.toLowerCase()) || 
                                                c.nombre.toLowerCase().includes(data.categoria.toLowerCase()));
             }
-            if (matchedCat) cat = matchedCat.nombre;
+            if (matchedCat) {
+              cat = matchedCat.nombre;
+            } else {
+              const nombreNuevo = data.categoria.charAt(0).toUpperCase() + data.categoria.slice(1).toLowerCase();
+              const yaExiste = currentCatsVideo.some(c => c.nombre.toLowerCase() === nombreNuevo.toLowerCase());
+              if (!yaExiste) {
+                const nuevaCat = {
+                  nombre: nombreNuevo,
+                  icon: 'MoreHorizontal',
+                  color: '#64748B',
+                };
+                currentCatsVideo.push(nuevaCat);
+                saveCategorias(currentCatsVideo);
+              }
+              cat = nombreNuevo;
+            }
           }
           
           let forma = getMergedPaymentMethods()[0];
@@ -1906,15 +1932,31 @@ export default function App() {
         
         const parsedArray = Array.isArray(dataArray) ? dataArray : [dataArray];
         
+        let currentCatsPhoto = [...categorias];
         const newTxList = parsedArray.map(data => {
           let cat = 'Otros';
           if (data.categoria) {
-            let matchedCat = categorias.find(c => c.nombre.toLowerCase() === data.categoria.toLowerCase());
+            let matchedCat = currentCatsPhoto.find(c => c.nombre.toLowerCase() === data.categoria.toLowerCase());
             if (!matchedCat) {
-              matchedCat = categorias.find(c => data.categoria.toLowerCase().includes(c.nombre.toLowerCase()) || 
+              matchedCat = currentCatsPhoto.find(c => data.categoria.toLowerCase().includes(c.nombre.toLowerCase()) || 
                                                c.nombre.toLowerCase().includes(data.categoria.toLowerCase()));
             }
-            if (matchedCat) cat = matchedCat.nombre;
+            if (matchedCat) {
+              cat = matchedCat.nombre;
+            } else {
+              const nombreNuevo = data.categoria.charAt(0).toUpperCase() + data.categoria.slice(1).toLowerCase();
+              const yaExiste = currentCatsPhoto.some(c => c.nombre.toLowerCase() === nombreNuevo.toLowerCase());
+              if (!yaExiste) {
+                const nuevaCat = {
+                  nombre: nombreNuevo,
+                  icon: 'MoreHorizontal',
+                  color: '#64748B',
+                };
+                currentCatsPhoto.push(nuevaCat);
+                saveCategorias(currentCatsPhoto);
+              }
+              cat = nombreNuevo;
+            }
           }
           
           let forma = getMergedPaymentMethods()[0];
@@ -2549,6 +2591,20 @@ export default function App() {
       triggerDynamicIsland("No permitido", "La categoría de respaldo no se puede borrar", false);
       return;
     }
+    // --- NUEVO: bloquear si tiene gastos asociados ---
+    const gastosAsociados = transacciones.filter(
+      t => t.tipo === 'Gasto' &&
+      (t.categoria || '').toLowerCase() === nombre.toLowerCase()
+    ).length;
+    if (gastosAsociados > 0) {
+      triggerDynamicIsland(
+        "No permitido",
+        `No puedes eliminar "${nombre}" porque tiene ${gastosAsociados} gasto(s) asociado(s). Reasigna los gastos primero.`,
+        false
+      );
+      return;
+    }
+    // --- FIN NUEVO ---
     requestConfirmation(
       "Eliminar Categoría",
       `¿Estás seguro de que quieres eliminar la categoría "${nombre}"?`,
@@ -3374,7 +3430,7 @@ export default function App() {
                             <span>{t.descripcion}</span>
                             {t.esRecurrente && (
                               <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-teal-50 text-teal-600 border border-teal-200 ml-1">
-                                ■ Recurrente
+                                🔄 Recurrente
                               </span>
                             )}
                           </div>
