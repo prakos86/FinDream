@@ -26,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { totalActivos = 0, totalPasivos = 0, dreamName = "", currentMeta = 0, countryName = "Colombia" } = req.body;
+    const { totalActivos = 0, totalPasivos = 0, dreamName = "", currentMeta = 0, countryName = "Colombia", topCategorias = [] } = req.body;
 
     // Sanitize input texts
     const cleanDreamName = sanitizeInputVal(dreamName);
@@ -34,6 +34,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const balanceLibre = Math.max(0, totalActivos - totalPasivos);
     const isEn = req.body.language === 'EN';
+
+    const topCategoriasStr = topCategorias.length > 0
+      ? (isEn
+        ? `Top spending categories: ${topCategorias.join(', ')}.`
+        : `Categorías con más gasto del usuario: ${topCategorias.join(', ')}.`)
+      : '';
 
     const systemPrompt = isEn 
       ? `You are an expert financial advisor. First, evaluate if the user's monthly financial data (Income & Expenses) is sufficient to make a structured savings recommendation.
@@ -50,7 +56,8 @@ Rules for the JSON output:
 2. "recommendedMeta" should be a realistic total sum for "${cleanDreamName}". If currentMeta is empty or too small, adjust to a typical cost. If their income is low, keep it attainable.
 3. "recommendedMonthlyAhorro" is the recommended monthly amount to save. It must be comfortable (usually 10% to 40% of their free balance). If free balance is $0, recommend a modest effort like $50 or $100.
 4. "explanation" is a brief (1 sentence), encouraging summary. If sufficientInfo is false, tell the user politely that we don't have enough data yet and ask them to input their regular income/expenses.
-5. "bullets" is an array of 3 to 4 specific savings recommendations or tips tailored to ${cleanCountryName} (e.g., local savings habits like CDT, Nequi pockets, "ahorro hormiga" reduction, etc.).`
+5. "bullets" is an array of 3 to 4 specific savings recommendations or tips tailored to ${cleanCountryName} (e.g., local savings habits like CDT, Nequi pockets, "ahorro hormiga" reduction, etc.).
+${topCategoriasStr}`
       : `Eres un asesor financiero experto e inteligente. Primero determina si los datos financieros mensuales provistos (Ingresos y Egresos) son suficientes para dar una asesoría de ahorro estructurada y realista.
 - Ingresos mensuales: $${totalActivos}
 - Egresos mensuales: $${totalPasivos}
@@ -65,7 +72,8 @@ Reglas para la propuesta en formato JSON:
 2. "recommendedMeta": Es el valor recomendado total para alcanzar "${cleanDreamName}". Si la meta inicial del usuario es razonable, apóyala o ajústala con base en el costo habitual para ese tipo de sueños.
 3. "recommendedMonthlyAhorro": Ahorro planificado mensual recomendado. Debe ser viable respecto a su excedente real de $${balanceLibre} (lo ideal es abonar entre un 15% y 40% de este excedente para no asfixiar su economía habitual. Si el excedente es de $0 o los datos son insuficientes, propón un esfuerzo bajo representativo de mínimo $50 o $100).
 4. "explanation": Un análisis muy breve y motivador (máximo 1 oración de introducción). Si sufficientInfo es false, explica amablemente que necesitas que te digan cuántos son sus ingresos y gastos.
-5. "bullets": Una lista (array de 3 o 4 strings) de recomendaciones concretas de ahorro y tips colombianos o locales de su país (ej. recortes de "gastos hormiga", optimización de suscripciones, aprovechamiento de cajillas de ahorro como Nequi/Daviplata, CDTs de alta rentabilidad, exención del 4x1000, etc.) adaptados a ${cleanCountryName}.`;
+5. "bullets": Una lista (array de 3 o 4 strings) de recomendaciones concretas de ahorro y tips colombianos o locales de su país (ej. recortes de "gastos hormiga", optimización de suscripciones, aprovechamiento de cajillas de ahorro como Nequi/Daviplata, CDTs de alta rentabilidad, exención del 4x1000, etc.) adaptados a ${cleanCountryName}.
+${topCategoriasStr}`;
 
     const ai = new GoogleGenAI({
       apiKey: process.env.GEMINI_API_KEY,
@@ -77,7 +85,7 @@ Reglas para la propuesta en formato JSON:
     });
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: isEn ? "Analyze these constraints and propose the dream metadata." : "Analiza los datos fiscales y genera la recomendación para el sueño.",
       config: {
         systemInstruction: systemPrompt,

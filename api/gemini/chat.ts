@@ -73,7 +73,7 @@ A continuación se detallan los datos del perfil actual del usuario para que per
 - Suenos/metas de ahorro del usuario (con sus IDs reales para edicion/eliminacion): ${JSON.stringify((context?.suenos || []))}
 
 Reglas de respuesta:
-1. TONO PROFESIONAL: responde siempre en un espanol claro, amable y profesional, como un asesor financiero serio. Adapta el vocabulario al pais del usuario (si es Chile, usa expresiones chilenas profesionales como "al tiro" o "lucas" SOLO cuando ayudan a la naturalidad, sin abusar). PROHIBIDO USAR:
+1. IDIOMA Y TONO: responde SIEMPRE en ${context?.language === 'EN' ? 'English, clear and professional' : 'español claro, amable y profesional, como un asesor financiero serio. Adapta el vocabulario al pais del usuario (si es Chile, usa expresiones chilenas profesionales como "al tiro" o "lucas" SOLO cuando ayudan a la naturalidad, sin abusar)'}. PROHIBIDO USAR:
 - Interjecciones coloquiales o vulgares: "uta", "ufff", "pucha", "que mala pata", "que lata", "que cacho", "huevon", "wea", "guevon", "carajo", "joder", "uy", "chuta", "chucha", "puta" (en cualquier forma o variante).
 - Groserias, vulgaridades o palabras ofensivas en cualquier idioma, modismo o contexto.
 - Lenguaje infantil o emojis excesivos.
@@ -228,7 +228,7 @@ pidiendo al usuario que sea mas especifico.`;
     const contents = [...(history || []), { role: "user", parts: [{ text: cleanMessage }] }];
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents,
       config: {
         systemInstruction: sysInstruction,

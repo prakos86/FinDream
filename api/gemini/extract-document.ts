@@ -18,7 +18,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { fileBase64, mimeType, textContent } = req.body;
+    const { fileBase64, mimeType, textContent, country = 'CO' } = req.body;
+    const moneda = country === 'CL' ? 'Chile (CLP — pesos chilenos)' : 'Colombia (COP — pesos colombianos)';
     const parts: any[] = [];
     
     if (fileBase64 && mimeType) {
@@ -30,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
     
-    const systemPrompt = `You are a specialized financial data extractor. You will be provided with a document (PDF, Image, or plain text / CSV) containing transaction receipts, invoices or bank statements. 
+    const systemPrompt = `You are a specialized financial data extractor for ${moneda}. You will be provided with a document (PDF, Image, or plain text / CSV) containing transaction receipts, invoices or bank statements. 
 Your goal is to extract the details for ALL transactions found in the document.
 Extract the following information for each transaction:
 - fecha: The date of the transaction in "YYYY-MM-DD" format.
@@ -78,15 +79,28 @@ ${textContent ? textContent.substring(0, 50000) : ""}`;
       }
     });
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: [
-        { role: "user", parts }
-      ],
-      config: {
-        responseMimeType: "application/json",
+    let response;
+    let lastError;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [
+            { role: "user", parts }
+          ],
+          config: {
+            responseMimeType: "application/json",
+          }
+        });
+        break;
+      } catch (err: any) {
+        lastError = err;
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 1500));
+        }
       }
-    });
+    }
+    if (!response) throw lastError;
     
     const data = JSON.parse(response.text || "{}");
     return res.json(data);

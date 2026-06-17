@@ -56,10 +56,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }));
     parts.push({ text: prompt });
     
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [{ role: 'user', parts }]
-    });
+    let response;
+    let lastError;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts }],
+          config: { responseMimeType: 'application/json' }
+        });
+        break;
+      } catch (err: any) {
+        lastError = err;
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 1500));
+        }
+      }
+    }
+    if (!response) throw lastError;
     
     const raw = (response.text || '')
       .replace(/```json|```/g, '').trim();

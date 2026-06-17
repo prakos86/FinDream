@@ -288,6 +288,18 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
       return;
     }
 
+    const catTotals: { [category: string]: number } = {};
+    (transacciones || []).forEach(t => {
+      if (t.tipo !== 'Ingreso') {
+        const cat = t.categoria || 'Otros';
+        catTotals[cat] = (catTotals[cat] || 0) + (t.monto || 0);
+      }
+    });
+    const top3Categories = Object.entries(catTotals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([cat]) => cat);
+
     try {
       const response = await fetch("/api/gemini/recommend-goal", {
         method: "POST",
@@ -299,6 +311,7 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
           currentMeta: currentMeta,
           countryName: selectedCountry === 'CO' ? 'Colombia' : selectedCountry === 'US' ? 'United States' : selectedCountry === 'ES' ? 'Spain' : 'Mexico',
           language: selectedLanguage,
+          topCategorias: top3Categories,
         }),
       });
 

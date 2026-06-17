@@ -1285,6 +1285,19 @@ export default function App() {
     if (!queryText.trim()) return;
     setIsSearchingCustomProducts(true);
     setCustomProductError(null);
+
+    const catTotals: { [category: string]: number } = {};
+    (transacciones || []).forEach(t => {
+      if (t.tipo !== 'Ingreso') {
+        const cat = t.categoria || 'Otros';
+        catTotals[cat] = (catTotals[cat] || 0) + (t.monto || 0);
+      }
+    });
+    const top3Categories = Object.entries(catTotals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([cat]) => cat);
+
     try {
       const response = await fetch("/api/gemini/recommend-custom-products", {
         method: "POST",
@@ -1293,6 +1306,9 @@ export default function App() {
           query: queryText,
           country: effectiveCountry === 'CO' ? 'Colombia' : 'Chile',
           language: selectedLanguage,
+          totalActivos,
+          totalPasivos,
+          topCategorias: top3Categories
         })
       });
 
@@ -1970,7 +1986,7 @@ export default function App() {
         const response = await fetch('/api/gemini/extract-document', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileBase64, mimeType, textContent })
+          body: JSON.stringify({ fileBase64, mimeType, textContent, country: selectedCountry })
         });
 
         if (!response.ok) throw new Error('Error en el servidor');

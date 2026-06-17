@@ -624,14 +624,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           utilizado: p.montoUtilizado
         })),
         financials: { totalActivos, totalPasivos },
-        transacciones: transacciones.slice(0, 30).map(t => ({
-          id: t.id,
-          tipo: t.tipo,
-          monto: t.monto,
-          categoria: t.categoria,
-          descripcion: t.descripcion,
-          fecha: t.fecha
-        }))
+        transacciones: [...transacciones]
+          .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+          .slice(0, 60)
+          .map(t => ({
+            id: t.id,
+            tipo: t.tipo,
+            monto: t.monto,
+            categoria: t.categoria,
+            descripcion: t.descripcion,
+            fecha: t.fecha
+          }))
       };
 
       const res = await fetch("/api/gemini/chat", {

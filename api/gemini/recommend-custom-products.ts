@@ -26,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { query, country = "Colombia", language = "ES" } = req.body;
+    const { query, country = "Colombia", language = "ES", totalActivos = 0, totalPasivos = 0, topCategorias = [] } = req.body;
     if (!query) {
       return res.status(400).json({ error: "Query is required" });
     }
@@ -40,6 +40,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const isEn = language === 'EN';
+    const balanceLibre = Math.max(0, totalActivos - totalPasivos);
+    const perfilStr = totalActivos > 0
+      ? (isEn
+        ? `User financial profile: monthly income $${totalActivos}, expenses $${totalPasivos}, free balance $${balanceLibre}.`
+        : `Perfil financiero del usuario: ingresos mensuales $${totalActivos}, egresos $${totalPasivos}, excedente libre $${balanceLibre}.`)
+      : '';
+
     const systemPrompt = isEn
       ? `You are an expert financial personal advisor. Based on the user's search intent: "${cleanQuery}", suggest high-quality financial products available in ${cleanCountry}.
 Your suggestions must be highly realistic and helpful, matched with top banks and fintechs in ${cleanCountry}.
@@ -53,12 +60,13 @@ The response MUST be a JSON object containing a "products" array. Each product h
 3. "producto": Exact name of the financial product
 4. "costoMensual": Estimated monthly handling fee. (e.g., "$0 COP" or "$0 CLP", match local currency format)
 5. "beneficios": Array of 3 to 4 key bullet advantages representing why this product is unique.
-6. "razon": 1 clear sentence showing how this product directly answers the user's query: "${cleanQuery}".`
+6. "razon": 1 clear sentence showing how this product directly answers the user's query: "${cleanQuery}".
+${perfilStr}`
       : `Eres un asesor financiero experto e inteligente. Basado en el requerimiento o búsqueda del usuario: "${cleanQuery}", sugiérele productos financieros reales y altamente recomendados disponibles en ${cleanCountry}.
 Tus sugerencias deben ser realistas, asociadas con bancos y fintechs destacados de ${cleanCountry}.
 Analiza con cautela qué productos se adaptan mejor a su consulta (CDT, tarjetas de crédito, de débito, cuentas de ahorro, créditos o inversiones digitales).
 Genera exactamente 2 o 3 sugerencias de productos financieros.
-
+ 
 Reglas para el objeto JSON que devolverás:
 Debe contener un arreglo "products". Cada producto en el arreglo DEBE tener:
 1. "id": cadena aleatoria o secuencial como "custom-rec-1", "custom-rec-2".
@@ -67,7 +75,8 @@ Debe contener un arreglo "products". Cada producto en el arreglo DEBE tener:
 4. "costoMensual": Cuota de manejo estimada (P. ej., "$0 CLP" o "$15.000 COP", según la moneda del país).
 5. "beneficios": Arreglo de 3 a 4 strings cortos (bullets) mostrando los mayores beneficios.
 6. "razon": 1 frase clara explicando por qué este producto específico es perfecto para su consulta "${cleanQuery}".
-Si te escriben desde Chile, responde usando un tono natural, profesional pero amigable ("cachai", etc. si aporta).`;
+Si te escriben desde Chile, responde usando un tono natural, profesional pero amigable ("cachai", etc. si aporta).
+${perfilStr}`;
 
     const ai = new GoogleGenAI({
       apiKey: process.env.GEMINI_API_KEY,
@@ -79,7 +88,7 @@ Si te escriben desde Chile, responde usando un tono natural, profesional pero am
     });
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: isEn ? `Based on: "${cleanQuery}" specify the recommended financial products.` : `Basado en: "${cleanQuery}", genera las recomendaciones de productos financieros.`,
       config: {
         systemInstruction: systemPrompt,
