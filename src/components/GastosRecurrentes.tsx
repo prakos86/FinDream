@@ -228,8 +228,8 @@ export const GastosRecurrentes: React.FC<GastosRecurrentesProps> = ({
     <div className="flex-1 flex flex-col h-[calc(100vh-190px)] mb-6 overflow-y-auto bg-slate-50 p-4 space-y-6">
       
       {/* Resumen de comprometido */}
-      <div className="bg-gradient-to-br from-[#1E293B] to-[#0F172A] p-5 rounded-3xl shadow-lg border border-slate-800 text-white relative overflow-hidden shrink-0">
-        <div className="absolute -top-4 -right-4 p-4 opacity-5">
+      <div className="bg-gradient-to-br from-[#1E293B] to-[#0F172A] p-5 rounded-3xl shadow-lg border border-slate-800 text-white relative overflow-visible shrink-0">
+        <div className="absolute -top-4 -right-4 p-4 opacity-5 pointer-events-none">
           <Calendar className="w-32 h-32" />
         </div>
         <div className="flex justify-between items-start">
@@ -248,7 +248,7 @@ export const GastosRecurrentes: React.FC<GastosRecurrentesProps> = ({
           </div>
           <button
             onClick={handleOpenCreate}
-            className="p-3 bg-teal-600 hover:bg-teal-500 text-white rounded-2xl flex items-center gap-1.5 transition active:scale-95 text-xs font-black uppercase cursor-pointer tracking-wider"
+            className="p-3 bg-teal-600 hover:bg-teal-500 text-white rounded-2xl flex items-center gap-1.5 transition active:scale-95 text-xs font-black uppercase cursor-pointer tracking-wider relative z-10"
           >
             <Plus className="w-4 h-4 stroke-[3px]" />
             {isES ? 'Crear Gasto' : 'Create Gasto'}
