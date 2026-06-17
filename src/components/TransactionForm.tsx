@@ -370,69 +370,38 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
         {popupTipo === 'Gasto' && (
           <div className="space-y-3.5 pt-1.5 border-t border-dashed border-slate-250">
             <div>
-              <label className="text-[10px] font-black uppercase tracking-wider text-slate-800 mb-1.5 block">
+              <label className="text-[10px] font-black uppercase tracking-wider text-slate-800 mb-1 block">
                 {selectedLanguage === 'ES' ? 'Cuotas totales (Opcional)' : 'Total Installments (Optional)'}
               </label>
-              {/* Chips 1-12 */}
-              <div className="flex flex-wrap gap-1.5 mb-2">
+              <select
+                value={popupCuotasTotal ?? ''}
+                onChange={(e) => {
+                  handleTap();
+                  const val = e.target.value;
+                  if (val === '') {
+                    setPopupCuotasTotal(undefined);
+                    setPopupEsAutomatica(false);
+                  } else {
+                    setPopupCuotasTotal(parseInt(val));
+                  }
+                }}
+                className="w-full bg-slate-50 border border-slate-205 rounded-xl py-2.5 px-3.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+              >
+                <option value="">
+                  {selectedLanguage === 'ES' ? 'Sin cuotas' : 'No installments'}
+                </option>
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => {
-                      handleTap();
-                      setPopupCuotasTotal(popupCuotasTotal === n ? undefined : n);
-                    }}
-                    className={`w-9 h-9 rounded-xl text-xs font-black border transition-all cursor-pointer
-                      ${popupCuotasTotal === n
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-indigo-50 hover:border-indigo-300'
-                      }`}
-                  >
-                    {n}
-                  </button>
+                  <option key={n} value={n}>
+                    {selectedLanguage === 'ES' ? `${n} cuota${n > 1 ? 's' : ''}` : `${n} installment${n > 1 ? 's' : ''}`}
+                  </option>
                 ))}
-                {/* Chip "+ de 12" */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleTap();
-                    setPopupCuotasTotal(popupCuotasTotal && popupCuotasTotal > 12 ? undefined : 13);
-                  }}
-                  className={`px-3 h-9 rounded-xl text-xs font-black border transition-all cursor-pointer
-                    ${popupCuotasTotal !== undefined && popupCuotasTotal > 12
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-indigo-50 hover:border-indigo-300'
-                    }`}
-                >
-                  {selectedLanguage === 'ES' ? '+12' : '+12'}
-                </button>
-              </div>
-              {/* Fallback input para > 12 */}
-              {popupCuotasTotal !== undefined && popupCuotasTotal > 12 && (
-                <input
-                  type="number"
-                  min="13"
-                  max="60"
-                  placeholder={selectedLanguage === 'ES' ? 'Ej: 24' : 'e.g. 24'}
-                  value={popupCuotasTotal === 13 ? '' : popupCuotasTotal}
-                  onChange={(e) => {
-                    handleTap();
-                    setPopupCuotasTotal(e.target.value ? parseInt(e.target.value) : 13);
-                  }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-              )}
-              {/* Limpiar selección */}
-              {popupCuotasTotal !== undefined && (
-                <button
-                  type="button"
-                  onClick={() => { handleTap(); setPopupCuotasTotal(undefined); setPopupEsAutomatica(false); }}
-                  className="mt-1.5 text-[10px] font-bold text-slate-400 hover:text-rose-500 cursor-pointer transition-colors"
-                >
-                  {selectedLanguage === 'ES' ? '✕ Sin cuotas' : '✕ No installments'}
-                </button>
-              )}
+                <option value="24">
+                  {selectedLanguage === 'ES' ? '24 cuotas' : '24 installments'}
+                </option>
+                <option value="36">
+                  {selectedLanguage === 'ES' ? '36 cuotas' : '36 installments'}
+                </option>
+              </select>
             </div>
 
             {popupCuotasTotal !== undefined && popupCuotasTotal > 1 && (
