@@ -1772,10 +1772,13 @@ export default function App() {
         videoEl.src = videoUrl;
         videoEl.muted = true;
         videoEl.playsInline = true;
+        // Esperar canplay garantiza que el primer frame esta decodificado
+        // y listo para ser capturado con drawImage
         await new Promise<void>((resolve, reject) => {
-          videoEl.onloadedmetadata = () => resolve();
+          videoEl.oncanplay = () => resolve();
           videoEl.onerror = () => reject(new Error('No se pudo cargar el video'));
-          setTimeout(() => reject(new Error('Timeout')), 10000);
+          setTimeout(() => reject(new Error('Timeout')), 15000); // +5s por seguridad
+          videoEl.load(); // forzar carga del primer frame
         });
         const duration = videoEl.duration || 10;
         const canvas = document.createElement('canvas');
