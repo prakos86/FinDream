@@ -1506,7 +1506,7 @@ export default function App() {
   const [busquedaGasto, setBusquedaGasto] = useState<string>('');
   const [rangoInicio, setRangoInicio] = useState<string>(''); // 'YYYY-MM-DD'
   const [rangoFin, setRangoFin] = useState<string>(''); // 'YYYY-MM-DD'
-  const [ordenSeleccionado, setOrdenSeleccionado] = useState<'MasReciente' | 'MayorGasto'>('MasReciente');
+  const [ordenSeleccionado, setOrdenSeleccionado] = useState<'MasReciente' | 'MayorGasto' | 'EnCuotas'>('MasReciente');
 
   // Duplicate detection state
   const [duplicatesPending, setDuplicatesPending] = useState<Transaccion[]>([]);
@@ -2392,6 +2392,11 @@ export default function App() {
   const baseLista = q ? transacciones : filterTransactions(transacciones);
   const transaccionesFiltradasLista = [...baseLista]
     .filter((t) => {
+      if (ordenSeleccionado === 'EnCuotas') {
+        if (t.cuotasTotal === undefined || t.cuotasTotal <= 1) {
+          return false;
+        }
+      }
       if (!q) return true;
       const enTexto =
         (t.descripcion || '').toLowerCase().includes(q) ||
@@ -2403,6 +2408,9 @@ export default function App() {
     .sort((a, b) => {
       if (ordenSeleccionado === 'MayorGasto') {
         return b.monto - a.monto;
+      } else if (ordenSeleccionado === 'EnCuotas') {
+        // dentro del filtro cuotas, ordenar por cuotaActual ascendente
+        return (a.cuotaActual ?? 0) - (b.cuotaActual ?? 0);
       } else {
         return new Date(b.fecha).getTime() - new Date(a.fecha).getTime();
       }
@@ -3427,6 +3435,21 @@ export default function App() {
                 )}
                 {selectedLanguage === 'ES' ? 'Mayor a menor' : 'Highest Amount'}
               </button>
+              <button
+                type="button"
+                onClick={() => { handleTap(); setOrdenSeleccionado('EnCuotas'); }}
+                className="relative flex-1 text-center py-1.5 text-[10px] font-bold rounded-lg focus:outline-none transition-colors z-10 px-2 cursor-pointer"
+                style={{ color: ordenSeleccionado === 'EnCuotas' ? '#ffffff' : '#4B5563' }}
+              >
+                {ordenSeleccionado === 'EnCuotas' && (
+                  <motion.div
+                    layoutId="activeSortBg"
+                    className="absolute inset-0 bg-[#312E81] rounded-lg -z-10 shadow-sm"
+                    transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                  />
+                )}
+                {selectedLanguage === 'ES' ? 'En cuotas' : 'Installments'}
+              </button>
             </div>
           </div>
 
@@ -3477,98 +3500,145 @@ export default function App() {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-50 flex justify-between items-center group hover:bg-slate-50 transition-colors"
+                      className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-50 flex flex-col group hover:bg-slate-50 transition-colors"
                     >
-                      <div className="flex items-center gap-3">
-                        {/* Transaction Icon Indicator */}
-                        <div 
-                          className="w-10 h-10 rounded-xl flex items-center justify-center animate-pulse"
-                          style={{ backgroundColor: `${itemColor}12` }}
-                        >
-                          {isExpense ? (
-                            renderCategoriaIcon(cat?.icon || 'MoreHorizontal', itemColor, "w-5.5 h-5.5")
-                          ) : (
-                            <TrendingUp className="w-5 h-5 text-emerald-600" />
-                          )}
-                        </div>
-
-                        {/* Title & category / date */}
-                        <div>
-                          <div className="text-xs font-black text-slate-800 flex items-center flex-wrap gap-1">
-                            <span>{t.descripcion}</span>
-                            {t.esRecurrente && (
-                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-teal-50 text-teal-600 border border-teal-200 ml-1">
-                                🔄 Recurrente
-                              </span>
+                      <div className="flex justify-between items-center w-full">
+                        <div className="flex items-center gap-3">
+                          {/* Transaction Icon Indicator */}
+                          <div 
+                            className="w-10 h-10 rounded-xl flex items-center justify-center animate-pulse"
+                            style={{ backgroundColor: `${itemColor}12` }}
+                          >
+                            {isExpense ? (
+                              renderCategoriaIcon(cat?.icon || 'MoreHorizontal', itemColor, "w-5.5 h-5.5")
+                            ) : (
+                              <TrendingUp className="w-5 h-5 text-emerald-600" />
                             )}
                           </div>
-                          <span className="text-[9.5px] text-slate-800 flex flex-wrap items-center gap-1.5 mt-1 font-extrabold">
-                            {isExpense ? (
-                              <>
-                                <span 
-                                  className="px-1.5 py-0.5 rounded-md text-[8px] font-black text-white uppercase tracking-wider" 
-                                  style={{ backgroundColor: itemColor }}
-                                >
-                                  {translateCategory(t.categoria || 'Otros')}
+
+                          {/* Title & category / date */}
+                          <div>
+                            <div className="text-xs font-black text-slate-800 flex items-center flex-wrap gap-1">
+                              <span>{t.descripcion}</span>
+                              {t.esRecurrente && (
+                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-teal-50 text-teal-600 border border-teal-200 ml-1">
+                                  🔄 Recurrente
                                 </span>
-                                {t.formaPago && (
-                                  <span className="px-1.5 py-0.5 rounded-md text-[8.5px] font-black bg-slate-100 text-slate-800 border border-slate-200 uppercase tracking-tight">
-                                    💳 {t.formaPago}
+                              )}
+                            </div>
+                            <span className="text-[9.5px] text-slate-800 flex flex-wrap items-center gap-1.5 mt-1 font-extrabold">
+                              {isExpense ? (
+                                <>
+                                  <span 
+                                    className="px-1.5 py-0.5 rounded-md text-[8px] font-black text-white uppercase tracking-wider" 
+                                    style={{ backgroundColor: itemColor }}
+                                  >
+                                    {translateCategory(t.categoria || 'Otros')}
                                   </span>
-                                )}
-                                {t.cuotasTotal && t.cuotaActual && (
-                                  <span className="px-1.5 py-0.5 rounded-md text-[8.5px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase tracking-tight">
-                                    🔁 {selectedLanguage === 'ES' 
-                                      ? `Cuota ${t.cuotaActual}/${t.cuotasTotal} ${t.esAutomatica ? '(Auto)' : ''}`
-                                      : `Installment ${t.cuotaActual}/${t.cuotasTotal} ${t.esAutomatica ? '(Auto)' : ''}`}
+                                  {t.formaPago && (
+                                    <span className="px-1.5 py-0.5 rounded-md text-[8.5px] font-black bg-slate-100 text-slate-800 border border-slate-200 uppercase tracking-tight">
+                                      💳 {t.formaPago}
+                                    </span>
+                                  )}
+                                  {t.cuotasTotal && t.cuotaActual && (
+                                    <span className="px-1.5 py-0.5 rounded-md text-[8.5px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase tracking-tight">
+                                      ■ {selectedLanguage === 'ES' 
+                                        ? `Cuota ${t.cuotaActual}/${t.cuotasTotal}`
+                                        : `Installment ${t.cuotaActual}/${t.cuotasTotal}`}
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black text-white uppercase tracking-wider bg-emerald-600">
+                                    {selectedLanguage === 'ES' ? 'INGRESO' : 'INCOME'}
                                   </span>
-                                )}
-                              </>
-                            ) : (
-                              <>
-                                <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black text-white uppercase tracking-wider bg-emerald-600">
-                                  {selectedLanguage === 'ES' ? 'INGRESO' : 'INCOME'}
-                                </span>
-                                {t.formaPago && (
-                                  <span className="px-1.5 py-0.5 rounded-md text-[8.5px] font-black bg-emerald-50 text-emerald-900 border border-emerald-150 uppercase tracking-tight">
-                                    💰 {t.formaPago}
-                                  </span>
-                                )}
-                              </>
-                            )}
-                            <span className="text-slate-600 font-bold">
-                              • {formatSafeDateString(t.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                  {t.formaPago && (
+                                    <span className="px-1.5 py-0.5 rounded-md text-[8.5px] font-black bg-emerald-50 text-emerald-950 border border-emerald-150 uppercase tracking-tight">
+                                      💰 {t.formaPago}
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                              <span className="text-slate-600 font-bold">
+                                • {formatSafeDateString(t.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                              </span>
                             </span>
+                          </div>
+                        </div>
+
+                        {/* Right amount and delete operations */}
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-black whitespace-nowrap ${isExpense ? 'text-rose-700' : 'text-emerald-700'}`}>
+                            {isExpense ? '-' : '+'}${t.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
                           </span>
+
+                          {/* Edit Transaction Trigger */}
+                          <button
+                            id={`btn-editar-${t.id}`}
+                            onClick={() => { handleTap(); setEditingTransaction(t); }}
+                            className="p-1 px-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer border border-transparent hover:border-indigo-100"
+                            title="Editar movimiento"
+                          >
+                            <MoreHorizontal className="w-4 h-4 text-slate-700 font-extrabold" />
+                          </button>
+
+                          {/* Delete Trigger */}
+                          <button
+                            id={`btn-borrar-${t.id}`}
+                            onClick={() => handleBorrarTransaccion(t.id, t.monto, t.tipo)}
+                            className="p-1 px-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                            title="Eliminar movimiento"
+                          >
+                            <Trash className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
 
-                      {/* Right amount and delete operations */}
-                      <div className="flex items-center gap-2">
-                        <span className={`text-sm font-black whitespace-nowrap ${isExpense ? 'text-rose-700' : 'text-emerald-700'}`}>
-                          {isExpense ? '-' : '+'}${t.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
-                        </span>
-
-                        {/* Edit Transaction Trigger */}
-                        <button
-                          id={`btn-editar-${t.id}`}
-                          onClick={() => { handleTap(); setEditingTransaction(t); }}
-                          className="p-1 px-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer border border-transparent hover:border-indigo-100"
-                          title="Editar movimiento"
-                        >
-                          <MoreHorizontal className="w-4 h-4 text-slate-700 font-extrabold" />
-                        </button>
-
-                        {/* Delete Trigger */}
-                        <button
-                          id={`btn-borrar-${t.id}`}
-                          onClick={() => handleBorrarTransaccion(t.id, t.monto, t.tipo)}
-                          className="p-1 px-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
-                          title="Eliminar movimiento"
-                        >
-                          <Trash className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {/* Barra de progreso cuotas */}
+                      {t.cuotasTotal && t.cuotasTotal > 1 && t.cuotaActual && (
+                        <div className="mt-2.5 pt-2.5 border-t border-slate-100 w-full">
+                          {/* Montos */}
+                          <div className="flex justify-between items-end mb-2">
+                            <div>
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
+                                {selectedLanguage === 'ES' ? 'VALOR CUOTA' : 'INSTALLMENT'}
+                              </p>
+                              <p className="text-xs font-black text-rose-600">
+                                -${t.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                              </p>
+                            </div>
+                            {t.montoOriginal && t.montoOriginal !== t.monto && (
+                              <div className="text-right">
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
+                                  {selectedLanguage === 'ES' ? 'TOTAL COMPRA' : 'TOTAL'}
+                                </p>
+                                <p className="text-[10px] font-black text-slate-400">
+                                  {(t.montoOriginal * t.cuotasTotal).toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          {/* Barra de progreso */}
+                          <div className="relative h-1.5 bg-slate-100 rounded-full">
+                            <div
+                              className="absolute left-0 top-0 h-1.5 bg-indigo-500 rounded-full transition-all"
+                              style={{ width: `${(t.cuotaActual / t.cuotasTotal) * 100}%` }}
+                            />
+                          </div>
+                          {/* Números de cuotas */}
+                          <div className="flex justify-between mt-1">
+                            {Array.from({ length: t.cuotasTotal }, (_, i) => i + 1).map(n => (
+                              <span
+                                key={n}
+                                className={`text-[7px] font-black ${n <= t.cuotaActual! ? 'text-indigo-600' : 'text-slate-400'}`}
+                              >
+                                {n}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </motion.div>
                   );
                 })}
@@ -4467,6 +4537,12 @@ export default function App() {
                 categorias={categorias}
                 getMergedPaymentMethods={getMergedPaymentMethods}
                 onDuplicatesFound={triggerDuplicatesModal}
+                suscripciones={suscripciones}
+                saveSuscripcionesList={saveSuscripcionesList}
+                gastosRecurrentes={gastosRecurrentes}
+                onNavigate={(tab) => setActiveTab(tab as any)}
+                saveCategorias={saveCategorias}
+                filtroSeleccionado={filtroSeleccionado}
               />
             ) : (
               /* --- B) INSIGHTS VIEW (Moved from Sueño tab) --- */
@@ -5083,7 +5159,7 @@ export default function App() {
                   const paisMoneda = effectiveCountry === 'CL' ? 'CLP' : 'COP';
                   const txConPais = { ...tx, paisMoneda };
                   const txToSave: Transaccion[] = [];
-                  if (txConPais.cuotasTotal && txConPais.cuotasTotal > 1 && txConPais.esAutomatica) {
+                  if (txConPais.cuotasTotal && txConPais.cuotasTotal > 1) {
                     const montoParaCuota = txConPais.monto / txConPais.cuotasTotal;
                     const dateParts = txConPais.fecha.split('-');
                     const year = dateParts[0];

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, Mic, Sparkles, Loader2, Volume2, VolumeX, ShieldCheck, Paperclip, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChatMessage, UserProfile, Transaccion, Sueno } from '../types';
+import { ChatMessage, UserProfile, Transaccion, Sueno, Suscripcion, GastoRecurrente } from '../types';
 import * as pdfjsLib from 'pdfjs-dist';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -30,6 +30,12 @@ interface ChatPanelProps {
   categorias: any[];
   getMergedPaymentMethods: () => string[];
   onDuplicatesFound: (dups: Transaccion[]) => void;
+  suscripciones: Suscripcion[];
+  saveSuscripcionesList: (s: Suscripcion[]) => void;
+  gastosRecurrentes: GastoRecurrente[];
+  onNavigate: (tab: string) => void;
+  saveCategorias: (cats: any[]) => void;
+  filtroSeleccionado: string;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -54,7 +60,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   setChatMessages,
   categorias,
   getMergedPaymentMethods,
-  onDuplicatesFound
+  onDuplicatesFound,
+  suscripciones,
+  saveSuscripcionesList,
+  gastosRecurrentes,
+  onNavigate,
+  saveCategorias,
+  filtroSeleccionado
 }) => {
   const [chatInput, setChatInput] = useState('');
   const [pendingActions, setPendingActions] = useState<any[] | null>(null);
@@ -607,13 +619,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const context = {
         language: selectedLanguage,
         countryName: selectedCountry === 'CO' ? 'Colombia' : 'Chile',
+        fechaHoy: new Date().toISOString().split('T')[0], // YYYY-MM-DD
         currencySymbol: selectedCountry === 'ES' ? '€' : '$',
         profile: userProfile,
         suenos: suenos.map(s => ({
           id: s.id,
           nombre: s.nombre,
           meta: s.meta,
-          esActivo: s.id === activeSuenoId
+          ahorroAcumulado: s.ahorroAcumulado || 0,
+          ahorroManual: s.ahorroManual || 0,
+          faltaAhorrar: Math.max(0, s.meta - (s.ahorroAcumulado || 0)),
+          esActivo: s.id === activeSuenoId,
+          historialAvances: (s.historialAvances || []).slice(-6) // últimos 6 meses
         })),
         productos: (userProfile.productos || []).map(p => ({
           id: p.id,
@@ -623,6 +640,35 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           cupo: p.montoTotal,
           utilizado: p.montoUtilizado
         })),
+        suscripciones: (suscripciones || []).map(s => ({
+          id: s.id,
+          nombre: s.nombre,
+          monto: s.monto,
+          moneda: s.moneda,
+          frecuencia: s.frecuencia,
+          categoria: s.categoria
+        })),
+        gastosRecurrentes: (gastosRecurrentes || []).map(g => ({
+          id: g.id,
+          nombre: g.nombre,
+          monto: g.monto,
+          categoria: g.categoria,
+          frecuencia: g.frecuencia,
+          activo: g.activo,
+          metodoPago: g.metodoPago
+        })),
+        formasDePago: getMergedPaymentMethods(),
+        categorias: (categorias || []).map(c => ({
+          nombre: c.nombre,
+          icon: c.icon
+        })),
+        portafolios: (userProfile.portafolios || []).map(p => ({
+          id: p.id,
+          nombre: p.nombre,
+          valor: p.valor,
+          plataforma: p.plataforma
+        })),
+        filtroActivo: filtroSeleccionado,
         financials: { totalActivos, totalPasivos },
         transacciones: [...transacciones]
           .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
@@ -633,7 +679,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             monto: t.monto,
             categoria: t.categoria,
             descripcion: t.descripcion,
-            fecha: t.fecha
+            fecha: t.fecha,
+            formaPago: t.formaPago,
+            ...(t.cuotasTotal && { cuotasTotal: t.cuotasTotal, cuotaActual: t.cuotaActual }),
+            ...(t.esRecurrente && { esRecurrente: true }),
+            ...(t.paisMoneda && { paisMoneda: t.paisMoneda })
           }))
       };
 
@@ -859,6 +909,44 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           currentSuenos = [...currentSuenos, newSueno];
           suenosChanged = true;
           triggerDynamicIsland("Sueño Creado", `${p.nombre}`, true);
+        } else if (action.type === 'navigate' && action.payload?.tab) {
+          onNavigate(action.payload.tab);
+          triggerDynamicIsland(
+            selectedLanguage === 'ES' ? 'Navegando' : 'Navigating',
+            action.payload.tab, true
+          );
+        } else if (action.type === 'addCategoria' && action.payload?.nombre) {
+          const p = action.payload;
+          const yaExiste = (categorias || []).some(
+            c => c.nombre.toLowerCase() === p.nombre.toLowerCase()
+          );
+          if (!yaExiste) {
+            const newCat = {
+              nombre: p.nombre,
+              icon: p.icon || 'MoreHorizontal',
+              color: p.color || '#6366f1'
+            };
+            saveCategorias([...(categorias || []), newCat]);
+            triggerDynamicIsland(
+              selectedLanguage === 'ES' ? 'Categoría creada' : 'Category created',
+              p.nombre, true
+            );
+          }
+        } else if (action.type === 'addPortafolio' && action.payload) {
+          const p = action.payload;
+          const newP = { id: `port-${Date.now()}`, nombre: p.nombre, valor: p.valor || 0, plataforma: p.plataforma || '' };
+          const updated = { ...currentProfile, portafolios: [...(currentProfile.portafolios || []), newP] };
+          currentProfile = updated;
+          profileChanged = true;
+          triggerDynamicIsland(selectedLanguage === 'ES' ? 'Portafolio agregado' : 'Portfolio added', p.nombre, true);
+        } else if (action.type === 'deletePortafolio' && action.payload?.id) {
+          currentProfile = { ...currentProfile, portafolios: (currentProfile.portafolios || []).filter(p => p.id !== action.payload.id) };
+          profileChanged = true;
+        } else if (action.type === 'editPortafolio' && action.payload?.id) {
+          currentProfile = { ...currentProfile, portafolios: (currentProfile.portafolios || []).map(p =>
+            p.id === action.payload.id ? { ...p, ...action.payload } : p
+          )};
+          profileChanged = true;
         }
       });
 

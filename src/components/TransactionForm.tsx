@@ -38,7 +38,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   });
   
   const [popupCuotasTotal, setPopupCuotasTotal] = useState<number | undefined>(initialTransaction?.cuotasTotal);
-  const [popupEsAutomatica, setPopupEsAutomatica] = useState<boolean>(initialTransaction?.esAutomatica || false);
   
   const [isListening, setIsListening] = useState(false);
   const [recognitionError, setRecognitionError] = useState<string | null>(null);
@@ -169,7 +168,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       descripcion: popupDescripcion.trim() || (popupTipo === 'Gasto' ? `Gasto en ${finalCategory}` : 'Ingreso manual'),
       formaPago: popupFormaPago || (popupTipo === 'Ingreso' ? 'Efectivo' : getMergedPaymentMethods()[0]) || 'Efectivo',
       cuotasTotal: popupTipo === 'Gasto' ? popupCuotasTotal : undefined,
-      esAutomatica: popupTipo === 'Gasto' ? popupEsAutomatica : undefined,
+      esAutomatica: popupTipo === 'Gasto' && popupCuotasTotal !== undefined && popupCuotasTotal > 1 ? true : undefined,
     };
 
     playTone('success', isMuted);
@@ -187,7 +186,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     setPopupCategoria(categorias.length > 0 ? categorias[0].nombre : 'Otros');
     setPopupFecha(new Date().toISOString().substring(0, 10));
     setPopupCuotasTotal(undefined);
-    setPopupEsAutomatica(false);
   };
 
   return (
@@ -380,7 +378,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   const val = e.target.value;
                   if (val === '') {
                     setPopupCuotasTotal(undefined);
-                    setPopupEsAutomatica(false);
                   } else {
                     setPopupCuotasTotal(parseInt(val));
                   }
@@ -403,24 +400,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 </option>
               </select>
             </div>
-
-            {popupCuotasTotal !== undefined && popupCuotasTotal > 1 && (
-              <div className="flex items-center gap-2.5 bg-indigo-50/50 p-3 border border-indigo-100/30 rounded-xl">
-                <input
-                  type="checkbox"
-                  id="chk-es-automatica"
-                  checked={popupEsAutomatica}
-                  onChange={(e) => {
-                    handleTap();
-                    setPopupEsAutomatica(e.target.checked);
-                  }}
-                  className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
-                />
-                <label htmlFor="chk-es-automatica" className="text-[10.5px] font-black text-slate-700 cursor-pointer select-none">
-                  {selectedLanguage === 'ES' ? '¿Carga automática mes a mes?' : 'Automatic charge month to month?'}
-                </label>
-              </div>
-            )}
           </div>
         )}
       </div>
