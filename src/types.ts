@@ -20,6 +20,7 @@ export interface Transaccion {
   cuotasTotal?: number;
   cuotaActual?: number;
   montoOriginal?: number;
+  montoTotalCompra?: number;
   esAutomatica?: boolean;
   idCuotaPrincipal?: string;
 

@@ -1055,7 +1055,8 @@ export default function App() {
   const [nuevoPortafolio, setNuevoPortafolio] = useState({ nombre: '', valor: '', plataforma: '' });
   const [activeProductSubTab, setActiveProductSubTab] = useState<'actuales' | 'recomendaciones'>('actuales');
   const [activeInsightSubTab, setActiveInsightSubTab] = useState<'asesor' | 'insights'>('asesor');
-  const [activeBalanceSubTab, setActiveBalanceSubTab] = useState<'movimientos' | 'recurrentes'>('movimientos');
+  const [activeBalanceSubTab, setActiveBalanceSubTab] = useState<'movimientos' | 'recurrentes' | 'cuotas'>('movimientos');
+  const [cuotaDetailTx, setCuotaDetailTx] = useState<string | null>(null); // idCuotaPrincipal del modal abierto
   const [portfolioFilter, setPortfolioFilter] = useState<'all' | 'debit' | 'credit' | 'credits'>('all');
   
   // States for Hidden Product Forms (Toggle with + button)
@@ -3430,6 +3431,19 @@ export default function App() {
           >
             ■ {selectedLanguage === 'ES' ? 'Recurrentes' : 'Recurring'}
           </button>
+          <button
+            onClick={() => {
+              handleTap();
+              setActiveBalanceSubTab('cuotas');
+            }}
+            className={`flex-1 text-center py-2 text-xs font-black rounded-xl transition flex items-center justify-center gap-1 cursor-pointer ${
+              activeBalanceSubTab === 'cuotas'
+                ? 'bg-white text-[#00897B] shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            ■ {selectedLanguage === 'ES' ? 'Cuotas' : 'Installments'}
+          </button>
         </div>
 
         {/* Contenido segun subtab activo */}
@@ -3444,7 +3458,201 @@ export default function App() {
             selectedLanguage={selectedLanguage}
             effectiveCountry={effectiveCountry}
           />
-        ) : (
+        ) : activeBalanceSubTab === 'cuotas' ? (() => {
+          // Agrupar todas las transacciones con cuotas por idCuotaPrincipal
+          const monedaActiva = effectiveCountry === 'CL' ? 'CLP' : 'COP';
+          const txConCuotas = transacciones.filter(t =>
+            t.cuotasTotal && t.cuotasTotal > 1 && t.idCuotaPrincipal &&
+            (!t.paisMoneda || t.paisMoneda === monedaActiva)
+          );
+
+          // Agrupar por idCuotaPrincipal
+          const grupos: Record<string, typeof txConCuotas> = {};
+          txConCuotas.forEach(t => {
+            const key = t.idCuotaPrincipal!;
+            if (!grupos[key]) grupos[key] = [];
+            grupos[key].push(t);
+          });
+
+          // Ordenar cada grupo por cuotaActual
+          Object.values(grupos).forEach(g =>
+            g.sort((a, b) => (a.cuotaActual ?? 0) - (b.cuotaActual ?? 0))
+          );
+
+          const hoy = new Date();
+          hoy.setHours(0, 0, 0, 0);
+
+          const gruposList = Object.entries(grupos).sort(([, a], [, b]) => {
+            // Activas primero, luego completadas
+            const aCompleta = a.every(t => new Date(t.fecha) <= hoy);
+            const bCompleta = b.every(t => new Date(t.fecha) <= hoy);
+            return Number(aCompleta) - Number(bCompleta);
+          });
+
+          if (gruposList.length === 0) {
+            return (
+              <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                <div className="text-4xl mb-3 text-slate-300">■</div>
+                <p className="text-sm font-bold text-slate-500">
+                  {selectedLanguage === 'ES' ? 'No tienes compras en cuotas' : 'No installment purchases'}
+                </p>
+              </div>
+            );
+          }
+
+          return (
+            <div className="flex flex-col gap-3 px-4 pb-6">
+              {gruposList.map(([idPrincipal, cuotas]) => {
+                const primera = cuotas[0];
+                const total = cuotas.length;
+                const pagadas = cuotas.filter(t => new Date(t.fecha) <= hoy).length;
+                const montoTotal = primera.montoTotalCompra || (primera.montoOriginal ? primera.montoOriginal * total : primera.monto * total);
+                const montoPagado = primera.monto * pagadas;
+                const montoPendiente = montoTotal - montoPagado;
+                const completada = pagadas === total;
+
+                return (
+                  <div key={idPrincipal}>
+                    {/* TARJETA COMPACTA */}
+                    <motion.div
+                      onClick={() => { handleTap(); setCuotaDetailTx(cuotaDetailTx === idPrincipal ? null : idPrincipal); }}
+                      className="bg-white rounded-2xl p-4 shadow-xs border border-gray-100 cursor-pointer hover:bg-slate-50 transition"
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1 min-w-0 pr-3 text-left">
+                          <p className="text-sm font-extrabold text-slate-900 truncate">
+                            {primera.descripcion || primera.categoria}
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">
+                            {primera.formaPago} · {primera.fecha}
+                          </p>
+                          <span className={`inline-block mt-1.5 px-2 py-0.5 rounded-full text-[8.5px] font-black ${
+                            completada ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'
+                          }`}>
+                            {completada
+                              ? (selectedLanguage === 'ES' ? `Pagada ${total}/${total}` : `Paid ${total}/${total}`)
+                              : `■ ${selectedLanguage === 'ES' ? `Cuota ${pagadas + 1}/${total}` : `Installment ${pagadas + 1}/${total}`}`
+                            }
+                          </span>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-black text-rose-500">
+                            -${primera.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">
+                            Total {montoTotal.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                          </p>
+                        </div>
+                      </div>
+                      {/* Barra de progreso compacta */}
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${completada ? 'bg-emerald-400' : 'bg-indigo-500'}`}
+                          style={{ width: `${(pagadas / total) * 100}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between mt-1">
+                        <p className="text-[9px] font-bold text-slate-400">
+                          {pagadas} {selectedLanguage === 'ES' ? 'pagadas' : 'paid'}
+                        </p>
+                        <p className="text-[9px] font-bold text-slate-400">
+                          {total - pagadas} {selectedLanguage === 'ES' ? 'pendientes' : 'pending'}
+                        </p>
+                      </div>
+                    </motion.div>
+                    {/* MODAL DETALLE — se abre debajo de la tarjeta */}
+                    <AnimatePresence>
+                      {cuotaDetailTx === idPrincipal && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          className="bg-white rounded-2xl mt-1 p-4 shadow-md border border-indigo-100"
+                        >
+                          {/* Resumen financiero */}
+                          <div className="grid grid-cols-3 gap-2 mb-4">
+                            <div className="bg-slate-50 rounded-xl p-2.5 text-center">
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-wide mb-1">
+                                {selectedLanguage === 'ES' ? 'Cuota' : 'Installment'}
+                              </p>
+                              <p className="text-xs font-black text-rose-500">
+                                -{primera.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                              </p>
+                            </div>
+                            <div className="bg-slate-50 rounded-xl p-2.5 text-center">
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-wide mb-1">
+                                {selectedLanguage === 'ES' ? 'Total' : 'Total'}
+                              </p>
+                              <p className="text-xs font-black text-slate-600">
+                                {montoTotal.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                              </p>
+                            </div>
+                            <div className="bg-slate-50 rounded-xl p-2.5 text-center">
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-wide mb-1">
+                                {selectedLanguage === 'ES' ? 'Por pagar' : 'Remaining'}
+                              </p>
+                              <p className="text-xs font-black text-indigo-600">
+                                {montoPendiente.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                              </p>
+                            </div>
+                          </div>
+                          {/* Lista de cuotas */}
+                          <div className="flex flex-col gap-1.5">
+                            {cuotas.map((t, idx) => {
+                              const fechaTx = new Date(t.fecha);
+                              const esPagada = fechaTx <= hoy;
+                              const esEsteMes = fechaTx.getFullYear() === hoy.getFullYear() &&
+                                fechaTx.getMonth() === hoy.getMonth();
+                              return (
+                                <div
+                                  key={t.id}
+                                  className={`flex items-center gap-3 rounded-xl px-3 py-2 ${
+                                    esEsteMes ? 'bg-violet-50' : esPagada ? 'bg-indigo-50/70' : 'bg-slate-50'
+                                  }`}
+                                >
+                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black ${
+                                    esEsteMes ? 'bg-violet-600 text-white ring-2 ring-violet-300'
+                                      : esPagada ? 'bg-indigo-500 text-white'
+                                      : 'bg-slate-200 text-slate-400'
+                                  }`}>
+                                    {idx + 1}
+                                  </div>
+                                  <div className="flex-1 min-w-0 text-left">
+                                    <p className="text-[10px] font-bold text-slate-600">{t.fecha}</p>
+                                    <p className={`text-[9px] font-black ${
+                                      esEsteMes ? 'text-violet-600'
+                                        : esPagada ? 'text-indigo-500'
+                                        : 'text-slate-400'
+                                    }`}>
+                                      {esEsteMes
+                                        ? (selectedLanguage === 'ES' ? 'Este mes' : 'This month')
+                                        : esPagada
+                                        ? (selectedLanguage === 'ES' ? 'Pagada' : 'Paid')
+                                        : (selectedLanguage === 'ES' ? 'Pendiente' : 'Pending')
+                                      }
+                                    </p>
+                                  </div>
+                                  <p className={`text-xs font-black shrink-0 ${
+                                    esEsteMes ? 'text-violet-600'
+                                      : esPagada ? 'text-indigo-500'
+                                      : 'text-slate-300'
+                                  }`}>
+                                    -{t.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })() : (
           <>
             {/* --- RECENT TRANSACTIONS LOG (Highly polished list, swipeable deletion) --- */}
             <div className="space-y-3 pt-2">
@@ -3667,13 +3875,13 @@ export default function App() {
                                 -${t.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
                               </p>
                             </div>
-                            {t.montoOriginal && t.montoOriginal !== t.monto && (
+                            {((t as any).montoTotalCompra || (t.montoOriginal && t.cuotasTotal ? t.montoOriginal * t.cuotasTotal : undefined)) && ((t as any).montoTotalCompra || (t.montoOriginal && t.cuotasTotal ? t.montoOriginal * t.cuotasTotal : undefined)) !== t.monto && (
                               <div className="text-right">
                                 <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
                                   {selectedLanguage === 'ES' ? 'TOTAL COMPRA' : 'TOTAL'}
                                 </p>
                                 <p className="text-[10px] font-black text-slate-400">
-                                  {(t.montoOriginal * t.cuotasTotal).toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                  {((t as any).montoTotalCompra || (t.montoOriginal && t.cuotasTotal ? t.montoOriginal * t.cuotasTotal : 0)).toLocaleString('es-ES', { minimumFractionDigits: 0 })}
                                 </p>
                               </div>
                             )}
@@ -5240,7 +5448,8 @@ export default function App() {
                         fecha: futureDate.toISOString().substring(0, 10),
                         cuotaActual: i,
                         monto: montoParaCuota,
-                        montoOriginal: montoParaCuota,
+                        montoOriginal: montoParaCuota, // valor de la cuota individual
+                        montoTotalCompra: txConPais.monto, // total original de la compra
                         idCuotaPrincipal: `cuota-${timestampId}`
                       });
                     }
