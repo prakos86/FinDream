@@ -3416,7 +3416,7 @@ export default function App() {
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            ■ {selectedLanguage === 'ES' ? 'Movimientos' : 'Transactions'}
+            💸 {selectedLanguage === 'ES' ? 'Movimientos' : 'Transactions'}
           </button>
           <button
             onClick={() => {
@@ -3429,7 +3429,7 @@ export default function App() {
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            ■ {selectedLanguage === 'ES' ? 'Recurrentes' : 'Recurring'}
+            🔄 {selectedLanguage === 'ES' ? 'Recurrentes' : 'Recurring'}
           </button>
           <button
             onClick={() => {
@@ -3442,7 +3442,7 @@ export default function App() {
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            ■ {selectedLanguage === 'ES' ? 'Cuotas' : 'Installments'}
+            💳 {selectedLanguage === 'ES' ? 'Cuotas' : 'Installments'}
           </button>
         </div>
 
@@ -3462,14 +3462,16 @@ export default function App() {
           // Agrupar todas las transacciones con cuotas por idCuotaPrincipal
           const monedaActiva = effectiveCountry === 'CL' ? 'CLP' : 'COP';
           const txConCuotas = transacciones.filter(t =>
-            t.cuotasTotal && t.cuotasTotal > 1 && t.idCuotaPrincipal &&
+            t.cuotasTotal && t.cuotasTotal > 1 &&
             (!t.paisMoneda || t.paisMoneda === monedaActiva)
           );
 
-          // Agrupar por idCuotaPrincipal
+          // Agrupar por idCuotaPrincipal si existe, o por clave sintetica (legacy)
           const grupos: Record<string, typeof txConCuotas> = {};
           txConCuotas.forEach(t => {
-            const key = t.idCuotaPrincipal!;
+            // Si tiene idCuotaPrincipal, usarlo. Si no (legacy), generar clave por descripcion+monto+total
+            const key = t.idCuotaPrincipal ||
+              `legacy-${(t.descripcion || t.categoria || '').toLowerCase().replace(/\s+/g, '-')}-${t.cuotasTotal}`;
             if (!grupos[key]) grupos[key] = [];
             grupos[key].push(t);
           });
@@ -3863,47 +3865,54 @@ export default function App() {
                       </div>
 
                       {/* Barra de progreso cuotas */}
-                      {t.cuotasTotal && t.cuotasTotal > 1 && t.cuotaActual && (
+                      {t.cuotasTotal && t.cuotasTotal > 1 && (
                         <div className="mt-2.5 pt-2.5 border-t border-slate-100 w-full">
-                          {/* Montos */}
-                          <div className="flex justify-between items-end mb-2">
-                            <div>
-                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
-                                {selectedLanguage === 'ES' ? 'VALOR CUOTA' : 'INSTALLMENT'}
-                              </p>
-                              <p className="text-xs font-black text-rose-600">
-                                -${t.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
-                              </p>
-                            </div>
-                            {((t as any).montoTotalCompra || (t.montoOriginal && t.cuotasTotal ? t.montoOriginal * t.cuotasTotal : undefined)) && ((t as any).montoTotalCompra || (t.montoOriginal && t.cuotasTotal ? t.montoOriginal * t.cuotasTotal : undefined)) !== t.monto && (
-                              <div className="text-right">
-                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
-                                  {selectedLanguage === 'ES' ? 'TOTAL COMPRA' : 'TOTAL'}
-                                </p>
-                                <p className="text-[10px] font-black text-slate-400">
-                                  {((t as any).montoTotalCompra || (t.montoOriginal && t.cuotasTotal ? t.montoOriginal * t.cuotasTotal : 0)).toLocaleString('es-ES', { minimumFractionDigits: 0 })}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                          {/* Barra de progreso */}
-                          <div className="relative h-1.5 bg-slate-100 rounded-full">
-                            <div
-                              className="absolute left-0 top-0 h-1.5 bg-indigo-500 rounded-full transition-all"
-                              style={{ width: `${(t.cuotaActual / t.cuotasTotal) * 100}%` }}
-                            />
-                          </div>
-                          {/* Números de cuotas */}
-                          <div className="flex justify-between mt-1">
-                            {Array.from({ length: t.cuotasTotal }, (_, i) => i + 1).map(n => (
-                              <span
-                                key={n}
-                                className={`text-[7px] font-black ${n <= t.cuotaActual! ? 'text-indigo-600' : 'text-slate-400'}`}
-                              >
-                                {n}
-                              </span>
-                            ))}
-                          </div>
+                          {/* Calculos con fallback para legacy */}
+                          {(() => {
+                            const cuotaActual = t.cuotaActual ?? 1;
+                            const montoTotal = (t as any).montoTotalCompra || (t.monto * t.cuotasTotal!);
+                            return (
+                              <>
+                                {/* Montos */}
+                                <div className="flex justify-between items-end mb-2">
+                                  <div>
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
+                                      {selectedLanguage === 'ES' ? 'VALOR CUOTA' : 'INSTALLMENT'}
+                                    </p>
+                                    <p className="text-xs font-black text-rose-600">
+                                      -${t.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
+                                      {selectedLanguage === 'ES' ? 'TOTAL COMPRA' : 'TOTAL'}
+                                    </p>
+                                    <p className="text-[10px] font-black text-slate-400">
+                                      {montoTotal.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                    </p>
+                                  </div>
+                                </div>
+                                {/* Barra de progreso */}
+                                <div className="relative h-1.5 bg-slate-100 rounded-full mb-1">
+                                  <div
+                                    className="absolute left-0 top-0 h-1.5 bg-indigo-500 rounded-full transition-all"
+                                    style={{ width: `${(cuotaActual / t.cuotasTotal!) * 100}%` }}
+                                  />
+                                </div>
+                                {/* Números de cuotas */}
+                                <div className="flex justify-between">
+                                  {Array.from({ length: t.cuotasTotal! }, (_, i) => i + 1).map(n => (
+                                    <span
+                                      key={n}
+                                      className={`text-[7px] font-black ${n <= cuotaActual ? 'text-indigo-600' : 'text-slate-400'}`}
+                                    >
+                                      {n}
+                                    </span>
+                                  ))}
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
                       )}
                     </motion.div>

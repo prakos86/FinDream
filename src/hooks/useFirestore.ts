@@ -118,7 +118,9 @@ export const useFirestore = (
         userPayload.correo = updatedProfile.correo || (user?.email) || '';
         userPayload.celular = updatedProfile.celular;
         userPayload.suscripciones = updatedProfile.suscripciones || suscripciones;
-        // gastosRecurrentes ya NO va en userPayload - va en financialPayload
+        // Mantener en raiz para compatibilidad legacy, y escribir en financial para nueva estructura
+        userPayload.gastosRecurrentes = gastosRecurrentes.map(g => ({ ...g }));
+        
         if (updatedProfile.productos) financialPayload.productos = updatedProfile.productos;
         if (updatedProfile.portafolios) financialPayload.portafolios = updatedProfile.portafolios;
         // Guardar solo los recurrentes del pais activo en el documento de ese pais
@@ -132,9 +134,12 @@ export const useFirestore = (
       if (updatedCategorias) financialPayload.categorias = updatedCategorias;
       if (updatedPaymentMethods) financialPayload.paymentMethods = updatedPaymentMethods;
       if (updatedSuscripciones) userPayload.suscripciones = updatedSuscripciones;
-      if (updatedGastosRecurrentes) financialPayload.gastosRecurrentes = updatedGastosRecurrentes
-        .filter(g => g.paisMoneda === (selectedCountry === 'CL' ? 'CLP' : 'COP'))
-        .map(g => ({ ...g }));
+      if (updatedGastosRecurrentes) {
+        userPayload.gastosRecurrentes = updatedGastosRecurrentes.map(g => ({ ...g }));
+        financialPayload.gastosRecurrentes = updatedGastosRecurrentes
+          .filter(g => g.paisMoneda === (selectedCountry === 'CL' ? 'CLP' : 'COP'))
+          .map(g => ({ ...g }));
+      }
       
       setIsSyncing(true);
       await Promise.all([
@@ -295,7 +300,14 @@ export const useFirestore = (
           if (Array.isArray(financialData.paymentMethods)) setPaymentMethods(financialData.paymentMethods);
           if (Array.isArray(userData.suscripciones)) setSuscripciones(userData.suscripciones);
           
-          const gastosRec = financialData.gastosRecurrentes || []; // <- lee del doc por pais
+          // Leer de financialData primero; si vacio, hacer fallback a userData (datos legacy admin)
+          const gastosRecFinancial = financialData.gastosRecurrentes || [];
+          const gastosRecLegacy = (userData.gastosRecurrentes || [])
+            .filter((g: any) => {
+              const monedaActiva = selectedCountry === 'CL' ? 'CLP' : 'COP';
+              return !g.paisMoneda ? selectedCountry === 'CO' : g.paisMoneda === monedaActiva;
+            });
+          const gastosRec = gastosRecFinancial.length > 0 ? gastosRecFinancial : gastosRecLegacy;
           setGastosRecurrentes(gastosRec);
           
           setLastSyncedTime(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
@@ -317,6 +329,7 @@ export const useFirestore = (
             correo: userProfile.correo || userData.correo || (user?.email) || '',
             celular: userProfile.celular || userData.celular || '',
             suscripciones: suscripciones,
+            gastosRecurrentes: gastosRecurrentes.map(g => ({ ...g })),
             updatedAt: new Date().toISOString()
           };
           
