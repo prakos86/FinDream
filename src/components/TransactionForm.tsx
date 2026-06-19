@@ -18,12 +18,14 @@ interface TransactionFormProps {
   playTone: (type: 'tap' | 'success' | 'delete' | 'voice', isMuted: boolean) => void;
   isMuted: boolean;
   formatLocalYYYYMMDD: (d: Date) => string;
+  transaccionesExistentes?: Transaccion[];
 }
 
 export const TransactionForm: React.FC<TransactionFormProps> = ({
   onSave, onCancel, initialTransaction, getMergedPaymentMethods, CATEGORIAS_PREDEFINIDAS,
   categorias, COLOMBIAN_PRODUCTS, translateProduct, selectedLanguage,
-  renderCategoriaIcon, triggerDynamicIsland, playTone, isMuted, formatLocalYYYYMMDD
+  renderCategoriaIcon, triggerDynamicIsland, playTone, isMuted, formatLocalYYYYMMDD,
+  transaccionesExistentes = []
 }) => {
   const [popupTipo, setPopupTipo] = useState<TipoMovimiento>(initialTransaction?.tipo || 'Gasto');
   const [popupMonto, setPopupMonto] = useState(initialTransaction?.monto?.toString() || '');
@@ -42,6 +44,13 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [isListening, setIsListening] = useState(false);
   const [recognitionError, setRecognitionError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [revisionAlert, setRevisionAlert] = useState<{
+    isOpen: boolean;
+    mensaje: string;
+    tipo: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+  }>({ isOpen: false, mensaje: '', tipo: '', onConfirm: () => {}, onCancel: () => {} });
   
   const recognitionRef = useRef<any>(null);
 
@@ -125,11 +134,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     const num = parseFloat(popupMonto);
     if (!num || num <= 0) return;
 
+    setIsSyncing(true);
     let finalCategory = popupCategoria;
     if (popupTipo === 'Gasto' && (!finalCategory || finalCategory === 'Otros' || finalCategory === '')) {
       const desc = popupDescripcion.trim();
       if (desc) {
-        setIsSyncing(true);
         triggerDynamicIsland("Categorizando IA...", "Asignando categoría inteligente", true);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -152,44 +161,101 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           }
         } catch (err) {
           finalCategory = 'Otros';
-        } finally {
-          setIsSyncing(false);
         }
       } else {
         finalCategory = 'Otros';
       }
     }
 
-    const nueva: Omit<Transaccion, "id"> & { cuotasTotal?: number; esAutomatica?: boolean } = {
-      tipo: popupTipo,
-      monto: num,
-      categoria: popupTipo === 'Gasto' ? finalCategory : undefined,
-      fecha: popupFecha || formatLocalYYYYMMDD(new Date()),
-      descripcion: popupDescripcion.trim() || (popupTipo === 'Gasto' ? `Gasto en ${finalCategory}` : 'Ingreso manual'),
-      formaPago: popupFormaPago || (popupTipo === 'Ingreso' ? 'Efectivo' : getMergedPaymentMethods()[0]) || 'Efectivo',
-      cuotasTotal: popupTipo === 'Gasto' ? popupCuotasTotal : undefined,
-      esAutomatica: popupTipo === 'Gasto' && popupCuotasTotal !== undefined && popupCuotasTotal > 1 ? true : undefined,
+    // --- Revisor silencioso de gastos ---
+    let alertasRevision: any[] = [];
+    if (popupTipo === 'Gasto') {
+      try {
+        const revisionResp = await fetch('/api/gemini/review-expense', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nuevoGasto: {
+              monto: num,
+              descripcion: popupDescripcion.trim(),
+              categoria: finalCategory,
+              fecha: popupFecha || formatLocalYYYYMMDD(new Date()),
+              formaPago: popupFormaPago
+            },
+            transaccionesRecientes: (transaccionesExistentes || []).slice(0, 30).map((t: any) => ({
+              id: t.id,
+              monto: t.monto,
+              descripcion: t.descripcion,
+              categoria: t.categoria,
+              fecha: t.fecha
+            })),
+            categoriasUsuario: categorias.map(c => c.nombre),
+            language: selectedLanguage
+          })
+        });
+        if (revisionResp.ok) {
+          const revisionData = await revisionResp.json();
+          alertasRevision = revisionData?.alertas || [];
+        }
+      } catch (e) {
+        // Si falla la revision, no bloquea el guardado normal
+      }
+    }
+
+    setIsSyncing(false);
+
+    const procederConGuardado = () => {
+      const nueva: Omit<Transaccion, "id"> & { cuotasTotal?: number; esAutomatica?: boolean } = {
+        tipo: popupTipo,
+        monto: num,
+        categoria: popupTipo === 'Gasto' ? finalCategory : undefined,
+        fecha: popupFecha || formatLocalYYYYMMDD(new Date()),
+        descripcion: popupDescripcion.trim() || (popupTipo === 'Gasto' ? `Gasto en ${finalCategory}` : 'Ingreso manual'),
+        formaPago: popupFormaPago || (popupTipo === 'Ingreso' ? 'Efectivo' : getMergedPaymentMethods()[0]) || 'Efectivo',
+        cuotasTotal: popupTipo === 'Gasto' ? popupCuotasTotal : undefined,
+        esAutomatica: popupTipo === 'Gasto' && popupCuotasTotal !== undefined && popupCuotasTotal > 1 ? true : undefined,
+      };
+
+      playTone('success', isMuted);
+      triggerDynamicIsland(
+        popupTipo === 'Ingreso' ? "¡Ingreso Añadido!" : "¡Gasto Registrado!", 
+        `${popupTipo === 'Ingreso' ? '+' : '-'}$${num.toLocaleString('es-ES')}`, 
+        popupTipo === 'Ingreso'
+      );
+      
+      onSave(nueva);
+      
+      // reset form inside
+      setPopupMonto('');
+      setPopupDescripcion('');
+      setPopupCategoria(categorias.length > 0 ? categorias[0].nombre : 'Otros');
+      setPopupFecha(new Date().toISOString().substring(0, 10));
+      setPopupCuotasTotal(undefined);
     };
 
-    playTone('success', isMuted);
-    triggerDynamicIsland(
-      popupTipo === 'Ingreso' ? "¡Ingreso Añadido!" : "¡Gasto Registrado!", 
-      `${popupTipo === 'Ingreso' ? '+' : '-'}$${num.toLocaleString('es-ES')}`, 
-      popupTipo === 'Ingreso'
-    );
-    
-    onSave(nueva);
-    
-    // reset form inside
-    setPopupMonto('');
-    setPopupDescripcion('');
-    setPopupCategoria(categorias.length > 0 ? categorias[0].nombre : 'Otros');
-    setPopupFecha(new Date().toISOString().substring(0, 10));
-    setPopupCuotasTotal(undefined);
+    if (popupTipo === 'Gasto' && alertasRevision.length > 0) {
+      const alerta = alertasRevision[0];
+      setRevisionAlert({
+        isOpen: true,
+        mensaje: alerta.mensaje,
+        tipo: alerta.tipo,
+        onConfirm: () => {
+          setRevisionAlert(prev => ({ ...prev, isOpen: false }));
+          procederConGuardado();
+        },
+        onCancel: () => {
+          setRevisionAlert(prev => ({ ...prev, isOpen: false }));
+        }
+      });
+      return;
+    }
+
+    procederConGuardado();
   };
 
   return (
-    <form onSubmit={handleGuardarMovimiento} className="flex-1 flex flex-col overflow-hidden min-h-0 text-left">
+    <>
+      <form onSubmit={handleGuardarMovimiento} className="flex-1 flex flex-col overflow-hidden min-h-0 text-left">
       <div className="flex-1 overflow-y-auto pr-1 space-y-4 no-scrollbar pb-3">
         <div>
           <label className="text-[10px] font-black uppercase tracking-wider text-slate-800 mb-1 block">Tipo de Flujo</label>
@@ -423,5 +489,44 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
         </button>
       </div>
     </form>
-  );
+
+    {revisionAlert.isOpen && (
+      <div
+        className="fixed inset-0 bg-black/60 z-[999] backdrop-blur-[2px] flex items-center justify-center p-4"
+        onClick={revisionAlert.onCancel}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white/95 backdrop-blur-md rounded-2xl max-w-[300px] w-full text-center shadow-2xl border border-gray-100/50"
+        >
+          <div className="p-5">
+            <div className="text-3xl mb-2">🤔</div>
+            <h4 className="text-[15px] font-extrabold text-slate-900 leading-tight">
+              {selectedLanguage === 'ES' ? 'Prako revisó este gasto' : 'Prako reviewed this expense'}
+            </h4>
+            <p className="text-xs text-slate-500 mt-2 leading-relaxed font-semibold">
+              {revisionAlert.mensaje}
+            </p>
+          </div>
+          <div className="border-t border-gray-100 flex">
+            <button
+              type="button"
+              onClick={revisionAlert.onCancel}
+              className="flex-1 py-3 px-4 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              {selectedLanguage === 'ES' ? 'Revisar' : 'Review'}
+            </button>
+            <button
+              type="button"
+              onClick={revisionAlert.onConfirm}
+              className="flex-1 py-3 px-4 text-sm font-bold text-indigo-600 hover:bg-slate-50 transition-colors cursor-pointer border-l border-gray-100"
+            >
+              {selectedLanguage === 'ES' ? 'Guardar igual' : 'Save anyway'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
+);
 };

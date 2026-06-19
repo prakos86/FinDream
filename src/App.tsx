@@ -2075,7 +2075,7 @@ export default function App() {
       selectedLanguage === 'ES'
         ? `Se encontraron ${allNewTxList.length} movimientos por un total de $${allNewTxList.reduce((sum, t) => sum + t.monto, 0).toLocaleString()}. ¿Deseas agregarlos?`
         : `Found ${allNewTxList.length} transactions totaling $${allNewTxList.reduce((sum, t) => sum + t.monto, 0).toLocaleString()}. Do you want to add them?`,
-      () => {
+      async () => {
         // Normaliza texto: minusculas, sin tildes, sin espacios extra
         const normalizar = (s: string) =>
           (s || '')
@@ -2119,7 +2119,54 @@ export default function App() {
             difDias(tx.fecha, nt.fecha) <= 2
           );
         const dups = allNewTxList.filter(esDup);
-        const nuevos = allNewTxList.filter(nt => !esDup(nt));
+        let nuevos = allNewTxList.filter(nt => !esDup(nt));
+
+        // --- Revisor semantico BATCH sobre TODOS los que NO fueron detectados por esDup ---
+        if (nuevos.length > 0) {
+          try {
+            const gastosParaRevisar = nuevos.map((nt, idx) => ({
+              id: nt.id || `batch-${idx}`,
+              monto: nt.monto,
+              descripcion: nt.descripcion,
+              categoria: nt.categoria,
+              fecha: nt.fecha,
+              formaPago: nt.formaPago
+            }));
+            const revisionResp = await fetch('/api/gemini/review-expense', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                nuevosGastos: gastosParaRevisar,
+                transaccionesRecientes: transacciones.slice(0, 30).map(t => ({
+                  id: t.id, monto: t.monto, descripcion: t.descripcion,
+                  categoria: t.categoria, fecha: t.fecha
+                })),
+                categoriasUsuario: categorias.map(c => c.nombre),
+                language: selectedLanguage
+              })
+            });
+            if (revisionResp.ok) {
+              const { alertas } = await revisionResp.json();
+              const duplicadosSemanticos = alertas.filter((a: any) => a.tipo === 'duplicado_semantico');
+              if (duplicadosSemanticos.length > 0) {
+                // Usar el id real para identificar exactamente que gastos mover, sin asumir posicion
+                const idsMarcados = new Set(
+                  duplicadosSemanticos.map((a: any) => a.idGastoRevisado).filter(Boolean)
+                );
+                const conflictList = nuevos.filter((nt, idx) =>
+                  idsMarcados.has(nt.id || `batch-${idx}`)
+                );
+                if (conflictList.length > 0) {
+                  dups.push(...conflictList);
+                  nuevos = nuevos.filter((nt, idx) => !idsMarcados.has(nt.id || `batch-${idx}`));
+                }
+              }
+            }
+          } catch (e) {
+            // Si falla, continua con el flujo normal sin bloquear
+          }
+        }
+        // --- Fin revisor semantico batch ---
 
         // OPCION C - Logica condicional
         if (nuevos.length === 0 && dups.length > 0) {
@@ -5153,6 +5200,7 @@ export default function App() {
                 </div>
               ) : (
                               <TransactionForm
+                transaccionesExistentes={transacciones}
                 startWithVoice={startVoiceOnAdd}
                 initialTransaction={initialTransactionForModal || (prefilledCategory ? { id: '', tipo: 'Gasto', monto: 0, categoria: prefilledCategory, descripcion: '', formaPago: '', fecha: formatLocalYYYYMMDD(new Date()) } : undefined)}
                 onSave={(tx) => {
@@ -5254,6 +5302,7 @@ export default function App() {
 
               <TransactionForm
                 key={editingTransaction.id}
+                transaccionesExistentes={transacciones}
                 initialTransaction={editingTransaction}
                 onSave={(updatedTx) => {
                   const updated: Transaccion = {
