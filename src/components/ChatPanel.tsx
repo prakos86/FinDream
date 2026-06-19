@@ -648,15 +648,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           frecuencia: s.frecuencia,
           categoria: s.categoria
         })),
-        gastosRecurrentes: (gastosRecurrentes || []).map(g => ({
-          id: g.id,
-          nombre: g.nombre,
-          monto: g.monto,
-          categoria: g.categoria,
-          frecuencia: g.frecuencia,
-          activo: g.activo,
-          metodoPago: g.metodoPago
-        })),
+        gastosRecurrentes: (gastosRecurrentes || [])
+          .filter(g => {
+            const monedaActiva = selectedCountry === 'CL' ? 'CLP' : 'COP';
+            return !g.paisMoneda ? selectedCountry === 'CO' : g.paisMoneda === monedaActiva;
+          })
+          .map(g => ({
+            id: g.id,
+            nombre: g.nombre,
+            monto: g.monto,
+            categoria: g.categoria,
+            frecuencia: g.frecuencia,
+            activo: g.activo,
+            metodoPago: g.metodoPago,
+            paisMoneda: g.paisMoneda
+          })),
         formasDePago: getMergedPaymentMethods(),
         categorias: (categorias || []).map(c => ({
           nombre: c.nombre,
@@ -671,6 +677,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         filtroActivo: filtroSeleccionado,
         financials: { totalActivos, totalPasivos },
         transacciones: [...transacciones]
+          .filter(t => {
+            // Solo transacciones del pais activo. Las legacy sin paisMoneda se asignan a CO.
+            const monedaActiva = selectedCountry === 'CL' ? 'CLP' : 'COP';
+            return !t.paisMoneda
+              ? selectedCountry === 'CO' // legacy sin campo -> solo visible en CO
+              : t.paisMoneda === monedaActiva;
+          })
           .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
           .slice(0, 60)
           .map(t => ({

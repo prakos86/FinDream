@@ -2137,12 +2137,22 @@ export default function App() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 nuevosGastos: gastosParaRevisar,
-                transaccionesRecientes: transacciones.slice(0, 30).map(t => ({
-                  id: t.id, monto: t.monto, descripcion: t.descripcion,
-                  categoria: t.categoria, fecha: t.fecha
-                })),
+                transaccionesRecientes: transacciones
+                  .filter(t => {
+                    // Solo transacciones del pais activo para comparacion correcta
+                    const monedaActiva = effectiveCountry === 'CL' ? 'CLP' : 'COP';
+                    return !t.paisMoneda
+                      ? effectiveCountry === 'CO'
+                      : t.paisMoneda === monedaActiva;
+                  })
+                  .slice(0, 30)
+                  .map(t => ({
+                    id: t.id, monto: t.monto, descripcion: t.descripcion,
+                    categoria: t.categoria, fecha: t.fecha
+                  })),
                 categoriasUsuario: categorias.map(c => c.nombre),
-                language: selectedLanguage
+                language: selectedLanguage,
+                country: effectiveCountry
               })
             });
             if (revisionResp.ok) {
@@ -2407,8 +2417,10 @@ export default function App() {
     const monedaActiva = effectiveCountry === 'CL' ? 'CLP' : 'COP';
 
     return items.filter(item => {
-      // Filtrar por pais: incluir si coincide o si no tiene paisMoneda (legado)
-      const matchPais = !item.paisMoneda || item.paisMoneda === monedaActiva;
+      // Filtrar por pais: legacy sin paisMoneda se asigna implicitamente a CO
+      const matchPais = !item.paisMoneda
+        ? effectiveCountry === 'CO' // transacciones sin campo -> solo CO
+        : item.paisMoneda === monedaActiva;
       if (!matchPais) return false;
 
       const itemTime = formatSafeDateString(item.fecha).getTime();
@@ -5200,6 +5212,7 @@ export default function App() {
                 </div>
               ) : (
                               <TransactionForm
+                selectedCountry={effectiveCountry}
                 transaccionesExistentes={transacciones}
                 startWithVoice={startVoiceOnAdd}
                 initialTransaction={initialTransactionForModal || (prefilledCategory ? { id: '', tipo: 'Gasto', monto: 0, categoria: prefilledCategory, descripcion: '', formaPago: '', fecha: formatLocalYYYYMMDD(new Date()) } : undefined)}
@@ -5302,6 +5315,7 @@ export default function App() {
 
               <TransactionForm
                 key={editingTransaction.id}
+                selectedCountry={effectiveCountry}
                 transaccionesExistentes={transacciones}
                 initialTransaction={editingTransaction}
                 onSave={(updatedTx) => {

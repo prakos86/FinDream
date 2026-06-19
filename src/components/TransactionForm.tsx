@@ -19,13 +19,15 @@ interface TransactionFormProps {
   isMuted: boolean;
   formatLocalYYYYMMDD: (d: Date) => string;
   transaccionesExistentes?: Transaccion[];
+  selectedCountry?: string;
 }
 
 export const TransactionForm: React.FC<TransactionFormProps> = ({
   onSave, onCancel, initialTransaction, getMergedPaymentMethods, CATEGORIAS_PREDEFINIDAS,
   categorias, COLOMBIAN_PRODUCTS, translateProduct, selectedLanguage,
   renderCategoriaIcon, triggerDynamicIsland, playTone, isMuted, formatLocalYYYYMMDD,
-  transaccionesExistentes = []
+  transaccionesExistentes = [],
+  selectedCountry = 'CO'
 }) => {
   const [popupTipo, setPopupTipo] = useState<TipoMovimiento>(initialTransaction?.tipo || 'Gasto');
   const [popupMonto, setPopupMonto] = useState(initialTransaction?.monto?.toString() || '');
@@ -190,7 +192,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               fecha: t.fecha
             })),
             categoriasUsuario: categorias.map(c => c.nombre),
-            language: selectedLanguage
+            language: selectedLanguage,
+            country: selectedCountry
           })
         });
         if (revisionResp.ok) {

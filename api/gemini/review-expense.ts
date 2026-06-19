@@ -10,8 +10,11 @@ export default async function handler(req: any, res: any) {
       nuevosGastos, // [{ id, monto, descripcion, categoria, fecha, formaPago }] - modo batch
       transaccionesRecientes = [],
       categoriasUsuario = [],
-      language = "ES"
+      language = "ES",
+      country = "CO" // 'CO' | 'CL' - para contexto del agente
     } = req.body;
+
+    const moneda = country === 'CL' ? 'pesos chilenos (CLP)' : 'pesos colombianos (COP)';
 
     // Acepta modo single (formulario manual) o modo batch (importacion). Todo se procesa como batch.
     const gastosARevisar = Array.isArray(nuevosGastos) && nuevosGastos.length > 0
@@ -22,7 +25,8 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ alertas: [] });
     }
 
-    const sysInstruction = `Eres un revisor silencioso de gastos para una app de finanzas personales.
+    const sysInstruction = `Eres un revisor silencioso de gastos para una app de finanzas personales
+en ${country === 'CL' ? 'Chile' : 'Colombia'}. Los montos son en ${moneda}.
 Tu unico trabajo es detectar POSIBLES errores en un gasto recien cargado, comparandolo
 contra el historial reciente del usuario. NUNCA decides ni corriges nada - solo detectas
 y generas una pregunta breve y respetuosa para que el USUARIO decida.

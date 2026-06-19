@@ -118,9 +118,13 @@ export const useFirestore = (
         userPayload.correo = updatedProfile.correo || (user?.email) || '';
         userPayload.celular = updatedProfile.celular;
         userPayload.suscripciones = updatedProfile.suscripciones || suscripciones;
-        userPayload.gastosRecurrentes = gastosRecurrentes.map(g => ({ ...g }));
+        // gastosRecurrentes ya NO va en userPayload - va en financialPayload
         if (updatedProfile.productos) financialPayload.productos = updatedProfile.productos;
         if (updatedProfile.portafolios) financialPayload.portafolios = updatedProfile.portafolios;
+        // Guardar solo los recurrentes del pais activo en el documento de ese pais
+        financialPayload.gastosRecurrentes = gastosRecurrentes
+          .filter(g => g.paisMoneda === (selectedCountry === 'CL' ? 'CLP' : 'COP'))
+          .map(g => ({ ...g }));
       }
       
       if (updatedTransacciones) financialPayload.transacciones = updatedTransacciones;
@@ -128,7 +132,9 @@ export const useFirestore = (
       if (updatedCategorias) financialPayload.categorias = updatedCategorias;
       if (updatedPaymentMethods) financialPayload.paymentMethods = updatedPaymentMethods;
       if (updatedSuscripciones) userPayload.suscripciones = updatedSuscripciones;
-      if (updatedGastosRecurrentes) userPayload.gastosRecurrentes = updatedGastosRecurrentes.map(g => ({ ...g }));
+      if (updatedGastosRecurrentes) financialPayload.gastosRecurrentes = updatedGastosRecurrentes
+        .filter(g => g.paisMoneda === (selectedCountry === 'CL' ? 'CLP' : 'COP'))
+        .map(g => ({ ...g }));
       
       setIsSyncing(true);
       await Promise.all([
@@ -205,7 +211,10 @@ export const useFirestore = (
             if (Array.isArray(data.paymentMethods)) setPaymentMethods(data.paymentMethods);
             if (Array.isArray(data.suscripciones)) setSuscripciones(data.suscripciones);
             
-            const gastosRec = data.gastosRecurrentes || [];
+            // Para no-admin, gastosRecurrentes viene del mismo documento unico (no tiene subcol paises)
+            // Se filtra en memoria por paisMoneda para separar el contexto
+            const gastosRec = (data.gastosRecurrentes || [])
+              .filter((g: GastoRecurrente) => g.paisMoneda === (selectedCountry === 'CL' ? 'CLP' : 'COP'));
             setGastosRecurrentes(gastosRec);
             
             setLastSyncedTime(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
@@ -286,28 +295,28 @@ export const useFirestore = (
           if (Array.isArray(financialData.paymentMethods)) setPaymentMethods(financialData.paymentMethods);
           if (Array.isArray(userData.suscripciones)) setSuscripciones(userData.suscripciones);
           
-          const gastosRec = userData.gastosRecurrentes || [];
+          const gastosRec = financialData.gastosRecurrentes || []; // <- lee del doc por pais
           setGastosRecurrentes(gastosRec);
           
           setLastSyncedTime(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
           setIsSyncing(false);
         } else {
           // First login initialization for this ecosystem
-          const payloadFinancial = {
+          const payloadFinancial: any = {
             productos: selectedCountry === 'CO' ? (userProfile.productos || []) : [],
             portafolios: selectedCountry === 'CO' ? (userProfile.portafolios || []) : [],
             transacciones: selectedCountry === 'CO' ? transacciones : [],
             suenos: selectedCountry === 'CO' ? suenos : [],
             categorias: categorias,
             paymentMethods: selectedCountry === 'CO' ? paymentMethods : ['Efectivo', 'Tarjeta de Débito', 'Tarjeta de Crédito', 'Transferencia Bancaria'],
+            gastosRecurrentes: gastosRecurrentes.filter(g => g.paisMoneda === (selectedCountry === 'CL' ? 'CLP' : 'COP')).map(g => ({ ...g })),
             updatedAt: new Date().toISOString()
           };
-          const payloadUser = {
+          const payloadUser: any = {
             nombre: userProfile.nombre || userData.nombre || (user?.displayName) || 'Invitado',
             correo: userProfile.correo || userData.correo || (user?.email) || '',
             celular: userProfile.celular || userData.celular || '',
             suscripciones: suscripciones,
-            gastosRecurrentes: gastosRecurrentes.map(g => ({ ...g })),
             updatedAt: new Date().toISOString()
           };
           
