@@ -1057,6 +1057,7 @@ export default function App() {
   const [activeInsightSubTab, setActiveInsightSubTab] = useState<'asesor' | 'insights'>('asesor');
   const [activeBalanceSubTab, setActiveBalanceSubTab] = useState<'movimientos' | 'recurrentes' | 'cuotas'>('movimientos');
   const [cuotaDetailTx, setCuotaDetailTx] = useState<string | null>(null); // idCuotaPrincipal del modal abierto
+  const [expandedMovCuota, setExpandedMovCuota] = useState<string | null>(null); // id de tx expandida en Movimientos
   const [portfolioFilter, setPortfolioFilter] = useState<'all' | 'debit' | 'credit' | 'credits'>('all');
   
   // States for Hidden Product Forms (Toggle with + button)
@@ -3865,14 +3866,38 @@ export default function App() {
                       </div>
 
                       {/* Barra de progreso cuotas */}
-                      {t.cuotasTotal && t.cuotasTotal > 1 && (
-                        <div className="mt-2.5 pt-2.5 border-t border-slate-100 w-full">
-                          {/* Calculos con fallback para legacy */}
-                          {(() => {
-                            const cuotaActual = t.cuotaActual ?? 1;
-                            const montoTotal = (t as any).montoTotalCompra || (t.monto * t.cuotasTotal!);
-                            return (
-                              <>
+                      {t.cuotasTotal && t.cuotasTotal > 1 && (() => {
+                        // Calculos correctos con soporte legacy
+                        const cuotaActual = t.cuotaActual ?? 1;
+                        // montoTotalCompra = total real de la compra (nuevas)
+                        // Para legacy: t.monto ES el total, la cuota = t.monto / t.cuotasTotal
+                        const montoTotal = (t as any).montoTotalCompra || t.monto;
+                        const valorCuota = (t as any).montoTotalCompra
+                          ? t.monto // nuevas: monto ya es la cuota
+                          : t.monto / t.cuotasTotal!; // legacy: dividir total entre cuotas
+                        const estaExpandida = expandedMovCuota === t.id;
+                        return (
+                          <div className="mt-2 pt-2 border-t border-slate-100 w-full animate-fade-in">
+                            {/* VISTA COMPACTA — siempre visible, toca para expandir */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTap();
+                                setExpandedMovCuota(estaExpandida ? null : t.id);
+                              }}
+                              className="w-full flex items-center justify-between cursor-pointer"
+                            >
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8.5px] font-black bg-indigo-50 text-indigo-600">
+                                ■ {selectedLanguage === 'ES' ? `Cuota ${cuotaActual}/${t.cuotasTotal}` : `Installment ${cuotaActual}/${t.cuotasTotal}`}
+                              </span>
+                              <span className="text-[9px] font-bold text-slate-400">
+                                {estaExpandida ? '▲' : '▼'}
+                              </span>
+                            </button>
+                            {/* VISTA EXPANDIDA — solo al tocar */}
+                            {estaExpandida && (
+                              <div className="mt-2.5">
                                 {/* Montos */}
                                 <div className="flex justify-between items-end mb-2">
                                   <div>
@@ -3880,7 +3905,7 @@ export default function App() {
                                       {selectedLanguage === 'ES' ? 'VALOR CUOTA' : 'INSTALLMENT'}
                                     </p>
                                     <p className="text-xs font-black text-rose-600">
-                                      -${t.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                      -${valorCuota.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
                                     </p>
                                   </div>
                                   <div className="text-right">
@@ -3899,7 +3924,7 @@ export default function App() {
                                     style={{ width: `${(cuotaActual / t.cuotasTotal!) * 100}%` }}
                                   />
                                 </div>
-                                {/* Números de cuotas */}
+                                {/* Numeros */}
                                 <div className="flex justify-between">
                                   {Array.from({ length: t.cuotasTotal! }, (_, i) => i + 1).map(n => (
                                     <span
@@ -3910,11 +3935,11 @@ export default function App() {
                                     </span>
                                   ))}
                                 </div>
-                              </>
-                            );
-                          })()}
-                        </div>
-                      )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </motion.div>
                   );
                 })}
