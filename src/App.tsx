@@ -3865,75 +3865,149 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Barra de progreso cuotas */}
+                      {/* Cuotas: vista compacta + expandida al tocar */}
                       {t.cuotasTotal && t.cuotasTotal > 1 && (() => {
-                        // Calculos correctos con soporte legacy
                         const cuotaActual = t.cuotaActual ?? 1;
-                        // montoTotalCompra = total real de la compra (nuevas)
-                        // Para legacy: t.monto ES el total, la cuota = t.monto / t.cuotasTotal
                         const montoTotal = (t as any).montoTotalCompra || t.monto;
                         const valorCuota = (t as any).montoTotalCompra
-                          ? t.monto // nuevas: monto ya es la cuota
-                          : t.monto / t.cuotasTotal!; // legacy: dividir total entre cuotas
+                          ? t.monto
+                          : Math.round(t.monto / t.cuotasTotal!);
+                        const montoPendiente = Math.round(valorCuota * (t.cuotasTotal! - cuotaActual));
                         const estaExpandida = expandedMovCuota === t.id;
+                        const hoy = new Date(); hoy.setHours(0,0,0,0);
+                        // Generar fechas de cada cuota a partir de la fecha de la tx
+                        const fechaBase = new Date(t.fecha + 'T12:00:00');
+                        const cuotas = Array.from({ length: t.cuotasTotal! }, (_, i) => {
+                          const f = new Date(fechaBase);
+                          f.setMonth(f.getMonth() + i);
+                          return f;
+                        });
+
                         return (
                           <div className="mt-2 pt-2 border-t border-slate-100 w-full animate-fade-in">
-                            {/* VISTA COMPACTA — siempre visible, toca para expandir */}
+                            {/* VISTA COMPACTA — badge + monto cuota + barra */}
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleTap();
-                                setExpandedMovCuota(estaExpandida ? null : t.id);
-                              }}
-                              className="w-full flex items-center justify-between cursor-pointer"
+                              onClick={(e) => { e.stopPropagation(); handleTap(); setExpandedMovCuota(estaExpandida ? null : t.id); }}
+                              className="w-full text-left cursor-pointer"
                             >
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8.5px] font-black bg-indigo-50 text-indigo-600">
-                                ■ {selectedLanguage === 'ES' ? `Cuota ${cuotaActual}/${t.cuotasTotal}` : `Installment ${cuotaActual}/${t.cuotasTotal}`}
-                              </span>
-                              <span className="text-[9px] font-bold text-slate-400">
-                                {estaExpandida ? '▲' : '▼'}
-                              </span>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8.5px] font-black bg-indigo-50 text-indigo-600">
+                                  ■ {selectedLanguage === 'ES' ? `Cuota ${cuotaActual}/${t.cuotasTotal}` : `Installment ${cuotaActual}/${t.cuotasTotal}`}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-black text-rose-500">
+                                    -{valorCuota.toLocaleString('es-ES')}
+                                  </span>
+                                  <span className="text-[9px] text-slate-400 font-bold">
+                                    {estaExpandida ? '▲' : '▼'}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-[9px] text-slate-400 font-bold mb-1.5 text-right">
+                                {selectedLanguage === 'ES' ? 'Total' : 'Total'} {montoTotal.toLocaleString('es-ES')}
+                              </div>
+                              <div className="relative h-1.5 bg-slate-100 rounded-full">
+                                <div
+                                  className="absolute left-0 top-0 h-1.5 bg-indigo-500 rounded-full transition-all"
+                                  style={{ width: `${(cuotaActual / t.cuotasTotal!) * 100}%` }}
+                                />
+                              </div>
                             </button>
-                            {/* VISTA EXPANDIDA — solo al tocar */}
+
+                            {/* VISTA EXPANDIDA — al tocar */}
                             {estaExpandida && (
-                              <div className="mt-2.5">
-                                {/* Montos */}
-                                <div className="flex justify-between items-end mb-2">
-                                  <div>
-                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
-                                      {selectedLanguage === 'ES' ? 'VALOR CUOTA' : 'INSTALLMENT'}
+                              <div className="mt-3">
+                                {/* 3 cajas resumen */}
+                                <div className="grid grid-cols-3 gap-1.5 mb-3">
+                                  <div className="bg-slate-50 rounded-xl p-2 text-center">
+                                    <p className="text-[7px] font-black text-slate-400 uppercase tracking-wide mb-0.5">
+                                      {selectedLanguage === 'ES' ? 'Cuota' : 'Installment'}
                                     </p>
-                                    <p className="text-xs font-black text-rose-600">
-                                      -${valorCuota.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                    <p className="text-[11px] font-black text-rose-500">
+                                      -{valorCuota.toLocaleString('es-ES')}
                                     </p>
                                   </div>
-                                  <div className="text-right">
-                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">
-                                      {selectedLanguage === 'ES' ? 'TOTAL COMPRA' : 'TOTAL'}
+                                  <div className="bg-slate-50 rounded-xl p-2 text-center">
+                                    <p className="text-[7px] font-black text-slate-400 uppercase tracking-wide mb-0.5">
+                                      {selectedLanguage === 'ES' ? 'Total' : 'Total'}
                                     </p>
-                                    <p className="text-[10px] font-black text-slate-400">
-                                      {montoTotal.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                    <p className="text-[11px] font-black text-slate-600">
+                                      {montoTotal.toLocaleString('es-ES')}
+                                    </p>
+                                  </div>
+                                  <div className="bg-slate-50 rounded-xl p-2 text-center">
+                                    <p className="text-[7px] font-black text-slate-400 uppercase tracking-wide mb-0.5">
+                                      {selectedLanguage === 'ES' ? 'Por pagar' : 'Remaining'}
+                                    </p>
+                                    <p className="text-[11px] font-black text-indigo-600">
+                                      {montoPendiente.toLocaleString('es-ES')}
                                     </p>
                                   </div>
                                 </div>
-                                {/* Barra de progreso */}
+
+                                {/* Barra progreso con pagadas/pendientes */}
                                 <div className="relative h-1.5 bg-slate-100 rounded-full mb-1">
                                   <div
                                     className="absolute left-0 top-0 h-1.5 bg-indigo-500 rounded-full transition-all"
                                     style={{ width: `${(cuotaActual / t.cuotasTotal!) * 100}%` }}
                                   />
                                 </div>
-                                {/* Numeros */}
-                                <div className="flex justify-between">
-                                  {Array.from({ length: t.cuotasTotal! }, (_, i) => i + 1).map(n => (
-                                    <span
-                                      key={n}
-                                      className={`text-[7px] font-black ${n <= cuotaActual ? 'text-indigo-600' : 'text-slate-400'}`}
-                                    >
-                                      {n}
-                                    </span>
-                                  ))}
+                                <div className="flex justify-between text-[8px] font-bold text-slate-400 mb-3">
+                                  <span>{cuotaActual} {selectedLanguage === 'ES' ? 'pagadas' : 'paid'}</span>
+                                  <span>{t.cuotasTotal! - cuotaActual} {selectedLanguage === 'ES' ? 'pendientes' : 'pending'}</span>
+                                </div>
+
+                                {/* Lista de cuotas */}
+                                <div className="flex flex-col gap-1.5">
+                                  {cuotas.map((fecha, idx) => {
+                                    const numCuota = idx + 1;
+                                    const esPagada = numCuota < cuotaActual;
+                                    const esEsteMes = numCuota === cuotaActual;
+                                    const esPendiente = numCuota > cuotaActual;
+                                    const fechaStr = fecha.toLocaleDateString(
+                                      selectedLanguage === 'ES' ? 'es-CO' : 'en-US',
+                                      { day: 'numeric', month: 'short', year: 'numeric' }
+                                    );
+                                    return (
+                                      <div
+                                        key={idx}
+                                        className={`flex items-center gap-2.5 rounded-xl px-3 py-2 ${
+                                          esEsteMes ? 'bg-violet-50' : esPagada ? 'bg-indigo-50' : 'bg-slate-50'
+                                        }`}
+                                      >
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black ${
+                                          esEsteMes ? 'bg-violet-600 text-white ring-2 ring-violet-200'
+                                            : esPagada ? 'bg-indigo-500 text-white'
+                                            : 'bg-slate-200 text-slate-400'
+                                        }`}>
+                                          {numCuota}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-[9px] font-bold text-slate-600">{fechaStr}</p>
+                                          <p className={`text-[8px] font-black ${
+                                            esEsteMes ? 'text-violet-600'
+                                              : esPagada ? 'text-indigo-500'
+                                              : 'text-slate-400'
+                                          }`}>
+                                            {esEsteMes
+                                              ? (selectedLanguage === 'ES' ? '★ Este mes' : '★ This month')
+                                              : esPagada
+                                                ? (selectedLanguage === 'ES' ? 'Pagada' : 'Paid')
+                                                : (selectedLanguage === 'ES' ? 'Pendiente' : 'Pending')
+                                            }
+                                          </p>
+                                        </div>
+                                        <p className={`text-[10px] font-black shrink-0 ${
+                                          esEsteMes ? 'text-violet-600'
+                                            : esPagada ? 'text-indigo-500'
+                                            : 'text-slate-300'
+                                        }`}>
+                                          -{valorCuota.toLocaleString('es-ES')}
+                                        </p>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}
