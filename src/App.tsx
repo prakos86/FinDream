@@ -3478,21 +3478,62 @@ export default function App() {
             effectiveCountry={effectiveCountry}
           />
         ) : activeBalanceSubTab === 'cuotas' ? (() => {
-          // Agrupar todas las transacciones con cuotas por idCuotaPrincipal
+          // Calcular limites del periodo activo (mismo patron que filterTransactions)
+          const nowCuotas = new Date();
+          const startOfMonthCuotas = new Date(nowCuotas.getFullYear(), nowCuotas.getMonth(), 1).getTime();
+          const endOfMonthCuotas = new Date(nowCuotas.getFullYear(), nowCuotas.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+          const startOfYearCuotas = new Date(nowCuotas.getFullYear(), 0, 1).getTime();
+          const endOfYearCuotas = new Date(nowCuotas.getFullYear(), 11, 31, 23, 59, 59, 999).getTime();
+          const startOfWeekCuotas = new Date(nowCuotas.getFullYear(), nowCuotas.getMonth(), nowCuotas.getDate()).getTime() - (nowCuotas.getDay() || 7 - 1) * 24 * 3600 * 1000;
+          const endOfWeekCuotas = startOfWeekCuotas + 7 * 24 * 3600 * 1000 - 1;
+
+          const caeDentroDePeriodo = (fecha: string): boolean => {
+            const t2 = new Date(fecha + 'T12:00:00').getTime();
+            switch (filtroSeleccionado) {
+              case 'Día': {
+                const startOfDayCuotas = new Date(nowCuotas.getFullYear(), nowCuotas.getMonth(), nowCuotas.getDate()).getTime();
+                const endOfDayCuotas = startOfDayCuotas + 24 * 3600 * 1000 - 1;
+                return t2 >= startOfDayCuotas && t2 <= endOfDayCuotas;
+              }
+              case 'Semana': return t2 >= startOfWeekCuotas && t2 <= endOfWeekCuotas;
+              case 'Mes': return t2 >= startOfMonthCuotas && t2 <= endOfMonthCuotas;
+              case 'Año': return t2 >= startOfYearCuotas && t2 <= endOfYearCuotas;
+              case 'Personalizado': {
+                if (!rangoInicio || !rangoFin) return true;
+                const ini = formatSafeDateString(rangoInicio).getTime();
+                const fin = formatSafeDateString(rangoFin).getTime() + (24 * 3600 * 1000 - 1);
+                return t2 >= ini && t2 <= fin;
+              }
+              case 'Histórico':
+              default: return true;
+            }
+          };
+
           const monedaActiva = effectiveCountry === 'CL' ? 'CLP' : 'COP';
-          const txConCuotas = transacciones.filter(t =>
-            t.cuotasTotal && t.cuotasTotal > 1 &&
-            (!t.paisMoneda || t.paisMoneda === monedaActiva) &&
-            // Para legacy (sin idCuotaPrincipal): solo incluir si tiene cuotaActual guardado
-            (t.idCuotaPrincipal || (t.cuotaActual !== undefined && t.cuotaActual !== null))
-          );
+          const txConCuotas = transacciones.filter(t => {
+            if (!(t.cuotasTotal && t.cuotasTotal > 1)) return false;
+            if (!(!t.paisMoneda || t.paisMoneda === monedaActiva)) return false;
+            if (!(t.idCuotaPrincipal || (t.cuotaActual !== undefined && t.cuotaActual !== null))) return false;
+
+            // Para legacy: calcular fecha efectiva de la cuota activa y verificar si cae en el periodo
+            if (!t.idCuotaPrincipal && t.cuotaActual) {
+              const fechaBase = new Date(t.fecha + 'T12:00:00');
+              fechaBase.setMonth(fechaBase.getMonth() + (t.cuotaActual - 1));
+              const fechaEfectiva = fechaBase.toISOString().substring(0, 10);
+              return caeDentroDePeriodo(fechaEfectiva);
+            }
+
+            // Para nuevas (idCuotaPrincipal): incluir siempre; el grupo se filtra despues
+            return true;
+          });
 
           // Agrupar por idCuotaPrincipal si existe, o por clave sintetica (legacy)
           const grupos: Record<string, typeof txConCuotas> = {};
           txConCuotas.forEach(t => {
-            // Si tiene idCuotaPrincipal, usarlo. Si no (legacy), generar clave por descripcion+monto+total
+            const desc = (t.descripcion || t.categoria || '').toLowerCase().replace(/\s+/g, '-');
+            const pago = (t.formaPago || '').toLowerCase().replace(/\s+/g, '-');
             const key = t.idCuotaPrincipal ||
-              `legacy-${(t.descripcion || t.categoria || '').toLowerCase().replace(/\s+/g, '-')}-${t.cuotasTotal}`;
+              `legacy-${desc}-${t.cuotasTotal}-${pago}`;
             if (!grupos[key]) grupos[key] = [];
             grupos[key].push(t);
           });
@@ -3528,7 +3569,15 @@ export default function App() {
               {gruposList.map(([idPrincipal, cuotas]) => {
                 const primera = cuotas[0];
                 const total = cuotas.length;
-                const pagadas = cuotas.filter(t => new Date(t.fecha) <= hoy).length;
+                const pagadas = cuotas.filter(t => {
+                  // Para legacy: usar fecha efectiva de la cuota
+                  if (!t.idCuotaPrincipal && t.cuotaActual && t.cuotaActual > 1) {
+                    const fb = new Date(t.fecha + 'T12:00:00');
+                    fb.setMonth(fb.getMonth() + (t.cuotaActual - 1));
+                    return fb <= hoy;
+                  }
+                  return new Date(t.fecha + 'T12:00:00') <= hoy;
+                }).length;
                 const montoTotal = primera.montoTotalCompra || (primera.montoOriginal ? primera.montoOriginal * total : primera.monto * total);
                 const montoPagado = primera.monto * pagadas;
                 const montoPendiente = montoTotal - montoPagado;
