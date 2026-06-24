@@ -59,13 +59,11 @@ import {
   Repeat
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import * as XLSX from 'xlsx';
-import * as pdfjsLib from 'pdfjs-dist';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 export const extractPdfText = async (file: File, password?: string): Promise<string> => {
   const arrayBuffer = await file.arrayBuffer();
+  const pdfjsLib = await import('pdfjs-dist');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
   const loadingTask = pdfjsLib.getDocument({
     data: arrayBuffer,
     password: password,
@@ -1942,6 +1940,7 @@ export default function App() {
 
         if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
           const data = await file.arrayBuffer();
+          const XLSX = await import('xlsx');
           const workbook = XLSX.read(data, { type: 'array' });
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
@@ -2411,10 +2410,16 @@ export default function App() {
   // Filter algorithms for current period
   const filterTransactions = (items: Transaccion[]): Transaccion[] => {
     const now = new Date();
+    // Limites inferiores
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const startOfWeek = startOfDay - (now.getDay() || 7 - 1) * 24 * 3600 * 1000;
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
     const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
+    // Limites superiores (fin del periodo activo, inclusive)
+    const endOfDay = startOfDay + 24 * 3600 * 1000 - 1;
+    const endOfWeek = startOfWeek + 7 * 24 * 3600 * 1000 - 1;
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+    const endOfYear = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999).getTime();
 
     const monedaActiva = effectiveCountry === 'CL' ? 'CLP' : 'COP';
 
@@ -2441,13 +2446,13 @@ export default function App() {
       const itemTime = formatSafeDateString(fechaEfectiva).getTime();
       switch (filtroSeleccionado) {
         case 'Día':
-          return itemTime >= startOfDay;
+          return itemTime >= startOfDay && itemTime <= endOfDay;
         case 'Semana':
-          return itemTime >= startOfWeek;
+          return itemTime >= startOfWeek && itemTime <= endOfWeek;
         case 'Mes':
-          return itemTime >= startOfMonth;
+          return itemTime >= startOfMonth && itemTime <= endOfMonth;
         case 'Año':
-          return itemTime >= startOfYear;
+          return itemTime >= startOfYear && itemTime <= endOfYear;
         case 'Personalizado': {
           if (!rangoInicio || !rangoFin) return true; // sin rango aun: mostrar todo
           const ini = formatSafeDateString(rangoInicio).getTime();
