@@ -2425,7 +2425,20 @@ export default function App() {
         : item.paisMoneda === monedaActiva;
       if (!matchPais) return false;
 
-      const itemTime = formatSafeDateString(item.fecha).getTime();
+      // Para cuotas legacy (sin idCuotaPrincipal, con cuotaActual):
+      // usar la fecha real de la cuota activa en vez de la fecha de la compra
+      let fechaEfectiva = item.fecha;
+      if (
+        item.cuotasTotal && item.cuotasTotal > 1 &&
+        item.cuotaActual && item.cuotaActual > 1 &&
+        !item.idCuotaPrincipal
+      ) {
+        const fechaBase = new Date(item.fecha + 'T12:00:00');
+        fechaBase.setMonth(fechaBase.getMonth() + (item.cuotaActual - 1));
+        fechaEfectiva = fechaBase.toISOString().substring(0, 10);
+      }
+
+      const itemTime = formatSafeDateString(fechaEfectiva).getTime();
       switch (filtroSeleccionado) {
         case 'Día':
           return itemTime >= startOfDay;
@@ -3464,7 +3477,9 @@ export default function App() {
           const monedaActiva = effectiveCountry === 'CL' ? 'CLP' : 'COP';
           const txConCuotas = transacciones.filter(t =>
             t.cuotasTotal && t.cuotasTotal > 1 &&
-            (!t.paisMoneda || t.paisMoneda === monedaActiva)
+            (!t.paisMoneda || t.paisMoneda === monedaActiva) &&
+            // Para legacy (sin idCuotaPrincipal): solo incluir si tiene cuotaActual guardado
+            (t.idCuotaPrincipal || (t.cuotaActual !== undefined && t.cuotaActual !== null))
           );
 
           // Agrupar por idCuotaPrincipal si existe, o por clave sintetica (legacy)
@@ -3772,8 +3787,8 @@ export default function App() {
                       exit={{ opacity: 0, height: 0 }}
                       className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-50 flex flex-col group hover:bg-slate-50 transition-colors"
                     >
-                      <div className="flex justify-between items-center w-full">
-                        <div className="flex items-center gap-3">
+                      <div className="flex justify-between items-start w-full">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
                           {/* Transaction Icon Indicator */}
                           <div 
                             className="w-10 h-10 rounded-xl flex items-center justify-center animate-pulse"
@@ -3838,7 +3853,7 @@ export default function App() {
                         </div>
 
                         {/* Right amount and delete operations */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
                           <span className={`text-sm font-black whitespace-nowrap ${isExpense ? 'text-rose-700' : 'text-emerald-700'}`}>
                             {isExpense ? '-' : '+'}${t.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
                           </span>
