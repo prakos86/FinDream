@@ -2430,17 +2430,26 @@ export default function App() {
         : item.paisMoneda === monedaActiva;
       if (!matchPais) return false;
 
-      // Para cuotas legacy (sin idCuotaPrincipal, con cuotaActual):
-      // usar la fecha real de la cuota activa en vez de la fecha de la compra
+      // Para cuotas legacy (sin idCuotaPrincipal):
+      // calcular la cuota que corresponde al mes activo segun diferencia de meses
       let fechaEfectiva = item.fecha;
       if (
         item.cuotasTotal && item.cuotasTotal > 1 &&
-        item.cuotaActual && item.cuotaActual > 1 &&
         !item.idCuotaPrincipal
       ) {
-        const fechaBase = new Date(item.fecha + 'T12:00:00');
-        fechaBase.setMonth(fechaBase.getMonth() + (item.cuotaActual - 1));
-        fechaEfectiva = fechaBase.toISOString().substring(0, 10);
+        const fechaCompra = new Date(item.fecha + 'T12:00:00');
+        const ahora = new Date();
+        // Diferencia en meses entre hoy y la fecha de compra
+        const diffMeses =
+          (ahora.getFullYear() - fechaCompra.getFullYear()) * 12 +
+          (ahora.getMonth() - fechaCompra.getMonth());
+        // Cuota del mes actual (1-based, no puede superar cuotasTotal)
+        const cuotaMesActual = Math.min(diffMeses + 1, item.cuotasTotal);
+        if (cuotaMesActual >= 1) {
+          const fechaCuota = new Date(fechaCompra);
+          fechaCuota.setMonth(fechaCompra.getMonth() + diffMeses);
+          fechaEfectiva = fechaCuota.toISOString().substring(0, 10);
+        }
       }
 
       const itemTime = formatSafeDateString(fechaEfectiva).getTime();
@@ -3515,12 +3524,17 @@ export default function App() {
             if (!(!t.paisMoneda || t.paisMoneda === monedaActiva)) return false;
             if (!(t.idCuotaPrincipal || (t.cuotaActual !== undefined && t.cuotaActual !== null))) return false;
 
-            // Para legacy: calcular fecha efectiva de la cuota activa y verificar si cae en el periodo
-            if (!t.idCuotaPrincipal && t.cuotaActual) {
+            if (!t.idCuotaPrincipal && t.cuotasTotal && t.cuotasTotal > 1) {
+              // Calcular si alguna cuota de esta compra cae dentro del periodo activo
+              // Generar todas las fechas de cuotas y verificar si alguna cae en el rango
               const fechaBase = new Date(t.fecha + 'T12:00:00');
-              fechaBase.setMonth(fechaBase.getMonth() + (t.cuotaActual - 1));
-              const fechaEfectiva = fechaBase.toISOString().substring(0, 10);
-              return caeDentroDePeriodo(fechaEfectiva);
+              for (let i = 0; i < t.cuotasTotal; i++) {
+                const fechaCuota = new Date(fechaBase);
+                fechaCuota.setMonth(fechaBase.getMonth() + i);
+                const fechaStr = fechaCuota.toISOString().substring(0, 10);
+                if (caeDentroDePeriodo(fechaStr)) return true;
+              }
+              return false;
             }
 
             // Para nuevas (idCuotaPrincipal): incluir siempre; el grupo se filtra despues
@@ -3530,10 +3544,16 @@ export default function App() {
           // Agrupar por idCuotaPrincipal si existe, o por clave sintetica (legacy)
           const grupos: Record<string, typeof txConCuotas> = {};
           txConCuotas.forEach(t => {
-            const desc = (t.descripcion || t.categoria || '').toLowerCase().replace(/\s+/g, '-');
-            const pago = (t.formaPago || '').toLowerCase().replace(/\s+/g, '-');
-            const key = t.idCuotaPrincipal ||
-              `legacy-${desc}-${t.cuotasTotal}-${pago}`;
+            let key: string;
+            if (t.idCuotaPrincipal) {
+              key = t.idCuotaPrincipal;
+            } else {
+              // Clave robusta para legacy: usa monto base + cuotasTotal + mes de la compra
+              // El monto base es el mismo para todas las cuotas del mismo producto
+              const montoBase = t.montoTotalCompra || (t.monto * (t.cuotasTotal || 1));
+              const mesCompra = t.fecha.substring(0, 7); // YYYY-MM
+              key = `legacy-${Math.round(montoBase)}-${t.cuotasTotal}-${mesCompra}`;
+            }
             if (!grupos[key]) grupos[key] = [];
             grupos[key].push(t);
           });
