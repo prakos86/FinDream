@@ -3578,8 +3578,59 @@ export default function App() {
             );
           }
 
+          // Calcular totales sobre todos los grupos visibles
+          let sumaTotal = 0;
+          let sumaPagado = 0;
+          let sumaPendiente = 0;
+          gruposList.forEach(([, cuotas]) => {
+            const primera = cuotas[0];
+            const totalCuotas = cuotas.length;
+            const valorCuota = (primera as any).montoTotalCompra
+              ? primera.monto
+              : Math.round(primera.monto / (primera.cuotasTotal || 1));
+            const montoTotalCompra = (primera as any).montoTotalCompra || primera.monto;
+            const pagadasGrupo = cuotas.filter(t => {
+              if (!t.idCuotaPrincipal && t.cuotaActual && t.cuotaActual > 1) {
+                const fb = new Date(t.fecha + 'T12:00:00');
+                fb.setMonth(fb.getMonth() + (t.cuotaActual - 1));
+                return fb <= hoy;
+              }
+              return new Date(t.fecha + 'T12:00:00') <= hoy;
+            }).length;
+            sumaTotal += montoTotalCompra;
+            sumaPagado += valorCuota * pagadasGrupo;
+            sumaPendiente += valorCuota * (totalCuotas - pagadasGrupo);
+          });
+
           return (
             <div className="flex flex-col gap-3 px-4 pb-6">
+              {/* Resumen superior */}
+              <div className="grid grid-cols-3 gap-2 mb-1">
+                <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-slate-100">
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                    {selectedLanguage === 'ES' ? 'Total' : 'Total'}
+                  </p>
+                  <p className="text-[11px] font-black text-slate-700 leading-tight">
+                    {sumaTotal.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+                  </p>
+                </div>
+                <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-emerald-100">
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                    {selectedLanguage === 'ES' ? 'Pagado' : 'Paid'}
+                  </p>
+                  <p className="text-[11px] font-black text-emerald-600 leading-tight">
+                    {sumaPagado.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+                  </p>
+                </div>
+                <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-rose-100">
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                    {selectedLanguage === 'ES' ? 'Pendiente' : 'Pending'}
+                  </p>
+                  <p className="text-[11px] font-black text-rose-500 leading-tight">
+                    {sumaPendiente.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+                  </p>
+                </div>
+              </div>
               {gruposList.map(([idPrincipal, cuotas]) => {
                 const primera = cuotas[0];
                 const total = cuotas.length;
