@@ -3606,27 +3606,27 @@ export default function App() {
             <div className="flex flex-col gap-3 px-4 pb-6">
               {/* Resumen superior */}
               <div className="grid grid-cols-3 gap-2 mb-1">
-                <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-slate-100">
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                <div className="bg-slate-50 rounded-2xl p-3 text-center shadow-sm border border-slate-200">
+                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-wider mb-1">
                     {selectedLanguage === 'ES' ? 'Total' : 'Total'}
                   </p>
-                  <p className="text-[11px] font-black text-slate-700 leading-tight">
+                  <p className="text-[12px] font-black text-slate-800 leading-tight">
                     {sumaTotal.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
                   </p>
                 </div>
-                <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-emerald-100">
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                <div className="bg-emerald-50 rounded-2xl p-3 text-center shadow-sm border border-emerald-200">
+                  <p className="text-[8px] font-black text-emerald-700 uppercase tracking-wider mb-1">
                     {selectedLanguage === 'ES' ? 'Pagado' : 'Paid'}
                   </p>
-                  <p className="text-[11px] font-black text-emerald-600 leading-tight">
+                  <p className="text-[12px] font-black text-emerald-700 leading-tight">
                     {sumaPagado.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
                   </p>
                 </div>
-                <div className="bg-white rounded-2xl p-3 text-center shadow-sm border border-rose-100">
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                <div className="bg-rose-50 rounded-2xl p-3 text-center shadow-sm border border-rose-200">
+                  <p className="text-[8px] font-black text-rose-600 uppercase tracking-wider mb-1">
                     {selectedLanguage === 'ES' ? 'Pendiente' : 'Pending'}
                   </p>
-                  <p className="text-[11px] font-black text-rose-500 leading-tight">
+                  <p className="text-[12px] font-black text-rose-600 leading-tight">
                     {sumaPendiente.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
                   </p>
                 </div>
