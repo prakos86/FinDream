@@ -3600,20 +3600,37 @@ export default function App() {
               </div>
               {gruposList.map(([idPrincipal, cuotas]) => {
                 const primera = cuotas[0];
-                const total = cuotas.length;
-                const pagadas = cuotas.filter(t => {
-                  // Para legacy: usar fecha efectiva de la cuota
-                  if (!t.idCuotaPrincipal && t.cuotaActual && t.cuotaActual > 1) {
-                    const fb = new Date(t.fecha + 'T12:00:00');
-                    fb.setMonth(fb.getMonth() + (t.cuotaActual - 1));
-                    return fb <= hoy;
-                  }
-                  return new Date(t.fecha + 'T12:00:00') <= hoy;
-                }).length;
-                const montoTotal = primera.montoTotalCompra || (primera.montoOriginal ? primera.montoOriginal * total : primera.monto * total);
-                const montoPagado = primera.monto * pagadas;
+                // Para nuevas (idCuotaPrincipal): usar cuotasTotal del campo, no cuotas.length
+                // porque solo existe en Firestore la cuota del mes actual, no las futuras
+                const esNueva = !!primera.idCuotaPrincipal;
+                const total = esNueva
+                  ? (primera.cuotasTotal || cuotas.length)
+                  : cuotas.length;
+                const valorCuota = primera.monto; // para nuevas, monto ya es el valor por cuota
+
+                // Cuotas pagadas: para nuevas, contar cuantas existen en Firestore con fecha <= hoy
+                const pagadas = esNueva
+                  ? cuotas.filter(t => new Date(t.fecha + 'T12:00:00') <= hoy).length
+                  : cuotas.filter(t => {
+                      if (!t.idCuotaPrincipal && t.cuotaActual && t.cuotaActual > 1) {
+                        const fb = new Date(t.fecha + 'T12:00:00');
+                        fb.setMonth(fb.getMonth() + (t.cuotaActual - 1));
+                        return fb <= hoy;
+                      }
+                      return new Date(t.fecha + 'T12:00:00') <= hoy;
+                    }).length;
+
+                // Cuota actual para mostrar en el badge
+                const cuotaActualNum = esNueva
+                  ? (pagadas + 1 <= total ? pagadas + 1 : total)
+                  : (pagadas + 1);
+
+                const montoTotal = esNueva
+                  ? (primera.montoTotalCompra || valorCuota * total)
+                  : (primera.montoTotalCompra || (primera.montoOriginal ? primera.montoOriginal * total : primera.monto * total));
+                const montoPagado = valorCuota * pagadas;
                 const montoPendiente = montoTotal - montoPagado;
-                const completada = pagadas === total;
+                const completada = pagadas >= total;
 
                 return (
                   <div key={idPrincipal}>
@@ -3636,7 +3653,7 @@ export default function App() {
                           }`}>
                             {completada
                               ? (selectedLanguage === 'ES' ? `Pagada ${total}/${total}` : `Paid ${total}/${total}`)
-                              : `■ ${selectedLanguage === 'ES' ? `Cuota ${pagadas + 1}/${total}` : `Installment ${pagadas + 1}/${total}`}`
+                              : `■ ${selectedLanguage === 'ES' ? `Cuota ${cuotaActualNum}/${total}` : `Installment ${cuotaActualNum}/${total}`}`
                             }
                           </span>
                         </div>
@@ -3703,14 +3720,31 @@ export default function App() {
                           </div>
                           {/* Lista de cuotas */}
                           <div className="flex flex-col gap-1.5">
-                            {cuotas.map((t, idx) => {
-                              const fechaTx = new Date(t.fecha);
-                              const esPagada = fechaTx <= hoy;
+                            {Array.from({ length: total }, (_, idx) => {
+                              // Para nuevas: generar fecha virtual a partir de la primera cuota
+                              // Para legacy: usar la tx real del array
+                              let fechaTx: Date;
+                              if (esNueva) {
+                                const txReal = cuotas.find(t => (t.cuotaActual ?? 1) === idx + 1);
+                                if (txReal) {
+                                  fechaTx = new Date(txReal.fecha + 'T12:00:00');
+                                } else {
+                                  // Generar fecha virtual
+                                  const base = new Date(primera.fecha + 'T12:00:00');
+                                  base.setMonth(base.getMonth() + idx);
+                                  fechaTx = base;
+                                }
+                              } else {
+                                fechaTx = new Date((cuotas[idx]?.fecha || primera.fecha) + 'T12:00:00');
+                              }
+                              const esPagada = fechaTx <= hoy && idx < pagadas;
                               const esEsteMes = fechaTx.getFullYear() === hoy.getFullYear() &&
                                 fechaTx.getMonth() === hoy.getMonth();
+                              const fechaStr = formatLocalYYYYMMDD(fechaTx);
+                              const montoVal = esNueva ? valorCuota : (cuotas[idx]?.monto || primera.monto);
                               return (
                                 <div
-                                  key={t.id}
+                                  key={`cuota-${idPrincipal}-${idx}`}
                                   className={`flex items-center gap-3 rounded-xl px-3 py-2 ${
                                     esEsteMes ? 'bg-violet-50' : esPagada ? 'bg-indigo-50/70' : 'bg-slate-50'
                                   }`}
@@ -3723,7 +3757,7 @@ export default function App() {
                                     {idx + 1}
                                   </div>
                                   <div className="flex-1 min-w-0 text-left">
-                                    <p className="text-[10px] font-bold text-slate-600">{t.fecha}</p>
+                                    <p className="text-[10px] font-bold text-slate-600">{fechaStr}</p>
                                     <p className={`text-[9px] font-black ${
                                       esEsteMes ? 'text-violet-600'
                                         : esPagada ? 'text-indigo-500'
@@ -3742,7 +3776,7 @@ export default function App() {
                                       : esPagada ? 'text-indigo-500'
                                       : 'text-slate-300'
                                   }`}>
-                                    -{t.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                    -{montoVal.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
                                   </p>
                                 </div>
                               );
