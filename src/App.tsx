@@ -5680,6 +5680,7 @@ export default function App() {
                         id: `cuota-${timestampId}-${i}`,
                         fecha: futureDate.toISOString().substring(0, 10),
                         cuotaActual: i,
+                        cuotasTotal: txConPais.cuotasTotal, // guardar explicitamente para filtros
                         monto: montoParaCuota,
                         montoOriginal: montoParaCuota, // valor de la cuota individual
                         montoTotalCompra: txConPais.monto, // total original de la compra
