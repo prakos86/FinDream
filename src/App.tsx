@@ -301,12 +301,23 @@ const TRANSLATIONS = {
 
 
 // Helper to synthesise iOS haptic/audio feedback using Web Audio API
+let _audioCtx: AudioContext | null = null;
+const getAudioCtx = (): AudioContext | null => {
+  try {
+    if (!_audioCtx || _audioCtx.state === 'closed') {
+      const AC = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AC) return null;
+      _audioCtx = new AC();
+    }
+    return _audioCtx;
+  } catch { return null; }
+};
+
 const playTone = (type: 'tap' | 'success' | 'delete' | 'voice', isMuted: boolean) => {
   if (isMuted) return;
   try {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
+    const ctx = getAudioCtx();
+    if (!ctx) return;
     
     if (type === 'tap') {
       // Short click sound
@@ -1694,7 +1705,7 @@ export default function App() {
         isPositive: true
       });
     }
-  }, [showSplash, effectiveCountry, gastosRecurrentes, transacciones, selectedLanguage]);
+  }, [showSplash, effectiveCountry, gastosRecurrentes, selectedLanguage]);
 
   // Handlers
 
@@ -2122,69 +2133,10 @@ export default function App() {
         const dups = allNewTxList.filter(esDup);
         let nuevos = allNewTxList.filter(nt => !esDup(nt));
 
-        // --- Revisor semantico BATCH sobre TODOS los que NO fueron detectados por esDup ---
-        if (nuevos.length > 0) {
-          try {
-            const gastosParaRevisar = nuevos.map((nt, idx) => ({
-              id: nt.id || `batch-${idx}`,
-              monto: nt.monto,
-              descripcion: nt.descripcion,
-              categoria: nt.categoria,
-              fecha: nt.fecha,
-              formaPago: nt.formaPago
-            }));
-            const revisionResp = await fetch('/api/gemini/review-expense', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                nuevosGastos: gastosParaRevisar,
-                transaccionesRecientes: transacciones
-                  .filter(t => {
-                    // Solo transacciones del pais activo para comparacion correcta
-                    const monedaActiva = effectiveCountry === 'CL' ? 'CLP' : 'COP';
-                    return !t.paisMoneda
-                      ? effectiveCountry === 'CO'
-                      : t.paisMoneda === monedaActiva;
-                  })
-                  .slice(0, 30)
-                  .map(t => ({
-                    id: t.id, monto: t.monto, descripcion: t.descripcion,
-                    categoria: t.categoria, fecha: t.fecha
-                  })),
-                categoriasUsuario: categorias.map(c => c.nombre),
-                language: selectedLanguage,
-                country: effectiveCountry
-              })
-            });
-            if (revisionResp.ok) {
-              const { alertas } = await revisionResp.json();
-              const duplicadosSemanticos = alertas.filter((a: any) => a.tipo === 'duplicado_semantico');
-              if (duplicadosSemanticos.length > 0) {
-                // Usar el id real para identificar exactamente que gastos mover, sin asumir posicion
-                const idsMarcados = new Set(
-                  duplicadosSemanticos.map((a: any) => a.idGastoRevisado).filter(Boolean)
-                );
-                const conflictList = nuevos.filter((nt, idx) =>
-                  idsMarcados.has(nt.id || `batch-${idx}`)
-                );
-                if (conflictList.length > 0) {
-                  dups.push(...conflictList);
-                  nuevos = nuevos.filter((nt, idx) => !idsMarcados.has(nt.id || `batch-${idx}`));
-                }
-              }
-            }
-          } catch (e) {
-            // Si falla, continua con el flujo normal sin bloquear
-          }
-        }
-        // --- Fin revisor semantico batch ---
-
-        // OPCION C - Logica condicional
+        // GUARDAR INMEDIATAMENTE sin esperar al revisor
         if (nuevos.length === 0 && dups.length > 0) {
-          // CASO 1: SOLO DUPLICADOS -> directo al modal de duplicados
           triggerDuplicatesModal(dups);
         } else if (nuevos.length > 0 && dups.length === 0) {
-          // CASO 2: SOLO NUEVOS -> agregar y confirmar (flujo normal)
           saveTransacciones([...nuevos, ...transacciones]);
           triggerDynamicIsland(
             selectedLanguage === 'ES' ? 'Completado' : 'Done',
@@ -2195,7 +2147,6 @@ export default function App() {
           );
           playTone('success', isMuted);
         } else if (nuevos.length > 0 && dups.length > 0) {
-          // CASO 3: NUEVOS + DUPLICADOS -> mostrar pestaña intermedia
           setMixedImportState({
             nuevos: nuevos,
             duplicados: dups,
@@ -2204,6 +2155,55 @@ export default function App() {
           });
           setShowMixedImportModal(true);
         }
+
+        // --- Revisor semantico BATCH en background (no bloquea) ---
+        if (nuevos.length > 0) {
+          const gastosParaRevisar = nuevos.map((nt, idx) => ({
+            id: nt.id || `batch-${idx}`,
+            monto: nt.monto,
+            descripcion: nt.descripcion,
+            categoria: nt.categoria,
+            fecha: nt.fecha,
+            formaPago: nt.formaPago
+          }));
+          fetch('/api/gemini/review-expense', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              nuevosGastos: gastosParaRevisar,
+              transaccionesRecientes: transacciones
+                .filter(t => {
+                  const monedaActiva = effectiveCountry === 'CL' ? 'CLP' : 'COP';
+                  return !t.paisMoneda ? effectiveCountry === 'CO' : t.paisMoneda === monedaActiva;
+                })
+                .slice(0, 30)
+                .map(t => ({
+                  id: t.id,
+                  monto: t.monto,
+                  descripcion: t.descripcion,
+                  categoria: t.categoria,
+                  fecha: t.fecha
+                })),
+              categoriasUsuario: categorias.map(c => c.nombre),
+              language: selectedLanguage,
+              country: effectiveCountry
+            })
+          }).then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (!data) return;
+            const dups2 = (data.alertas || []).filter((a: any) => a.tipo === 'duplicado_semantico');
+            if (dups2.length > 0) {
+              triggerDynamicIsland(
+                selectedLanguage === 'ES' ? 'Posibles duplicados' : 'Possible duplicates',
+                selectedLanguage === 'ES'
+                  ? `Se detectaron ${dups2.length} posibles repetidos`
+                  : `${dups2.length} possible duplicates detected`,
+                false
+              );
+            }
+          }).catch(() => {});
+        }
+        // --- Fin revisor semantico batch ---
       }
     );
     e.target.value = '';
@@ -2328,40 +2328,7 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Self-healing effect to correct any old Concon or Administradora installment transaction that was parsed at total purchase value ($762.392) instead of the actual monthly installment ($63.532).
-  useEffect(() => {
-    if (transacciones.length > 0) {
-      let needsHealing = false;
-      const healed = transacciones.map(t => {
-        const descLower = (t.descripcion || '').toLowerCase();
-        const isConcon = descLower.includes('concon') || descLower.includes('administradora');
-        // Check for exact monto of 762392
-        if (isConcon && t.monto === 762392) {
-          needsHealing = true;
-          return {
-            ...t,
-            monto: 63532,
-            descripcion: t.descripcion ? t.descripcion.replace('762.392', '63.532') : 'Concon - Cuota 06/12'
-          };
-        }
-        return t;
-      });
 
-      if (needsHealing) {
-        console.log("Self-healing: corrected installment transaction total to monthly cuota of 63,532.");
-        // We delay slightly to avoid React state update overlaps during mount/syncing
-        const timeout = setTimeout(() => {
-          saveTransacciones(healed);
-          triggerDynamicIsland(
-            selectedLanguage === 'ES' ? 'Cuota Corregida' : 'Installment Corrected',
-            selectedLanguage === 'ES' ? 'Se ajustó cuota Concon de 762K a 63K' : 'Adjusted Concon installment from 762K to 63K',
-            true
-          );
-        }, 1000);
-        return () => clearTimeout(timeout);
-      }
-    }
-  }, [transacciones.length]);
 
   // Dynamic Island Alert timeout
   const triggerDynamicIsland = (text: string, subtext: string, isPositive: boolean) => {
@@ -3893,19 +3860,22 @@ export default function App() {
               </div>
             ) : (
               <AnimatePresence initial={false}>
-                {transaccionesFiltradasLista.map((t) => {
-                  const isExpense = t.tipo === 'Gasto';
-                  const cat = isExpense ? (categorias.find(c => c.nombre === t.categoria) || CATEGORIAS_PREDEFINIDAS.find(c => c.nombre === t.categoria)) : null;
-                  const itemColor = isExpense ? (cat?.color || '#312E81') : '#10B981';
+                {(() => {
+                  // Crear mapa de categorias una sola vez O(n) en vez de O(n2) (FIX 6)
+                  const catMap = new Map<string, any>([
+                    ...CATEGORIAS_PREDEFINIDAS.map(c => [c.nombre, c] as [string, any]),
+                    ...categorias.map(c => [c.nombre, c] as [string, any])
+                  ]);
+                  return transaccionesFiltradasLista.map((t) => {
+                    const isExpense = t.tipo === 'Gasto';
+                    const cat = isExpense ? catMap.get(t.categoria || '') : null;
+                    const itemColor = isExpense ? (cat?.color || '#312E81') : '#10B981';
 
-                  return (
-                    <motion.div
-                      key={t.id}
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-50 flex flex-col group hover:bg-slate-50 transition-colors"
-                    >
+                    return (
+                      <div
+                        key={t.id}
+                        className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-50 flex flex-col group hover:bg-slate-50 transition-colors"
+                      >
                       <div className="flex justify-between items-start w-full">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           {/* Transaction Icon Indicator */}
@@ -4148,10 +4118,11 @@ export default function App() {
                           </div>
                         );
                       })()}
-                    </motion.div>
+                    </div>
                   );
-                })}
-              </AnimatePresence>
+                });
+              })()}
+            </AnimatePresence>
             )}
           </div>
         </div>

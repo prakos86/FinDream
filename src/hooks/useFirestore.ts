@@ -1,5 +1,5 @@
 import React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, startTransition } from 'react';
 import { UserProfile, Transaccion, Sueno, Categoria, Suscripcion, GastoRecurrente } from '../types';
 
 export const useFirestore = (
@@ -275,43 +275,50 @@ export const useFirestore = (
 
       if (syncUnsubscribeRef.current) syncUnsubscribeRef.current();
 
-      syncUnsubscribeRef.current = onSnapshot(countryDocRef, async (countrySnap) => {
-        const userSnap = await getDoc(userDocRef);
-        const userData = userSnap.exists() ? userSnap.data() : {};
+      // Cargar userData una sola vez antes de suscribirse para evitar el round-trip bloqueante dentro de onSnapshot (FIX 5)
+      const userSnapInit = await getDoc(userDocRef);
+      const userDataRef = { current: userSnapInit.exists() ? userSnapInit.data() : {} };
+
+      // Suscribirse al snapshot del pais sin round-trip adicional (FIX 5)
+      syncUnsubscribeRef.current = onSnapshot(countryDocRef, (countrySnap) => {
+        const userData = userDataRef.current; // usar cache, sin await
 
         if (countrySnap.exists()) {
           const financialData = countrySnap.data();
           
-          if (userData.nombre || (user?.displayName)) {
-            const loadedProfile: UserProfile = {
-              nombre: userData.nombre || (user?.displayName) || 'Invitado',
-              correo: userData.correo || (user?.email) || '',
-              celular: userData.celular || '',
-              productos: financialData.productos || [],
-              portafolios: financialData.portafolios || [],
-              suscripciones: userData.suscripciones || []
-            };
-            setUserProfile(loadedProfile);
-            localStorage.setItem(`finanza_user_profile_v2_${selectedCountry}`, JSON.stringify(loadedProfile));
-          }
-          if (Array.isArray(financialData.transacciones)) setTransacciones(financialData.transacciones);
-          if (Array.isArray(financialData.suenos)) setSuenos(financialData.suenos);
-          if (Array.isArray(financialData.categorias)) setCategorias(financialData.categorias);
-          if (Array.isArray(financialData.paymentMethods)) setPaymentMethods(financialData.paymentMethods);
-          if (Array.isArray(userData.suscripciones)) setSuscripciones(userData.suscripciones);
-          
-          // Leer de financialData primero; si vacio, hacer fallback a userData (datos legacy admin)
-          const gastosRecFinancial = financialData.gastosRecurrentes || [];
-          const gastosRecLegacy = (userData.gastosRecurrentes || [])
-            .filter((g: any) => {
-              const monedaActiva = selectedCountry === 'CL' ? 'CLP' : 'COP';
-              return !g.paisMoneda ? selectedCountry === 'CO' : g.paisMoneda === monedaActiva;
-            });
-          const gastosRec = gastosRecFinancial.length > 0 ? gastosRecFinancial : gastosRecLegacy;
-          setGastosRecurrentes(gastosRec);
-          
-          setLastSyncedTime(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-          setIsSyncing(false);
+          // Envolver actualizaciones de estado en startTransition para batching (FIX 4)
+          startTransition(() => {
+            if (userData.nombre || (user?.displayName)) {
+              const loadedProfile: UserProfile = {
+                nombre: userData.nombre || (user?.displayName) || 'Invitado',
+                correo: userData.correo || (user?.email) || '',
+                celular: userData.celular || '',
+                productos: financialData.productos || [],
+                portafolios: financialData.portafolios || [],
+                suscripciones: userData.suscripciones || []
+              };
+              setUserProfile(loadedProfile);
+              localStorage.setItem(`finanza_user_profile_v2_${selectedCountry}`, JSON.stringify(loadedProfile));
+            }
+            if (Array.isArray(financialData.transacciones)) setTransacciones(financialData.transacciones);
+            if (Array.isArray(financialData.suenos)) setSuenos(financialData.suenos);
+            if (Array.isArray(financialData.categorias)) setCategorias(financialData.categorias);
+            if (Array.isArray(financialData.paymentMethods)) setPaymentMethods(financialData.paymentMethods);
+            if (Array.isArray(userData.suscripciones)) setSuscripciones(userData.suscripciones);
+            
+            // Leer de financialData primero; si vacio, hacer fallback a userData (datos legacy admin)
+            const gastosRecFinancial = financialData.gastosRecurrentes || [];
+            const gastosRecLegacy = (userData.gastosRecurrentes || [])
+              .filter((g: any) => {
+                const monedaActiva = selectedCountry === 'CL' ? 'CLP' : 'COP';
+                return !g.paisMoneda ? selectedCountry === 'CO' : g.paisMoneda === monedaActiva;
+              });
+            const gastosRec = gastosRecFinancial.length > 0 ? gastosRecFinancial : gastosRecLegacy;
+            setGastosRecurrentes(gastosRec);
+            
+            setLastSyncedTime(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+            setIsSyncing(false);
+          });
         } else {
           // First login initialization for this ecosystem
           const payloadFinancial: any = {
@@ -333,10 +340,12 @@ export const useFirestore = (
             updatedAt: new Date().toISOString()
           };
           
-          await setDoc(userDocRef, payloadUser, { merge: true }).catch(e => console.error(e));
-          await setDoc(countryDocRef, payloadFinancial).catch(e => console.error(e));
-          setLastSyncedTime(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-          setIsSyncing(false);
+          setDoc(userDocRef, payloadUser, { merge: true }).catch(e => console.error(e));
+          setDoc(countryDocRef, payloadFinancial).catch(e => console.error(e));
+          startTransition(() => {
+            setLastSyncedTime(new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+            setIsSyncing(false);
+          });
         }
       }, (e) => {
         console.error("Firestore onSnapshot error:", e);
