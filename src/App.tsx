@@ -2408,7 +2408,7 @@ export default function App() {
   }, [importFromSheets]);
 
   // Filter algorithms for current period
-  const filterTransactions = (items: Transaccion[]): Transaccion[] => {
+  const filterTransactions = useMemo(() => (items: Transaccion[]): Transaccion[] => {
     const now = new Date();
     // Limites inferiores
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -2473,49 +2473,43 @@ export default function App() {
           return true;
       }
     });
-  };
+  }, [filtroSeleccionado, effectiveCountry, rangoInicio, rangoFin]);
 
   const q = busquedaGasto.trim().toLowerCase();
   const qNum = q.replace(/[^0-9]/g, ''); // solo digitos, para buscar por monto
-  const baseLista = q ? transacciones : filterTransactions(transacciones);
-  const transaccionesFiltradasLista = [...baseLista]
-    .filter((t) => {
-      if (ordenSeleccionado === 'EnCuotas') {
-        if (t.cuotasTotal === undefined || t.cuotasTotal <= 1) {
-          return false;
+  const transaccionesFiltradasLista = useMemo(() => {
+    const baseLista = q ? transacciones : filterTransactions(transacciones);
+    return [...baseLista]
+      .filter((t) => {
+        if (ordenSeleccionado === 'EnCuotas') {
+          if (t.cuotasTotal === undefined || t.cuotasTotal <= 1) return false;
         }
-      }
-      if (!q) return true;
-      const enTexto =
-        (t.descripcion || '').toLowerCase().includes(q) ||
-        (t.categoria || '').toLowerCase().includes(q) ||
-        (t.formaPago || '').toLowerCase().includes(q);
-      const enMonto = qNum !== '' && String(t.monto).includes(qNum);
-      return enTexto || enMonto;
-    })
-    .sort((a, b) => {
-      if (ordenSeleccionado === 'MayorGasto') {
-        return b.monto - a.monto;
-      } else if (ordenSeleccionado === 'EnCuotas') {
-        // dentro del filtro cuotas, ordenar por cuotaActual ascendente
-        return (a.cuotaActual ?? 0) - (b.cuotaActual ?? 0);
-      } else {
+        if (!q) return true;
+        const enTexto =
+          (t.descripcion || '').toLowerCase().includes(q) ||
+          (t.categoria || '').toLowerCase().includes(q) ||
+          (t.formaPago || '').toLowerCase().includes(q);
+        const enMonto = qNum !== '' && String(t.monto).includes(qNum);
+        return enTexto || enMonto;
+      })
+      .sort((a, b) => {
+        if (ordenSeleccionado === 'MayorGasto') return b.monto - a.monto;
+        if (ordenSeleccionado === 'EnCuotas') return (a.cuotaActual ?? 0) - (b.cuotaActual ?? 0);
         return new Date(b.fecha).getTime() - new Date(a.fecha).getTime();
-      }
-    });
+      });
+  }, [transacciones, q, qNum, ordenSeleccionado, filterTransactions, effectiveCountry]);
 
-  const transaccionesFiltradas = filterTransactions(transacciones);
-
-  // Recalculates dynamically
-  const totalActivos = transaccionesFiltradas
-    .filter(t => t.tipo === 'Ingreso')
-    .reduce((sum, t) => sum + t.monto, 0);
-
-  const totalPasivos = transaccionesFiltradas
-    .filter(t => t.tipo === 'Gasto')
-    .reduce((sum, t) => sum + t.monto, 0);
-
-  const realAhorroNeto = totalActivos - totalPasivos;
+  const { transaccionesFiltradas, totalActivos, totalPasivos, realAhorroNeto } = useMemo(() => {
+    const filtradas = filterTransactions(transacciones);
+    const activos = filtradas.filter(t => t.tipo === 'Ingreso').reduce((s, t) => s + t.monto, 0);
+    const pasivos = filtradas.filter(t => t.tipo === 'Gasto').reduce((s, t) => s + t.monto, 0);
+    return {
+      transaccionesFiltradas: filtradas,
+      totalActivos: activos,
+      totalPasivos: pasivos,
+      realAhorroNeto: activos - pasivos
+    };
+  }, [transacciones, filterTransactions]);
 
   const getCategoriaMonto = (catNombre: string) => {
     const catNombreLow = catNombre.toLowerCase();
@@ -3927,8 +3921,8 @@ export default function App() {
                         </div>
 
                         {/* Right amount and delete operations */}
-                        <div className="flex items-center gap-2 shrink-0 ml-2">
-                          <span className={`text-sm font-black whitespace-nowrap ${isExpense ? 'text-rose-700' : 'text-emerald-700'}`}>
+                        <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
+                          <span className={`text-sm font-black max-w-[100px] truncate ${isExpense ? 'text-rose-700' : 'text-emerald-700'}`}>
                             {isExpense ? '-' : '+'}${t.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
                           </span>
 

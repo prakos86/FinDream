@@ -137,83 +137,17 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     if (!num || num <= 0) return;
 
     setIsSyncing(true);
-    let finalCategory = popupCategoria;
-    if (popupTipo === 'Gasto' && (!finalCategory || finalCategory === 'Otros' || finalCategory === '')) {
-      const desc = popupDescripcion.trim();
-      if (desc) {
-        triggerDynamicIsland("Categorizando IA...", "Asignando categoría inteligente", true);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-        try {
-          const response = await fetch('/api/gemini/categorize', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              description: desc,
-              categories: categorias.map(c => c.nombre)
-            }),
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-          if (response.ok) {
-            const data = await response.json();
-            finalCategory = data?.category || 'Otros';
-          } else {
-            finalCategory = 'Otros';
-          }
-        } catch (err) {
-          finalCategory = 'Otros';
-        }
-      } else {
-        finalCategory = 'Otros';
-      }
-    }
-
-    // --- Revisor silencioso de gastos ---
-    let alertasRevision: any[] = [];
-    if (popupTipo === 'Gasto') {
-      try {
-        const revisionResp = await fetch('/api/gemini/review-expense', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            nuevoGasto: {
-              monto: num,
-              descripcion: popupDescripcion.trim(),
-              categoria: finalCategory,
-              fecha: popupFecha || formatLocalYYYYMMDD(new Date()),
-              formaPago: popupFormaPago
-            },
-            transaccionesRecientes: (transaccionesExistentes || []).slice(0, 30).map((t: any) => ({
-              id: t.id,
-              monto: t.monto,
-              descripcion: t.descripcion,
-              categoria: t.categoria,
-              fecha: t.fecha
-            })),
-            categoriasUsuario: categorias.map(c => c.nombre),
-            language: selectedLanguage,
-            country: selectedCountry
-          })
-        });
-        if (revisionResp.ok) {
-          const revisionData = await revisionResp.json();
-          alertasRevision = revisionData?.alertas || [];
-        }
-      } catch (e) {
-        // Si falla la revision, no bloquea el guardado normal
-      }
-    }
-
+    // Usar categoria seleccionada o 'Otros' como placeholder inmediato
+    const finalCategoryInicial = (popupCategoria && popupCategoria !== '') ? popupCategoria : 'Otros';
     setIsSyncing(false);
 
-    const procederConGuardado = () => {
+    const procederConGuardado = (cat: string) => {
       const nueva: Omit<Transaccion, "id"> & { cuotasTotal?: number; esAutomatica?: boolean } = {
         tipo: popupTipo,
         monto: num,
-        categoria: popupTipo === 'Gasto' ? finalCategory : undefined,
+        categoria: popupTipo === 'Gasto' ? cat : undefined,
         fecha: popupFecha || formatLocalYYYYMMDD(new Date()),
-        descripcion: popupDescripcion.trim() || (popupTipo === 'Gasto' ? `Gasto en ${finalCategory}` : 'Ingreso manual'),
+        descripcion: popupDescripcion.trim() || (popupTipo === 'Gasto' ? `Gasto en ${cat}` : 'Ingreso manual'),
         formaPago: popupFormaPago || (popupTipo === 'Ingreso' ? 'Efectivo' : getMergedPaymentMethods()[0]) || 'Efectivo',
         cuotasTotal: popupTipo === 'Gasto' ? popupCuotasTotal : undefined,
         esAutomatica: popupTipo === 'Gasto' && popupCuotasTotal !== undefined && popupCuotasTotal > 1 ? true : undefined,
@@ -236,24 +170,61 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       setPopupCuotasTotal(undefined);
     };
 
-    if (popupTipo === 'Gasto' && alertasRevision.length > 0) {
-      const alerta = alertasRevision[0];
-      setRevisionAlert({
-        isOpen: true,
-        mensaje: alerta.mensaje,
-        tipo: alerta.tipo,
-        onConfirm: () => {
-          setRevisionAlert(prev => ({ ...prev, isOpen: false }));
-          procederConGuardado();
-        },
-        onCancel: () => {
-          setRevisionAlert(prev => ({ ...prev, isOpen: false }));
-        }
-      });
-      return;
+    procederConGuardado(finalCategoryInicial);
+
+    // Categorizar en background si no tenia categoria asignada
+    if (popupTipo === 'Gasto' && (!popupCategoria || popupCategoria === 'Otros' || popupCategoria === '')) {
+      const desc = popupDescripcion.trim();
+      if (desc) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        fetch('/api/gemini/categorize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            description: desc,
+            categories: categorias.map(c => c.nombre)
+          }),
+          signal: controller.signal
+        }).then(r => r.ok ? r.json() : null)
+        .then(data => {
+          clearTimeout(timeoutId);
+          if (data?.category && data.category !== 'Otros') {
+            triggerDynamicIsland(
+              selectedLanguage === 'ES' ? 'Categoría asignada' : 'Category assigned',
+              data.category, true
+            );
+          }
+        }).catch(() => {});
+      }
     }
 
-    procederConGuardado();
+    // review-expense en background — no bloquea ni muestra modal (simplificado)
+    if (popupTipo === 'Gasto') {
+      fetch('/api/gemini/review-expense', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nuevoGasto: {
+            monto: num,
+            descripcion: popupDescripcion.trim(),
+            categoria: finalCategoryInicial,
+            fecha: popupFecha || formatLocalYYYYMMDD(new Date()),
+            formaPago: popupFormaPago
+          },
+          transaccionesRecientes: (transaccionesExistentes || []).slice(0, 30).map((t: any) => ({
+            id: t.id,
+            monto: t.monto,
+            descripcion: t.descripcion,
+            categoria: t.categoria,
+            fecha: t.fecha
+          })),
+          categoriasUsuario: categorias.map(c => c.nombre),
+          language: selectedLanguage,
+          country: selectedCountry
+        })
+      }).catch(() => {});
+    }
   };
 
   return (
@@ -288,6 +259,24 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               Ingreso (Activo)
             </button>
           </div>
+        </div>
+
+        <div>
+          <label className="text-[10px] font-black uppercase tracking-wider text-slate-800 mb-1 block">
+            {selectedLanguage === 'ES' ? 'Nombre del Gasto' : 'Expense Name'}
+          </label>
+          <input
+            id="input-descripcion"
+            type="text"
+            maxLength={40}
+            placeholder={popupTipo === 'Gasto'
+              ? (selectedLanguage === 'ES' ? 'Ej: Netflix, Arriendo, Mercado...' : 'e.g. Netflix, Rent, Groceries...')
+              : (selectedLanguage === 'ES' ? 'Ej: Pago de servicios, Nómina...' : 'e.g. Services payment, Payroll...')
+            }
+            value={popupDescripcion}
+            onChange={(e) => setPopupDescripcion(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+          />
         </div>
 
         <div>
@@ -408,19 +397,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               ))
             )}
           </select>
-        </div>
-
-        <div>
-          <label className="text-[10px] font-black uppercase tracking-wider text-slate-800 mb-1 block">Descripción (Opcional)</label>
-          <input
-            id="input-descripcion"
-            type="text"
-            maxLength={40}
-            placeholder={popupTipo === 'Gasto' ? 'Ej: Supermercado, Alquiler...' : 'Ej: Pago de servicios, Nómina...'}
-            value={popupDescripcion}
-            onChange={(e) => setPopupDescripcion(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-          />
         </div>
 
         <div>
