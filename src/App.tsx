@@ -3806,21 +3806,7 @@ export default function App() {
                 )}
                 {selectedLanguage === 'ES' ? 'Mayor a menor' : 'Highest Amount'}
               </button>
-              <button
-                type="button"
-                onClick={() => { handleTap(); setOrdenSeleccionado('EnCuotas'); }}
-                className="relative flex-1 text-center py-1.5 text-[10px] font-bold rounded-lg focus:outline-none transition-colors z-10 px-2 cursor-pointer"
-                style={{ color: ordenSeleccionado === 'EnCuotas' ? '#ffffff' : '#4B5563' }}
-              >
-                {ordenSeleccionado === 'EnCuotas' && (
-                  <motion.div
-                    layoutId="activeSortBg"
-                    className="absolute inset-0 bg-[#312E81] rounded-lg -z-10 shadow-sm"
-                    transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                  />
-                )}
-                {selectedLanguage === 'ES' ? 'En cuotas' : 'Installments'}
-              </button>
+
             </div>
           </div>
 
