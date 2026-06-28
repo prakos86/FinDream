@@ -3549,6 +3549,7 @@ export default function App() {
           let sumaTotal = 0;
           let sumaPagado = 0;
           let sumaPendiente = 0;
+          let sumaMes = 0; // <- agregar esta linea
           gruposList.forEach(([, cuotas]) => {
             const primera = cuotas[0];
             const totalCuotas = cuotas.length;
@@ -3567,18 +3568,50 @@ export default function App() {
             sumaTotal += montoTotalCompra;
             sumaPagado += valorCuota * pagadasGrupo;
             sumaPendiente += valorCuota * (totalCuotas - pagadasGrupo);
+
+            // Calcular la cuota que corresponde al mes actual para este grupo
+            const mesActual = nowCuotas.getMonth();
+            const anioActual = nowCuotas.getFullYear();
+            // Para nuevas: buscar la tx cuya fecha cae en el mes actual
+            // Para legacy: calcular que cuota cae en el mes actual
+            const primeraDelGrupo = cuotas[0];
+            const esNuevoGrupo = !!primeraDelGrupo.idCuotaPrincipal;
+            if (esNuevoGrupo) {
+              const txEsteMes = cuotas.find(t => {
+                const f = new Date(t.fecha + 'T12:00:00');
+                return f.getMonth() === mesActual && f.getFullYear() === anioActual;
+              });
+              if (txEsteMes) sumaMes += txEsteMes.monto;
+            } else {
+              // Legacy: calcular fecha de la cuota del mes actual
+              const fechaBase = new Date(primeraDelGrupo.fecha + 'T12:00:00');
+              const diffMeses = (anioActual - fechaBase.getFullYear()) * 12 +
+                (mesActual - fechaBase.getMonth());
+              const cuotaEsteMes = diffMeses + 1;
+              if (cuotaEsteMes >= 1 && cuotaEsteMes <= totalCuotas) {
+                sumaMes += valorCuota;
+              }
+            }
           });
 
           return (
             <div className="flex flex-col gap-3 px-4 pb-6">
               {/* Resumen superior */}
-              <div className="grid grid-cols-3 gap-2 mb-1">
+              <div className="grid grid-cols-2 gap-2 mb-1">
                 <div className="bg-slate-50 rounded-2xl p-3 text-center shadow-sm border border-slate-200">
                   <p className="text-[8px] font-black text-slate-500 uppercase tracking-wider mb-1">
-                    {selectedLanguage === 'ES' ? 'Total' : 'Total'}
+                    {selectedLanguage === 'ES' ? 'Total compras' : 'Total purchases'}
                   </p>
                   <p className="text-[12px] font-black text-slate-800 leading-tight">
                     {sumaTotal.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
+                  </p>
+                </div>
+                <div className="bg-violet-50 rounded-2xl p-3 text-center shadow-sm border border-violet-200">
+                  <p className="text-[8px] font-black text-violet-700 uppercase tracking-wider mb-1">
+                    {selectedLanguage === 'ES' ? 'Cuota este mes' : 'This month'}
+                  </p>
+                  <p className="text-[12px] font-black text-violet-700 leading-tight">
+                    {sumaMes.toLocaleString('es-ES', { maximumFractionDigits: 0 })}
                   </p>
                 </div>
                 <div className="bg-emerald-50 rounded-2xl p-3 text-center shadow-sm border border-emerald-200">
