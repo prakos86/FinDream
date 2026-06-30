@@ -2415,7 +2415,7 @@ export default function App() {
         if (cuotaMesActual >= 1) {
           const fechaCuota = new Date(fechaCompra);
           fechaCuota.setMonth(fechaCompra.getMonth() + diffMeses);
-          fechaEfectiva = fechaCuota.toISOString().substring(0, 10);
+          fechaEfectiva = formatLocalYYYYMMDD(fechaCuota); // fix: hora local, no UTC
         }
       }
 
@@ -3492,7 +3492,7 @@ export default function App() {
               for (let i = 0; i < t.cuotasTotal; i++) {
                 const fechaCuota = new Date(fechaBase);
                 fechaCuota.setMonth(fechaBase.getMonth() + i);
-                const fechaStr = fechaCuota.toISOString().substring(0, 10);
+                const fechaStr = formatLocalYYYYMMDD(fechaCuota);
                 if (caeDentroDePeriodo(fechaStr)) return true;
               }
               return false;
@@ -5724,7 +5724,7 @@ export default function App() {
                       txToSave.push({
                         ...txConPais,
                         id: `cuota-${timestampId}-${i}`,
-                        fecha: futureDate.toISOString().substring(0, 10),
+                        fecha: formatLocalYYYYMMDD(futureDate),
                         cuotaActual: i,
                         cuotasTotal: txConPais.cuotasTotal, // guardar explicitamente para filtros
                         monto: montoParaCuota,
