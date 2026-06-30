@@ -3690,13 +3690,26 @@ export default function App() {
                             }
                           </span>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-black text-rose-500">
-                            -${primera.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">
-                            Total {montoTotal.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
-                          </p>
+                        <div className="flex items-start gap-1.5 shrink-0">
+                          <div className="text-right">
+                            <p className="text-sm font-black text-rose-500">
+                              -${primera.monto.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                            </p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              Total {montoTotal.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleTap();
+                              setEditingTransaction(primera);
+                            }}
+                            className="p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer mt-0.5 shrink-0"
+                          >
+                            <MoreHorizontal className="w-4 h-4 text-slate-400" />
+                          </button>
                         </div>
                       </div>
                       {/* Barra de progreso compacta */}
