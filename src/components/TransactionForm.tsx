@@ -437,6 +437,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                     {selectedLanguage === 'ES' ? `${n} cuota${n > 1 ? 's' : ''}` : `${n} installment${n > 1 ? 's' : ''}`}
                   </option>
                 ))}
+                <option value="18">
+                  {selectedLanguage === 'ES' ? '18 cuotas' : '18 installments'}
+                </option>
                 <option value="24">
                   {selectedLanguage === 'ES' ? '24 cuotas' : '24 installments'}
                 </option>
