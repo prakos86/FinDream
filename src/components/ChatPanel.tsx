@@ -676,28 +676,61 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         })),
         filtroActivo: filtroSeleccionado,
         financials: { totalActivos, totalPasivos },
-        transacciones: [...transacciones]
-          .filter(t => {
+        transacciones: (() => {
+          const rawExpandedTxs: any[] = [];
+          const formatLocalYYYYMMDD = (d: Date): string => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const r = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${r}`;
+          };
+
+          transacciones.forEach(item => {
             // Solo transacciones del pais activo. Las legacy sin paisMoneda se asignan a CO.
             const monedaActiva = selectedCountry === 'CL' ? 'CLP' : 'COP';
-            return !t.paisMoneda
+            const matchPais = !item.paisMoneda
               ? selectedCountry === 'CO' // legacy sin campo -> solo visible en CO
-              : t.paisMoneda === monedaActiva;
-          })
-          .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-          .slice(0, 60)
-          .map(t => ({
-            id: t.id,
-            tipo: t.tipo,
-            monto: t.monto,
-            categoria: t.categoria,
-            descripcion: t.descripcion,
-            fecha: t.fecha,
-            formaPago: t.formaPago,
-            ...(t.cuotasTotal && { cuotasTotal: t.cuotasTotal, cuotaActual: t.cuotaActual }),
-            ...(t.esRecurrente && { esRecurrente: true }),
-            ...(t.paisMoneda && { paisMoneda: t.paisMoneda })
-          }))
+              : item.paisMoneda === monedaActiva;
+            if (!matchPais) return;
+
+            if (item.cuotasTotal && item.cuotasTotal > 1 && !item.idCuotaPrincipal) {
+              const fechaCompra = new Date(item.fecha + 'T12:00:00');
+              for (let i = 1; i <= item.cuotasTotal; i++) {
+                const dateCopy = new Date(fechaCompra);
+                dateCopy.setMonth(fechaCompra.getMonth() + i - 1);
+                rawExpandedTxs.push({
+                  ...item,
+                  id: `${item.id}-cuota-${i}`,
+                  fecha: formatLocalYYYYMMDD(dateCopy),
+                  cuotaActual: i,
+                  monto: Math.round(item.monto / item.cuotasTotal),
+                  montoOriginal: Math.round(item.monto / item.cuotasTotal),
+                  montoTotalCompra: item.monto,
+                  idCuotaPrincipal: `legacy-${item.id}`
+                });
+              }
+            } else {
+              rawExpandedTxs.push(item);
+            }
+          });
+
+          return rawExpandedTxs
+            .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+            .slice(0, 100)
+            .map(t => ({
+              id: t.id,
+              tipo: t.tipo,
+              monto: t.monto,
+              categoria: t.categoria,
+              descripcion: t.descripcion,
+              fecha: t.fecha,
+              formaPago: t.formaPago,
+              ...(t.cuotasTotal && { cuotasTotal: t.cuotasTotal, cuotaActual: t.cuotaActual }),
+              ...(t.esRecurrente && { esRecurrente: true }),
+              ...(t.paisMoneda && { paisMoneda: t.paisMoneda }),
+              ...(t.idCuotaPrincipal && { idCuotaPrincipal: t.idCuotaPrincipal })
+            }));
+        })()
       };
 
       const res = await fetch("/api/gemini/chat", {

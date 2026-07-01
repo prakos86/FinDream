@@ -2398,36 +2398,41 @@ export default function App() {
 
     const monedaActiva = effectiveCountry === 'CL' ? 'CLP' : 'COP';
 
-    return items.filter(item => {
+    // 1. Expandir cuotas legacy en transacciones individuales de cuota
+    const expandedItems: Transaccion[] = [];
+    items.forEach(item => {
       // Filtrar por pais: legacy sin paisMoneda se asigna implicitamente a CO
       const matchPais = !item.paisMoneda
         ? effectiveCountry === 'CO' // transacciones sin campo -> solo CO
         : item.paisMoneda === monedaActiva;
-      if (!matchPais) return false;
+      if (!matchPais) return;
 
-      // Para cuotas legacy (sin idCuotaPrincipal):
-      // calcular la cuota que corresponde al mes activo segun diferencia de meses
-      let fechaEfectiva = item.fecha;
-      if (
-        item.cuotasTotal && item.cuotasTotal > 1 &&
-        !item.idCuotaPrincipal
-      ) {
+      if (item.cuotasTotal && item.cuotasTotal > 1 && !item.idCuotaPrincipal) {
         const fechaCompra = new Date(item.fecha + 'T12:00:00');
-        const ahora = new Date();
-        // Diferencia en meses entre hoy y la fecha de compra
-        const diffMeses =
-          (ahora.getFullYear() - fechaCompra.getFullYear()) * 12 +
-          (ahora.getMonth() - fechaCompra.getMonth());
-        // Cuota del mes actual (1-based, no puede superar cuotasTotal)
-        const cuotaMesActual = Math.min(diffMeses + 1, item.cuotasTotal);
-        if (cuotaMesActual >= 1) {
-          const fechaCuota = new Date(fechaCompra);
-          fechaCuota.setMonth(fechaCompra.getMonth() + diffMeses);
-          fechaEfectiva = formatLocalYYYYMMDD(fechaCuota); // fix: hora local, no UTC
+        for (let i = 1; i <= item.cuotasTotal; i++) {
+          const dateCopy = new Date(fechaCompra);
+          dateCopy.setMonth(fechaCompra.getMonth() + i - 1);
+          const fechaCuotaStr = formatLocalYYYYMMDD(dateCopy);
+          
+          expandedItems.push({
+            ...item,
+            id: `${item.id}-cuota-${i}`,
+            fecha: fechaCuotaStr,
+            cuotaActual: i,
+            monto: Math.round(item.monto / item.cuotasTotal),
+            montoOriginal: Math.round(item.monto / item.cuotasTotal),
+            montoTotalCompra: item.monto,
+            idCuotaPrincipal: `legacy-${item.id}`
+          });
         }
+      } else {
+        expandedItems.push(item);
       }
+    });
 
-      const itemTime = formatSafeDateString(fechaEfectiva).getTime();
+    // 2. Filtrar los items expandidos por el periodo seleccionado
+    return expandedItems.filter(item => {
+      const itemTime = formatSafeDateString(item.fecha).getTime();
       switch (filtroSeleccionado) {
         case 'Día':
           return itemTime >= startOfDay && itemTime <= endOfDay;
@@ -6270,9 +6275,14 @@ export default function App() {
                       if (tx) {
                         let filtered: Transaccion[];
                         if (tx.idCuotaPrincipal) {
-                          filtered = transacciones.filter(t => t.idCuotaPrincipal !== tx.idCuotaPrincipal);
+                          if (tx.idCuotaPrincipal.startsWith('legacy-')) {
+                            const parentId = tx.idCuotaPrincipal.replace('legacy-', '');
+                            filtered = transacciones.filter(t => t.id !== parentId);
+                          } else {
+                            filtered = transacciones.filter(t => t.idCuotaPrincipal !== tx.idCuotaPrincipal);
+                          }
                         } else {
-                          // Legacy: single record
+                          // Fallback
                           filtered = transacciones.filter(t => t.id !== tx.id);
                         }
                         saveTransacciones(filtered);
@@ -6297,7 +6307,40 @@ export default function App() {
                       handleTap();
                       const tx = deleteCuotaDialog.tx;
                       if (tx) {
-                        const filtered = transacciones.filter(t => t.id !== tx.id);
+                        let filtered: Transaccion[];
+                        if (tx.idCuotaPrincipal && tx.idCuotaPrincipal.startsWith('legacy-')) {
+                          const parentId = tx.idCuotaPrincipal.replace('legacy-', '');
+                          const parentTx = transacciones.find(t => t.id === parentId);
+                          if (parentTx) {
+                            const nuevasCuotas: Transaccion[] = [];
+                            const fechaBase = new Date(parentTx.fecha + 'T12:00:00');
+                            const timestampId = Date.now();
+                            for (let i = 1; i <= parentTx.cuotasTotal!; i++) {
+                              if (i === tx.cuotaActual) continue;
+                              const dateCopy = new Date(fechaBase);
+                              dateCopy.setMonth(fechaBase.getMonth() + i - 1);
+                              nuevasCuotas.push({
+                                ...parentTx,
+                                id: `cuota-${timestampId}-${i}`,
+                                fecha: formatLocalYYYYMMDD(dateCopy),
+                                cuotaActual: i,
+                                cuotasTotal: parentTx.cuotasTotal,
+                                monto: Math.round(parentTx.monto / parentTx.cuotasTotal!),
+                                montoOriginal: Math.round(parentTx.monto / parentTx.cuotasTotal!),
+                                montoTotalCompra: parentTx.monto,
+                                idCuotaPrincipal: `cuota-${timestampId}`
+                              });
+                            }
+                            filtered = [
+                              ...nuevasCuotas,
+                              ...transacciones.filter(t => t.id !== parentId)
+                            ];
+                          } else {
+                            filtered = transacciones.filter(t => t.id !== tx.id);
+                          }
+                        } else {
+                          filtered = transacciones.filter(t => t.id !== tx.id);
+                        }
                         saveTransacciones(filtered);
                         playTone('delete', isMuted);
                         triggerDynamicIsland(
