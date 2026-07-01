@@ -3724,8 +3724,28 @@ export default function App() {
                               setEditingTransaction(primera);
                             }}
                             className="p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer mt-0.5 shrink-0"
+                            title={selectedLanguage === 'ES' ? 'Editar movimiento' : 'Edit transaction'}
                           >
                             <MoreHorizontal className="w-4 h-4 text-slate-400" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleTap();
+                              const mesActual = nowCuotas.getMonth();
+                              const anioActual = nowCuotas.getFullYear();
+                              const txEsteMes = cuotas.find(t => {
+                                const f = new Date(t.fecha + 'T12:00:00');
+                                return f.getMonth() === mesActual && f.getFullYear() === anioActual;
+                              });
+                              const targetTx = txEsteMes || primera;
+                              handleBorrarTransaccion(targetTx.id, targetTx.monto, targetTx.tipo);
+                            }}
+                            className="p-1 rounded-lg hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer mt-0.5 shrink-0 text-slate-400"
+                            title={selectedLanguage === 'ES' ? 'Eliminar movimiento' : 'Delete transaction'}
+                          >
+                            <Trash className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -3834,13 +3854,35 @@ export default function App() {
                                       }
                                     </p>
                                   </div>
-                                  <p className={`text-xs font-black shrink-0 ${
-                                    esEsteMes ? 'text-violet-600'
-                                      : esPagada ? 'text-indigo-500'
-                                      : 'text-slate-300'
-                                  }`}>
-                                    -{montoVal.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
-                                  </p>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <p className={`text-xs font-black ${
+                                      esEsteMes ? 'text-violet-600'
+                                        : esPagada ? 'text-indigo-500'
+                                        : 'text-slate-300'
+                                    }`}>
+                                      -{montoVal.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                    </p>
+                                    {(() => {
+                                      const txReal = esNueva ? cuotas.find(t => (t.cuotaActual ?? 1) === idx + 1) : primera;
+                                      if (txReal) {
+                                        return (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleTap();
+                                              handleBorrarTransaccion(txReal.id, txReal.monto, txReal.tipo);
+                                            }}
+                                            className="p-1 rounded-md text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                                            title={selectedLanguage === 'ES' ? 'Eliminar esta cuota' : 'Delete this installment'}
+                                          >
+                                            <Trash className="w-3.5 h-3.5" />
+                                          </button>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
                                 </div>
                               );
                             })}
