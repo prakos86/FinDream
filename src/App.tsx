@@ -2453,7 +2453,7 @@ export default function App() {
           return true;
       }
     });
-  }, [filtroSeleccionado, effectiveCountry, rangoInicio, rangoFin]);
+  }, [filtroSeleccionado, effectiveCountry, rangoInicio, rangoFin, transacciones]);
 
   const q = busquedaGasto.trim().toLowerCase();
   const qNum = q.replace(/[^0-9]/g, ''); // solo digitos, para buscar por monto
