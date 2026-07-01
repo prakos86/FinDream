@@ -1560,6 +1560,14 @@ export default function App() {
     onConfirm: () => {}
   });
 
+  const [deleteCuotaDialog, setDeleteCuotaDialog] = useState<{
+    isOpen: boolean;
+    tx: Transaccion | null;
+  }>({
+    isOpen: false,
+    tx: null,
+  });
+
   const [errorDialog, setErrorDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -2535,6 +2543,15 @@ export default function App() {
   };
 
   const handleBorrarTransaccion = (id: string, monto: number, tipo: string) => {
+    const tx = transacciones.find(t => t.id === id);
+    if (tx && (tx.idCuotaPrincipal || (tx.cuotasTotal && tx.cuotasTotal > 1))) {
+      setDeleteCuotaDialog({
+        isOpen: true,
+        tx: tx
+      });
+      return;
+    }
+
     requestConfirmation(
       "Eliminar movimiento",
       "¿Estás seguro de que quieres eliminar este movimiento?",
@@ -6159,6 +6176,111 @@ export default function App() {
                     className="py-3 px-4 text-sm font-bold text-rose-600 hover:bg-rose-50 active:bg-rose-100 transition-colors cursor-pointer"
                   >
                     Confirmar
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* --- PREMIUM CUSTOM iOS CONFIRMATION DIALOG FOR CUOTAS --- */}
+      <AnimatePresence>
+        {deleteCuotaDialog.isOpen && deleteCuotaDialog.tx && (
+          <>
+            {/* Backdrop overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDeleteCuotaDialog({ isOpen: false, tx: null })}
+              className="fixed inset-0 bg-black/60 z-[999] backdrop-blur-[2px] flex items-center justify-center p-4"
+            >
+              {/* Alert Card */}
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white/95 backdrop-blur-md rounded-2xl max-w-[280px] w-full text-center shadow-2xl border border-gray-150 overflow-hidden"
+              >
+                <div className="p-5 pb-4">
+                  <div className="text-3xl mb-2">💳</div>
+                  <h4 className="text-[16px] font-extrabold text-slate-900 leading-tight">
+                    {selectedLanguage === 'ES' ? 'Eliminar Gasto en Cuotas' : 'Delete Installment Expense'}
+                  </h4>
+                  <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                    {selectedLanguage === 'ES' 
+                      ? 'Este movimiento corresponde a un gasto en cuotas. ¿Deseas eliminar únicamente esta cuota del mes, o prefieres borrar la compra/gasto completo con todas sus cuotas?' 
+                      : 'This transaction is part of an installment plan. Do you want to delete only this specific month\'s installment, or would you prefer to delete the entire purchase with all its installments?'}
+                  </p>
+                </div>
+
+                {/* Vertical actions (better for three options) */}
+                <div className="border-t border-gray-100 flex flex-col divide-y divide-gray-100">
+                  {/* Option 1: Delete all installments (gasto completo) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleTap();
+                      const tx = deleteCuotaDialog.tx;
+                      if (tx) {
+                        let filtered: Transaccion[];
+                        if (tx.idCuotaPrincipal) {
+                          filtered = transacciones.filter(t => t.idCuotaPrincipal !== tx.idCuotaPrincipal);
+                        } else {
+                          // Legacy: single record
+                          filtered = transacciones.filter(t => t.id !== tx.id);
+                        }
+                        saveTransacciones(filtered);
+                        playTone('delete', isMuted);
+                        triggerDynamicIsland(
+                          selectedLanguage === 'ES' ? "Compra Eliminada" : "Purchase Deleted", 
+                          selectedLanguage === 'ES' ? "Se borró la compra completa con sus cuotas." : "The entire purchase and its installments were deleted.", 
+                          false
+                        );
+                      }
+                      setDeleteCuotaDialog({ isOpen: false, tx: null });
+                    }}
+                    className="py-3 px-4 text-xs font-black text-rose-600 hover:bg-rose-50 active:bg-rose-100 transition-colors cursor-pointer text-center"
+                  >
+                    {selectedLanguage === 'ES' ? 'Eliminar Gasto Completo' : 'Delete Entire Purchase'}
+                  </button>
+
+                  {/* Option 2: Delete only this installment */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleTap();
+                      const tx = deleteCuotaDialog.tx;
+                      if (tx) {
+                        const filtered = transacciones.filter(t => t.id !== tx.id);
+                        saveTransacciones(filtered);
+                        playTone('delete', isMuted);
+                        triggerDynamicIsland(
+                          selectedLanguage === 'ES' ? "Cuota Eliminada" : "Installment Deleted", 
+                          selectedLanguage === 'ES' ? "Se borró únicamente esta cuota mensual." : "Only this monthly installment was deleted.", 
+                          false
+                        );
+                      }
+                      setDeleteCuotaDialog({ isOpen: false, tx: null });
+                    }}
+                    className="py-3 px-4 text-xs font-bold text-indigo-600 hover:bg-indigo-50 active:bg-indigo-100 transition-colors cursor-pointer text-center"
+                  >
+                    {selectedLanguage === 'ES' ? 'Eliminar Solo Esta Cuota' : 'Delete Only This Installment'}
+                  </button>
+
+                  {/* Option 3: Cancel */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleTap();
+                      setDeleteCuotaDialog({ isOpen: false, tx: null });
+                    }}
+                    className="py-3 px-4 text-xs font-bold text-slate-500 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer text-center"
+                  >
+                    {selectedLanguage === 'ES' ? 'Cancelar' : 'Cancel'}
                   </button>
                 </div>
               </motion.div>
