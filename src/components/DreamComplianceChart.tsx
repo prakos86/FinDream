@@ -21,7 +21,7 @@ interface DreamComplianceChartProps {
   saveUserProfileData?: (updated: UserProfile) => void;
 }
 
-export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
+export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = React.memo(({
   suenos,
   activeSuenoId,
   realAhorroNeto,
@@ -1782,4 +1782,16 @@ export const DreamComplianceChart: React.FC<DreamComplianceChartProps> = ({
       )}
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.suenos === nextProps.suenos &&
+    prevProps.activeSuenoId === nextProps.activeSuenoId &&
+    prevProps.realAhorroNeto === nextProps.realAhorroNeto &&
+    prevProps.totalActivos === nextProps.totalActivos &&
+    prevProps.totalPasivos === nextProps.totalPasivos &&
+    prevProps.selectedCountry === nextProps.selectedCountry &&
+    prevProps.selectedLanguage === nextProps.selectedLanguage &&
+    prevProps.transacciones === nextProps.transacciones &&
+    prevProps.userProfile === nextProps.userProfile
+  );
+});

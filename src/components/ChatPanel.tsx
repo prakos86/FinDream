@@ -38,7 +38,7 @@ interface ChatPanelProps {
   filtroSeleccionado: string;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({
+export const ChatPanel: React.FC<ChatPanelProps> = React.memo(({
   selectedLanguage,
   selectedCountry,
   userProfile,
@@ -1441,4 +1441,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       )}
     </>
   );
-};
+}, (prevProps, nextProps) => {
+  // Solo re-renderizar si cambian props relevantes
+  return (
+    prevProps.selectedLanguage === nextProps.selectedLanguage &&
+    prevProps.selectedCountry === nextProps.selectedCountry &&
+    prevProps.totalActivos === nextProps.totalActivos &&
+    prevProps.totalPasivos === nextProps.totalPasivos &&
+    prevProps.transacciones === nextProps.transacciones &&
+    prevProps.suenos === nextProps.suenos &&
+    prevProps.userProfile === nextProps.userProfile &&
+    prevProps.chatMessages === nextProps.chatMessages &&
+    prevProps.suscripciones === nextProps.suscripciones &&
+    prevProps.gastosRecurrentes === nextProps.gastosRecurrentes &&
+    prevProps.categorias === nextProps.categorias &&
+    prevProps.isMuted === nextProps.isMuted
+  );
+});

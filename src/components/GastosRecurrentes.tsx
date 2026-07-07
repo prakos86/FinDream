@@ -42,7 +42,7 @@ export const proximoPago = (g: GastoRecurrente): Date => {
   return new Date(hoy.getFullYear(), hoy.getMonth() + 1, targetDay);
 };
 
-export const GastosRecurrentes: React.FC<GastosRecurrentesProps> = ({
+export const GastosRecurrentes: React.FC<GastosRecurrentesProps> = React.memo(({
   gastosRecurrentes,
   onSave,
   todosLosGastos,
@@ -693,4 +693,12 @@ export const GastosRecurrentes: React.FC<GastosRecurrentesProps> = ({
       </AnimatePresence>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.gastosRecurrentes === nextProps.gastosRecurrentes &&
+    prevProps.todosLosGastos === nextProps.todosLosGastos &&
+    prevProps.selectedLanguage === nextProps.selectedLanguage &&
+    prevProps.effectiveCountry === nextProps.effectiveCountry &&
+    prevProps.transacciones === nextProps.transacciones
+  );
+});

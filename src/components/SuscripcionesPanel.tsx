@@ -26,7 +26,7 @@ interface SuscripcionesPanelProps {
   onAddOpened?: () => void;
 }
 
-export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
+export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = React.memo(({
   suscripciones = [],
   saveSuscripcionesList,
   selectedCountry,
@@ -500,4 +500,11 @@ export const SuscripcionesPanel: React.FC<SuscripcionesPanelProps> = ({
       </AnimatePresence>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.suscripciones === nextProps.suscripciones &&
+    prevProps.selectedCountry === nextProps.selectedCountry &&
+    prevProps.selectedLanguage === nextProps.selectedLanguage &&
+    prevProps.autoOpenAdd === nextProps.autoOpenAdd
+  );
+});

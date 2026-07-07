@@ -12,11 +12,31 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            // React core - siempre necesario
+            'vendor-react': ['react', 'react-dom'],
+            // Firebase - se carga al login
+            'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+            // Charts - solo en pantalla Suenos/Balance
+            'vendor-charts': ['recharts'],
+            // Animaciones
+            'vendor-motion': ['motion'],
+            // Iconos Lucide
+            'vendor-lucide': ['lucide-react'],
+            // PDF y Excel - solo al importar documentos (lazy ya aplicado)
+            'vendor-pdf': ['pdfjs-dist'],
+            'vendor-xlsx': ['xlsx'],
+          },
+        },
+      },
+      // Aumentar warning threshold para chunks grandes
+      chunkSizeWarningLimit: 1000,
     },
   };
 });
