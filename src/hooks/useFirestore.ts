@@ -28,6 +28,11 @@ export const useFirestore = (
   const [availableCountries, setAvailableCountries] = useState<('CO' | 'CL')[]>([]);
   const syncUnsubscribeRef = useRef<(() => void) | null>(null);
 
+  const userProfileRef = useRef(userProfile);
+  useEffect(() => {
+    userProfileRef.current = userProfile;
+  }, [userProfile]);
+
   const resolveUserId = (user: any): string | null => {
     if (!user) return null;
 
@@ -47,8 +52,8 @@ export const useFirestore = (
           if (parsed.correo) return parsed.correo.toLowerCase().trim();
         }
       } catch {}
-      if (userProfile && userProfile.correo) {
-        return userProfile.correo.toLowerCase().trim();
+      if (userProfileRef.current && userProfileRef.current.correo) {
+        return userProfileRef.current.correo.toLowerCase().trim();
       }
       return user.uid;
     }
@@ -79,7 +84,7 @@ export const useFirestore = (
       const userDocRef = doc(db, 'users', userRefId);
       const financialDocRef = doc(db, 'users', userRefId, 'paises', selectedCountry);
       const nowString = new Date().toISOString();
-      const esAdmin = Boolean(userProfile?.correo?.toLowerCase().trim() === 'prakos@gmail.com' || (user?.email && user.email.toLowerCase().trim() === 'prakos@gmail.com'));
+      const esAdmin = Boolean(userProfileRef.current?.correo?.toLowerCase().trim() === 'prakos@gmail.com' || (user?.email && user.email.toLowerCase().trim() === 'prakos@gmail.com'));
       
       if (!esAdmin) {
         const payload: any = { updatedAt: nowString };
@@ -177,7 +182,7 @@ export const useFirestore = (
       
       setIsLocalMode(false);
       const userDocRef = doc(db, 'users', userRefId);
-      const esAdmin = Boolean(userProfile?.correo?.toLowerCase().trim() === 'prakos@gmail.com' || (user?.email && user.email.toLowerCase().trim() === 'prakos@gmail.com'));
+      const esAdmin = Boolean(userProfileRef.current?.correo?.toLowerCase().trim() === 'prakos@gmail.com' || (user?.email && user.email.toLowerCase().trim() === 'prakos@gmail.com'));
 
       try {
         const [coSnap, clSnap] = await Promise.all([
@@ -236,10 +241,10 @@ export const useFirestore = (
           } else {
             // First login initialization
             const payload = {
-              nombre: userProfile.nombre || (user?.displayName) || 'Invitado',
-              correo: userProfile.correo || (user?.email) || '',
-              celular: userProfile.celular || '',
-              productos: userProfile.productos || [],
+              nombre: userProfileRef.current.nombre || (user?.displayName) || 'Invitado',
+              correo: userProfileRef.current.correo || (user?.email) || '',
+              celular: userProfileRef.current.celular || '',
+              productos: userProfileRef.current.productos || [],
               transacciones, suenos, categorias, paymentMethods, suscripciones,
               gastosRecurrentes: gastosRecurrentes.map(g => ({ ...g })),
               updatedAt: new Date().toISOString()
@@ -340,8 +345,8 @@ export const useFirestore = (
         } else {
           // First login initialization for this ecosystem
           const payloadFinancial: any = {
-            productos: selectedCountry === 'CO' ? (userProfile.productos || []) : [],
-            portafolios: selectedCountry === 'CO' ? (userProfile.portafolios || []) : [],
+            productos: selectedCountry === 'CO' ? (userProfileRef.current.productos || []) : [],
+            portafolios: selectedCountry === 'CO' ? (userProfileRef.current.portafolios || []) : [],
             transacciones: selectedCountry === 'CO' ? transacciones : [],
             suenos: selectedCountry === 'CO' ? suenos : [],
             categorias: categorias,
@@ -350,9 +355,9 @@ export const useFirestore = (
             updatedAt: new Date().toISOString()
           };
           const payloadUser: any = {
-            nombre: userProfile.nombre || userData.nombre || (user?.displayName) || 'Invitado',
-            correo: userProfile.correo || userData.correo || (user?.email) || '',
-            celular: userProfile.celular || userData.celular || '',
+            nombre: userProfileRef.current.nombre || userData.nombre || (user?.displayName) || 'Invitado',
+            correo: userProfileRef.current.correo || userData.correo || (user?.email) || '',
+            celular: userProfileRef.current.celular || userData.celular || '',
             suscripciones: suscripciones,
             gastosRecurrentes: gastosRecurrentes.map(g => ({ ...g })),
             updatedAt: new Date().toISOString()

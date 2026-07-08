@@ -924,10 +924,22 @@ export default function App() {
   });
   
   // Country & Language config state
-  const [selectedCountry, setSelectedCountry] = useState<'CO' | 'CL'>('CO');
+  const [selectedCountry, setSelectedCountry] = useState<'CO' | 'CL'>(() => {
+    try {
+      const saved = localStorage.getItem('findream_selected_country');
+      if (saved === 'CO' || saved === 'CL') return saved;
+    } catch {}
+    return 'CO';
+  });
   const [selectedLanguage, setSelectedLanguage] = useState<'ES' | 'EN'>('ES');
   const [showCountrySelector, setShowCountrySelector] = useState(false);
   const [hasShownCountrySelector, setHasShownCountrySelector] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('findream_selected_country', selectedCountry);
+    } catch {}
+  }, [selectedCountry]);
 
   // AI Chat Messages state (preserved across tabs)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -1669,11 +1681,18 @@ export default function App() {
   );
 
   useEffect(() => {
-    if (!showSplash && availableCountries && availableCountries.length > 1 && !hasShownCountrySelector) {
-      setShowCountrySelector(true);
-      setHasShownCountrySelector(true);
+    if (!showSplash && availableCountries) {
+      if (availableCountries.length > 1 && !hasShownCountrySelector) {
+        setShowCountrySelector(true);
+        setHasShownCountrySelector(true);
+      } else if (availableCountries.length === 1) {
+        const singleCountry = availableCountries[0];
+        if (selectedCountry !== singleCountry) {
+          setSelectedCountry(singleCountry);
+        }
+      }
     }
-  }, [availableCountries, showSplash, hasShownCountrySelector]);
+  }, [availableCountries, showSplash, hasShownCountrySelector, selectedCountry]);
 
   // C2 — Auto-registro diario
   useEffect(() => {
