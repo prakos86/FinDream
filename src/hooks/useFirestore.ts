@@ -160,6 +160,7 @@ export const useFirestore = (
   };
 
   const syncWithFirestore = async (user: any) => {
+    console.log('[DEBUG CL] syncWithFirestore called, country=' + selectedCountry + ' user=' + user?.email);
     setIsSyncing(true);
     try {
       const { doc, setDoc, getDoc, onSnapshot } = await import('firebase/firestore');
@@ -296,9 +297,11 @@ export const useFirestore = (
       // Suscribirse al snapshot del pais sin round-trip adicional (FIX 5)
       syncUnsubscribeRef.current = onSnapshot(countryDocRef, (countrySnap) => {
         const userData = userDataRef.current; // usar cache, sin await
+        console.log('[DEBUG CL] onSnapshot fired, country=' + selectedCountry + ' exists=' + countrySnap.exists());
 
         if (countrySnap.exists()) {
           const financialData = countrySnap.data();
+          console.log('[DEBUG CL] keys=' + Object.keys(financialData).join(',') + ' txIsArray=' + Array.isArray(financialData.transacciones));
           
           // Envolver actualizaciones de estado en startTransition para batching (FIX 4)
           startTransition(() => {
@@ -318,6 +321,7 @@ export const useFirestore = (
             const txRaw = Array.isArray(financialData.transacciones)
               ? financialData.transacciones
               : [];
+            console.log('[DEBUG CL] setTransacciones called, len=' + txRaw.length + ' country=' + selectedCountry);
             setTransacciones(txRaw.map((t: any) => ({
               ...t,
               monto: Math.abs(Number(t.monto) || 0)
