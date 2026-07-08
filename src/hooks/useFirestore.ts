@@ -210,15 +210,19 @@ export const useFirestore = (
               setUserProfile(loadedProfile);
               localStorage.setItem('finanza_user_profile_v2', JSON.stringify(loadedProfile));
             }
-            if (Array.isArray(data.transacciones)) {
-              setTransacciones(data.transacciones.map((t: any) => ({
-                ...t,
-                monto: Math.abs(Number(t.monto) || 0)
-              })));
-            }
-            if (Array.isArray(data.suenos)) setSuenos(data.suenos);
-            if (Array.isArray(data.categorias)) setCategorias(data.categorias);
-            if (Array.isArray(data.paymentMethods)) setPaymentMethods(data.paymentMethods);
+            // Siempre setear aunque sea array vacio — evita que queden datos del pais anterior
+            const txRaw = Array.isArray(data.transacciones)
+              ? data.transacciones
+              : [];
+            setTransacciones(txRaw.map((t: any) => ({
+              ...t,
+              monto: Math.abs(Number(t.monto) || 0)
+            })));
+            setSuenos(Array.isArray(data.suenos) ? data.suenos : []);
+            setCategorias(Array.isArray(data.categorias) ? data.categorias : []);
+            setPaymentMethods(Array.isArray(data.paymentMethods)
+              ? data.paymentMethods
+              : ['Efectivo', 'Tarjeta de Debito', 'Tarjeta de Credito', 'Transferencia Bancaria']);
             if (Array.isArray(data.suscripciones)) setSuscripciones(data.suscripciones);
             
             // Para no-admin, gastosRecurrentes viene del mismo documento unico (no tiene subcol paises)
@@ -305,15 +309,19 @@ export const useFirestore = (
               setUserProfile(loadedProfile);
               localStorage.setItem(`finanza_user_profile_v2_${selectedCountry}`, JSON.stringify(loadedProfile));
             }
-            if (Array.isArray(financialData.transacciones)) {
-              setTransacciones(financialData.transacciones.map((t: any) => ({
-                ...t,
-                monto: Math.abs(Number(t.monto) || 0)
-              })));
-            }
-            if (Array.isArray(financialData.suenos)) setSuenos(financialData.suenos);
-            if (Array.isArray(financialData.categorias)) setCategorias(financialData.categorias);
-            if (Array.isArray(financialData.paymentMethods)) setPaymentMethods(financialData.paymentMethods);
+            // Siempre setear aunque sea array vacio — evita que queden datos del pais anterior
+            const txRaw = Array.isArray(financialData.transacciones)
+              ? financialData.transacciones
+              : [];
+            setTransacciones(txRaw.map((t: any) => ({
+              ...t,
+              monto: Math.abs(Number(t.monto) || 0)
+            })));
+            setSuenos(Array.isArray(financialData.suenos) ? financialData.suenos : []);
+            setCategorias(Array.isArray(financialData.categorias) ? financialData.categorias : []);
+            setPaymentMethods(Array.isArray(financialData.paymentMethods)
+              ? financialData.paymentMethods
+              : ['Efectivo', 'Tarjeta de Debito', 'Tarjeta de Credito', 'Transferencia Bancaria']);
             if (Array.isArray(userData.suscripciones)) setSuscripciones(userData.suscripciones);
             
             // Leer de financialData primero; si vacio, hacer fallback a userData (datos legacy admin)
@@ -369,6 +377,13 @@ export const useFirestore = (
   };
 
   useEffect(() => {
+    // Resetear datos al cambiar de pais para evitar mostrar datos del pais anterior
+    setTransacciones([]);
+    setSuenos([]);
+    setCategorias([]);
+    setGastosRecurrentes([]);
+    setPaymentMethods([]);
+
     let unsubscribe: (() => void) | null = null;
     const initAuthSync = async () => {
       try {
