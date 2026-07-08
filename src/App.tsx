@@ -895,6 +895,33 @@ export default function App() {
       return true;
     }
   });
+
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('findream_onboarding_done') === 'true';
+    } catch { return false; }
+  });
+  const [user, setUser] = useState<any>(null);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  const completeOnboarding = () => {
+    try { localStorage.setItem('findream_onboarding_done', 'true'); } catch {}
+    setHasSeenOnboarding(true);
+  };
+
+  const [showPluHint, setShowPlusHint] = useState<boolean>(() => {
+    try {
+      if (localStorage.getItem('findream_plus_hint_dismissed') === 'true') {
+        return false;
+      }
+      const firstOpen = localStorage.getItem('findream_first_open');
+      if (!firstOpen) {
+        localStorage.setItem('findream_first_open', Date.now().toString());
+        return true;
+      }
+      const diasDesdeApertura = (Date.now() - parseInt(firstOpen)) / (1000 * 60 * 60 * 24);
+      return diasDesdeApertura < 3;
+    } catch { return false; }
+  });
   
   // Country & Language config state
   const [selectedCountry, setSelectedCountry] = useState<'CO' | 'CL'>('CO');
@@ -1208,9 +1235,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (user && !user.isAnonymous) {
-        console.log('Auth state changed - usuario autenticado:', user.email);
+    const unsub = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser && !currentUser.isAnonymous) {
+        console.log('Auth state changed - usuario autenticado:', currentUser.email);
         setIsAppLocked(false);
       }
     });
@@ -3975,18 +4003,30 @@ export default function App() {
 
           <div id="lista-transacciones" className="space-y-2.5">
             {transaccionesFiltradasLista.length === 0 ? (
-              <div className="bg-white border rounded-2xl p-6 text-center text-slate-700 border-dashed border-slate-300">
-                <Clock className="w-8 h-8 text-indigo-400 mx-auto mb-2 animate-bounce" />
-                <p className="text-sm font-black text-slate-800">
-                  {selectedLanguage === 'ES' 
-                    ? `No hay movimientos registrados en ${filtroSeleccionado}` 
-                    : `No movements registered in ${filtroSeleccionado}`}
+              <div className="bg-white border rounded-2xl p-6 text-center border-dashed border-slate-200">
+                <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-3 text-3xl">
+                  📸
+                </div>
+                <p className="text-sm font-black text-slate-800 mb-1">
+                  {selectedLanguage === 'ES' ? 'Importa tus gastos' : 'Import your expenses'}
                 </p>
-                <p className="text-[10.5px] text-slate-700 font-bold mt-1">
-                  {selectedLanguage === 'ES' 
-                    ? 'Presiona el botón "+" o "Demo" para comenzar.' 
-                    : 'Press the "+" or "Demo" button to start.'}
+                <p className="text-[10.5px] text-slate-500 leading-relaxed mb-4">
+                  {selectedLanguage === 'ES'
+                    ? 'Toma una foto del extracto de tu banco y la IA registra todo en segundos. También puedes agregar un gasto manual.'
+                    : 'Take a photo of your bank statement and AI registers everything in seconds. You can also add manually.'}
                 </p>
+                <button
+                  onClick={() => { handleTap(); setIsAddingOpen(true); }}
+                  className="w-full bg-[#008B81] text-white py-2.5 rounded-xl font-black text-xs mb-2 cursor-pointer"
+                >
+                  {selectedLanguage === 'ES' ? '📸 Importar extracto' : '📸 Import statement'}
+                </button>
+                <button
+                  onClick={() => { handleTap(); setIsAddingOpen(true); }}
+                  className="w-full border border-[#008B81] text-[#008B81] py-2.5 rounded-xl font-black text-xs cursor-pointer"
+                >
+                  {selectedLanguage === 'ES' ? '+ Agregar manual' : '+ Add manually'}
+                </button>
               </div>
             ) : (
               <AnimatePresence initial={false}>
@@ -5050,7 +5090,15 @@ export default function App() {
               <h3 className="text-xs font-black uppercase tracking-widest text-[#00897B]">{selectedLanguage === 'ES' ? 'Mis Activos' : 'My Assets'}</h3>
               {(userProfile.portafolios || []).length === 0 ? (
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 border-dashed text-center">
-                  <p className="text-xs font-semibold text-slate-500">{selectedLanguage === 'ES' ? 'Aún no tienes activos en tu portafolio.' : 'You have no assets in your portfolio yet.'}</p>
+                  <div className="text-3xl mb-2">💼</div>
+                  <p className="text-sm font-black text-slate-800 mb-1">
+                    {selectedLanguage === 'ES' ? 'Tu patrimonio en un vistazo' : 'Your wealth at a glance'}
+                  </p>
+                  <p className="text-xs text-slate-500 leading-relaxed mb-3">
+                    {selectedLanguage === 'ES'
+                      ? 'Agrega tus inversiones, CDTs o acciones para ver cuanto vale todo lo que tienes.'
+                      : 'Add your investments, bonds or stocks to see your total net worth.'}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3">
@@ -5200,6 +5248,21 @@ export default function App() {
         ) : null}
       </div>
 
+      {/* Hint animado en el boton '+' */}
+      {showPluHint && activeTab !== 'insights' && (activeTab !== 'finance' || activeBalanceSubTab !== 'recurrentes') && (
+        <div 
+          className="absolute left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+          style={{
+            bottom: 'calc(4rem + 45px + env(safe-area-inset-bottom, 0px))'
+          }}
+        >
+          <div className="relative bg-[#312E81] text-white text-[11px] font-black px-4 py-2.5 rounded-2xl shadow-xl whitespace-nowrap animate-bounce border border-indigo-700">
+            {selectedLanguage === 'ES' ? '✨ ¡Prueba importar tu extracto bancario!' : '✨ Try importing your bank statement!'}
+            <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#312E81] rotate-45 border-r border-b border-indigo-700" />
+          </div>
+        </div>
+      )}
+
       {/* Floating Action Button (Moved to bottom right to avoid overlap with 5 tabs) */}
       {activeTab !== 'insights' && (activeTab !== 'finance' || activeBalanceSubTab !== 'recurrentes') && (
         <div className="absolute left-1/2 -translate-x-1/2 z-50"
@@ -5219,6 +5282,8 @@ export default function App() {
                 setInitialTransactionForModal(null);
                 setPopupInitialChoice('choice');
                 setIsAddingOpen(true);
+                setShowPlusHint(false);
+                try { localStorage.setItem('findream_plus_hint_dismissed', 'true'); } catch {}
               }
             }}
             className="w-14 h-14 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-[3px] border-white shadow-lg active:scale-95 duration-200 cursor-pointer select-none"
@@ -6567,6 +6632,93 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* Onboarding — solo primera vez, despues de login */}
+      {!showSplash && user && !hasSeenOnboarding && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl mx-4 max-w-sm w-full overflow-hidden shadow-2xl relative animate-scale-in">
+            {/* Slides */}
+            {onboardingStep === 0 && (
+              <div className="p-8 flex flex-col items-center text-center">
+                <div className="text-6xl mb-4">📸</div>
+                <h2 className="text-xl font-black text-slate-900 mb-2 leading-tight">
+                  {selectedLanguage === 'ES' ? 'Registra gastos en segundos' : 'Log expenses in seconds'}
+                </h2>
+                <p className="text-sm text-slate-500 leading-relaxed mb-6">
+                  {selectedLanguage === 'ES'
+                    ? 'Toma una foto de tu extracto bancario y la IA importa todos tus movimientos automáticamente.'
+                    : 'Take a photo of your bank statement and the AI registers all your movements automatically.'}
+                </p>
+                <div className="flex gap-2 mb-6">
+                  <div className="w-6 h-2 bg-[#008B81] rounded-full"/>
+                  <div className="w-2 h-2 bg-slate-200 rounded-full"/>
+                  <div className="w-2 h-2 bg-slate-200 rounded-full"/>
+                </div>
+                <button
+                  onClick={() => setOnboardingStep(1)}
+                  className="w-full bg-[#008B81] text-white py-3 rounded-2xl font-black text-sm"
+                >
+                  {selectedLanguage === 'ES' ? 'Continuar →' : 'Continue →'}
+                </button>
+                <button onClick={completeOnboarding} className="mt-3 text-xs text-slate-400 font-semibold">
+                  {selectedLanguage === 'ES' ? 'Saltar tutorial' : 'Skip tutorial'}
+                </button>
+              </div>
+            )}
+            {onboardingStep === 1 && (
+              <div className="p-8 flex flex-col items-center text-center">
+                <div className="text-6xl mb-4">💳</div>
+                <h2 className="text-xl font-black text-slate-900 mb-2 leading-tight">
+                  {selectedLanguage === 'ES' ? 'Controla tus cuotas sin estrés' : 'Track your installments stress-free'}
+                </h2>
+                <p className="text-sm text-slate-500 leading-relaxed mb-6">
+                  {selectedLanguage === 'ES'
+                    ? 'Ve exactamente cuánto pagas en cuotas cada mes y cuánto te falta por pagar en cada compra.'
+                    : 'See exactly how much you pay in installments each month and how much is left on each purchase.'}
+                </p>
+                <div className="flex gap-2 mb-6">
+                  <div className="w-2 h-2 bg-slate-200 rounded-full"/>
+                  <div className="w-6 h-2 bg-[#008B81] rounded-full"/>
+                  <div className="w-2 h-2 bg-slate-200 rounded-full"/>
+                </div>
+                <button
+                  onClick={() => setOnboardingStep(2)}
+                  className="w-full bg-[#008B81] text-white py-3 rounded-2xl font-black text-sm"
+                >
+                  {selectedLanguage === 'ES' ? 'Continuar →' : 'Continue →'}
+                </button>
+                <button onClick={completeOnboarding} className="mt-3 text-xs text-slate-400 font-semibold">
+                  {selectedLanguage === 'ES' ? 'Saltar tutorial' : 'Skip tutorial'}
+                </button>
+              </div>
+            )}
+            {onboardingStep === 2 && (
+              <div className="p-8 flex flex-col items-center text-center">
+                <div className="text-6xl mb-4">🎯</div>
+                <h2 className="text-xl font-black text-slate-900 mb-2 leading-tight">
+                  {selectedLanguage === 'ES' ? 'Cumple tus sueños financieros' : 'Fulfill your financial dreams'}
+                </h2>
+                <p className="text-sm text-slate-500 leading-relaxed mb-6">
+                  {selectedLanguage === 'ES'
+                    ? 'Define metas de ahorro y la IA te dice cuánto necesitas guardar cada mes para lograrlo.'
+                    : 'Set savings goals and the AI tells you how much you need to save each month to achieve them.'}
+                </p>
+                <div className="flex gap-2 mb-6">
+                  <div className="w-2 h-2 bg-slate-200 rounded-full"/>
+                  <div className="w-2 h-2 bg-slate-200 rounded-full"/>
+                  <div className="w-6 h-2 bg-[#008B81] rounded-full"/>
+                </div>
+                <button
+                  onClick={completeOnboarding}
+                  className="w-full bg-[#008B81] text-white py-3 rounded-2xl font-black text-sm"
+                >
+                  {selectedLanguage === 'ES' ? 'Empezar ahora' : 'Get started'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {pdfPasswordModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[9999]">
