@@ -210,7 +210,12 @@ export const useFirestore = (
               setUserProfile(loadedProfile);
               localStorage.setItem('finanza_user_profile_v2', JSON.stringify(loadedProfile));
             }
-            if (Array.isArray(data.transacciones)) setTransacciones(data.transacciones);
+            if (Array.isArray(data.transacciones)) {
+              setTransacciones(data.transacciones.map((t: any) => ({
+                ...t,
+                monto: Math.abs(Number(t.monto) || 0)
+              })));
+            }
             if (Array.isArray(data.suenos)) setSuenos(data.suenos);
             if (Array.isArray(data.categorias)) setCategorias(data.categorias);
             if (Array.isArray(data.paymentMethods)) setPaymentMethods(data.paymentMethods);
@@ -300,7 +305,12 @@ export const useFirestore = (
               setUserProfile(loadedProfile);
               localStorage.setItem(`finanza_user_profile_v2_${selectedCountry}`, JSON.stringify(loadedProfile));
             }
-            if (Array.isArray(financialData.transacciones)) setTransacciones(financialData.transacciones);
+            if (Array.isArray(financialData.transacciones)) {
+              setTransacciones(financialData.transacciones.map((t: any) => ({
+                ...t,
+                monto: Math.abs(Number(t.monto) || 0)
+              })));
+            }
             if (Array.isArray(financialData.suenos)) setSuenos(financialData.suenos);
             if (Array.isArray(financialData.categorias)) setCategorias(financialData.categorias);
             if (Array.isArray(financialData.paymentMethods)) setPaymentMethods(financialData.paymentMethods);

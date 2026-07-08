@@ -2509,8 +2509,12 @@ export default function App() {
 
   const { transaccionesFiltradas, totalActivos, totalPasivos, realAhorroNeto } = useMemo(() => {
     const filtradas = filterTransactions(transacciones);
-    const activos = filtradas.filter(t => t.tipo === 'Ingreso').reduce((s, t) => s + t.monto, 0);
-    const pasivos = filtradas.filter(t => t.tipo === 'Gasto').reduce((s, t) => s + t.monto, 0);
+    const activos = filtradas
+      .filter(t => t.tipo === 'Ingreso')
+      .reduce((s, t) => s + Math.abs(t.monto), 0);
+    const pasivos = filtradas
+      .filter(t => t.tipo === 'Gasto')
+      .reduce((s, t) => s + Math.abs(t.monto), 0);
     return {
       transaccionesFiltradas: filtradas,
       totalActivos: activos,
