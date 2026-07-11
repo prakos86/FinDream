@@ -1,6 +1,6 @@
 {
   "name": "Finanza Insight",
-  "description": "Una aplicación iOS premium para el control de finanzas personales, activos y pasivos.",
+  "description": "Una aplicación iOS premium para el control de finanzas personales, activos, pasivos y el seguimiento de tu ruta financiera.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

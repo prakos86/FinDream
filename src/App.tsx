@@ -56,7 +56,8 @@ import {
   Scissors,
   Briefcase,
   Upload,
-  Repeat
+  Repeat,
+  Map
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -218,6 +219,7 @@ const TRANSLATIONS = {
     sin_productos: "Aún no tienes elementos de portafolio registrados en esta pestaña.",
     costo_mensual: "Costo Mensual",
     beneficios: "Beneficios",
+    MI_RUTA: "Mi Ruta",
   },
   EN: {
     tab_resumen: "Balance",
@@ -296,6 +298,7 @@ const TRANSLATIONS = {
     sin_productos: "No registered portfolio items yet in this tab.",
     costo_mensual: "Monthly Cost",
     beneficios: "Benefits",
+    MI_RUTA: "My Path",
   }
 };
 
@@ -803,6 +806,7 @@ const ALL_TABS = [
   { id: "portafolios",   label: "tab_portafolio",    icon: "Briefcase",  tabKey: "portafolios" },
   { id: "suscripciones", label: "tab_suscripciones", icon: "Repeat",     tabKey: "suscripciones" },
   { id: "insights",      label: "tab_insights",      icon: "Sparkles",   tabKey: "insights" },
+  { id: "ruta",          label: "MI_RUTA",           icon: "Map",        tabKey: "ruta" },
 ];
 
 export default function App() {
@@ -1015,7 +1019,7 @@ export default function App() {
   };
 
   // Navigation tabs state
-  const [activeTab, setActiveTab] = useState<'finance' | 'cloud' | 'productos' | 'portafolios' | 'insights' | 'suscripciones' | 'recurrentes'>('finance');
+  const [activeTab, setActiveTab] = useState<'finance' | 'cloud' | 'productos' | 'portafolios' | 'insights' | 'suscripciones' | 'recurrentes' | 'ruta'>('finance');
   
   // Estado del orden, persistido en localStorage
   const [tabOrder, setTabOrder] = useState<string[]>(() => {
@@ -3038,6 +3042,8 @@ export default function App() {
                       ? t('tab_portafolio')
                       : activeTab === 'suscripciones'
                         ? t('tab_suscripciones')
+                        : activeTab === 'ruta'
+                          ? t('MI_RUTA')
                         : activeTab === 'recurrentes'
                           ? (selectedLanguage === 'ES' ? 'Recurrentes' : 'Recurring')
                           : t('tab_insights')}
@@ -5268,6 +5274,240 @@ export default function App() {
             autoOpenAdd={autoOpenSubModal}
             onAddOpened={() => setAutoOpenSubModal(false)}
           />
+        ) : activeTab === 'ruta' ? (
+          <div className="flex flex-col gap-4 px-4 pb-24 pt-4 animate-fade-in">
+            {/* Header */}
+            <div className="text-center mb-2">
+              <h1 className="text-xl font-black text-slate-900">
+                {selectedLanguage === 'ES' ? 'Tu Ruta Financiera' : 'Your Financial Path'}
+              </h1>
+              <p className="text-xs text-slate-500 mt-1">
+                {selectedLanguage === 'ES'
+                  ? 'Un camino claro hacia tu libertad financiera'
+                  : 'A clear path to your financial freedom'}
+              </p>
+            </div>
+
+            {/* Etapa 1 — Conocete */}
+            {(() => {
+              const tieneGastos = transacciones.length > 0;
+              const progreso = tieneGastos ? Math.min(100, Math.round((transacciones.length / 20) * 100)) : 0;
+              return (
+                <div
+                  className={`rounded-2xl p-4 border-2 cursor-pointer transition-all duration-200 ${tieneGastos ? 'border-teal-400 bg-teal-50 shadow-sm' : 'border-slate-200 bg-white'}`}
+                  onClick={() => { handleTap(); setActiveTab('finance'); }}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${tieneGastos ? 'bg-teal-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                      🔍
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-black text-slate-900">
+                          {selectedLanguage === 'ES' ? '1. Conócete' : '1. Know Yourself'}
+                        </p>
+                        {tieneGastos && <span className="text-[9px] font-black text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full">OK</span>}
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        {selectedLanguage === 'ES' ? 'Registra y entiende tus gastos' : 'Track and understand your spending'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: progreso + '%' }} />
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <p className="text-[9px] text-slate-400">{transacciones.length} movimientos registrados</p>
+                    <p className="text-[9px] font-bold text-teal-600">{progreso}%</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Etapa 2 — Organizate */}
+            {(() => {
+              const tieneRecurrentes = gastosRecurrentes.length > 0;
+              const progreso = tieneRecurrentes ? Math.min(100, Math.round((gastosRecurrentes.length / 5) * 100)) : 0;
+              return (
+                <div
+                  className={`rounded-2xl p-4 border-2 cursor-pointer transition-all duration-200 ${tieneRecurrentes ? 'border-indigo-400 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white'}`}
+                  onClick={() => { handleTap(); setActiveTab('finance'); setActiveBalanceSubTab('recurrentes'); }}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${tieneRecurrentes ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                      📋
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-black text-slate-900">
+                          {selectedLanguage === 'ES' ? '2. Organízate' : '2. Get Organized'}
+                        </p>
+                        {tieneRecurrentes && <span className="text-[9px] font-black text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">OK</span>}
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        {selectedLanguage === 'ES' ? 'Controla lo fijo: recurrentes y cuotas' : 'Control fixed costs: recurring and installments'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: progreso + '%' }} />
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <p className="text-[9px] text-slate-400">{gastosRecurrentes.length} gastos fijos configurados</p>
+                    <p className="text-[9px] font-bold text-indigo-600">{progreso}%</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Etapa 3 — Suena */}
+            {(() => {
+              const tieneSuenos = suenos.length > 0;
+              const progreso = tieneSuenos ? Math.min(100, Math.round((suenos.length / 3) * 100)) : 0;
+              return (
+                <div
+                  className={`rounded-2xl p-4 border-2 cursor-pointer transition-all duration-200 ${tieneSuenos ? 'border-amber-400 bg-amber-50 shadow-sm' : 'border-slate-200 bg-white'}`}
+                  onClick={() => { handleTap(); setActiveTab('cloud'); }}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${tieneSuenos ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                      💭
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-black text-slate-900">
+                          {selectedLanguage === 'ES' ? '3. Sueña' : '3. Dream'}
+                        </p>
+                        {tieneSuenos && <span className="text-[9px] font-black text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">OK</span>}
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        {selectedLanguage === 'ES' ? 'Define metas financieras concretas' : 'Set concrete financial goals'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: progreso + '%' }} />
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <p className="text-[9px] text-slate-400">{suenos.length} {selectedLanguage === 'ES' ? 'metas creadas' : 'goals created'}</p>
+                    <p className="text-[9px] font-bold text-amber-600">{progreso}%</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Etapa 4 — Avanza */}
+            {(() => {
+              const tieneProductos = (userProfile.productos || []).length > 0;
+              const progreso = tieneProductos ? 70 : 10;
+              return (
+                <div
+                  className={`rounded-2xl p-4 border-2 cursor-pointer transition-all duration-200 ${tieneProductos ? 'border-violet-400 bg-violet-50 shadow-sm' : 'border-slate-200 bg-white'}`}
+                  onClick={() => { handleTap(); setActiveTab('insights'); }}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${tieneProductos ? 'bg-violet-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                      🚀
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-black text-slate-900">
+                          {selectedLanguage === 'ES' ? '4. Avanza' : '4. Advance'}
+                        </p>
+                        <span className="text-[9px] font-black text-violet-600 bg-violet-100 px-2 py-0.5 rounded-full">IA</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        {selectedLanguage === 'ES'
+                          ? 'Recomendaciones IA y productos financieros'
+                          : 'AI recommendations and financial products'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: progreso + '%' }} />
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <p className="text-[9px] text-slate-400">
+                      {selectedLanguage === 'ES' ? 'Pregúntale algo a tu asesor IA' : 'Ask your AI advisor something'}
+                    </p>
+                    <p className="text-[9px] font-bold text-violet-600">{progreso}%</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Etapa 5 — Logra */}
+            {(() => {
+              const suenosCumplidos = suenos.filter(s =>
+                s.ahorroAcumulado !== undefined && s.meta > 0 && s.ahorroAcumulado >= s.meta
+              ).length;
+              const progreso = suenosCumplidos > 0 ? 100 : (suenos.length > 0 ? 30 : 0);
+              return (
+                <div
+                  className={`rounded-2xl p-4 border-2 cursor-pointer transition-all duration-200 ${suenosCumplidos > 0 ? 'border-emerald-400 bg-emerald-50 shadow-sm' : 'border-slate-200 bg-white'}`}
+                  onClick={() => { handleTap(); setActiveTab('cloud'); }}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${suenosCumplidos > 0 ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                      🏆
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-black text-slate-900">
+                          {selectedLanguage === 'ES' ? '5. Logra' : '5. Achieve'}
+                        </p>
+                        {suenosCumplidos > 0 && (
+                          <span className="text-[9px] font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                            {suenosCumplidos} {selectedLanguage === 'ES' ? 'logrado' : 'achieved'}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        {selectedLanguage === 'ES' ? 'Celebra y define tu próximo reto' : 'Celebrate and set your next challenge'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: progreso + '%' }} />
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <p className="text-[9px] text-slate-400">
+                      {suenosCumplidos > 0
+                        ? (selectedLanguage === 'ES' ? suenosCumplidos + ' meta(s) cumplida(s)' : suenosCumplidos + ' goal(s) achieved')
+                        : (selectedLanguage === 'ES' ? 'Cumple tu primera meta para desbloquear' : 'Complete your first goal to unlock')}
+                    </p>
+                    <p className="text-[9px] font-bold text-emerald-600">{progreso}%</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Mensaje motivacional de la IA */}
+            <div className="bg-gradient-to-r from-[#008B81] to-[#005f58] rounded-2xl p-4 text-white mt-2 shadow-md">
+              <p className="text-[10px] font-black uppercase tracking-wide opacity-70 mb-1">
+                {selectedLanguage === 'ES' ? '✦ Tu asesor IA dice' : '✦ Your AI advisor says'}
+              </p>
+              <p className="text-sm font-bold leading-relaxed">
+                {transacciones.length === 0
+                  ? (selectedLanguage === 'ES'
+                    ? 'Comienza importando tus gastos del mes. El primer paso es conocer tu situación actual.'
+                    : 'Start by importing your monthly expenses. The first step is knowing your current situation.')
+                  : suenos.length === 0
+                  ? (selectedLanguage === 'ES'
+                    ? 'Ya tienes ' + transacciones.length + ' movimientos registrados. Es momento de definir hacia dónde quieres ir.'
+                    : 'You have ' + transacciones.length + ' transactions recorded. Time to define where you want to go.')
+                  : (selectedLanguage === 'ES'
+                  ? 'Vas por buen camino. Sigue registrando y la IA te dará recomendaciones personalizadas.'
+                  : 'You are on the right track. Keep recording and AI will give you personalized recommendations.')}
+              </p>
+              <button
+                onClick={() => { handleTap(); setActiveTab('insights'); }}
+                className="mt-3 bg-white/20 text-white text-[10px] font-black px-3 py-1.5 rounded-xl cursor-pointer hover:bg-white/30 transition-all duration-150"
+              >
+                {selectedLanguage === 'ES' ? 'Hablar con mi asesor →' : 'Talk to my advisor →'}
+              </button>
+            </div>
+          </div>
         ) : null}
       </div>
 
@@ -5327,7 +5567,7 @@ export default function App() {
         </div>
       )}
 
-      <div id="bottom-nav-scroll" className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 grid grid-cols-7 items-center justify-items-center z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] px-1 overflow-hidden">
+      <div id="bottom-nav-scroll" className="absolute bottom-0 inset-x-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] bg-white/95 backdrop-blur-md border-t border-gray-150 grid grid-cols-8 items-center justify-items-center z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] px-1 overflow-hidden">
         {tabOrder.slice(0, 3).map((tabId) => {
           const tab = ALL_TABS.find(t => t.id === tabId);
           if (!tab) return null;
@@ -5366,6 +5606,7 @@ export default function App() {
               {tab.icon === "Briefcase" && <Briefcase className="w-5.5 h-5.5 stroke-[2.5px]" />}
               {tab.icon === "Repeat" && <Repeat className="w-5.5 h-5.5 stroke-[2.5px]" />}
               {tab.icon === "Sparkles" && <Sparkles className="w-5.5 h-5.5 stroke-[2.5px] animate-pulse" />}
+              {tab.icon === "Map" && <Map className="w-5.5 h-5.5 stroke-[2.5px]" />}
               <span className="text-[8px] sm:text-[9.5px] font-black mt-1 uppercase tracking-tighter truncate max-w-full px-0.5 text-center w-full">
                 {t(tab.label as any)}
               </span>
@@ -5376,7 +5617,7 @@ export default function App() {
           );
         })}
 
-        {/* Central Spacer Column (4th grid-column out of 7) */}
+        {/* Central Spacer Column (4th grid-column out of 8) */}
         <div className="w-full h-8 flex items-center justify-center pointer-events-none" />
 
         {tabOrder.slice(3).map((tabId) => {
@@ -5417,6 +5658,7 @@ export default function App() {
               {tab.icon === "Briefcase" && <Briefcase className="w-5.5 h-5.5 stroke-[2.5px]" />}
               {tab.icon === "Repeat" && <Repeat className="w-5.5 h-5.5 stroke-[2.5px]" />}
               {tab.icon === "Sparkles" && <Sparkles className="w-5.5 h-5.5 stroke-[2.5px] animate-pulse" />}
+              {tab.icon === "Map" && <Map className="w-5.5 h-5.5 stroke-[2.5px]" />}
               <span className="text-[8px] sm:text-[9.5px] font-black mt-1 uppercase tracking-tighter truncate max-w-full px-0.5 text-center w-full">
                 {t(tab.label as any)}
               </span>
