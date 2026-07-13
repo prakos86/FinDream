@@ -57,7 +57,7 @@ import {
   Briefcase,
   Upload,
   Repeat,
-  Map
+  Navigation
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -806,7 +806,7 @@ const ALL_TABS = [
   { id: "portafolios",   label: "tab_portafolio",    icon: "Briefcase",  tabKey: "portafolios" },
   { id: "suscripciones", label: "tab_suscripciones", icon: "Repeat",     tabKey: "suscripciones" },
   { id: "insights",      label: "tab_insights",      icon: "Sparkles",   tabKey: "insights" },
-  { id: "ruta",          label: "MI_RUTA",           icon: "Map",        tabKey: "ruta" },
+  { id: "ruta",          label: "MI_RUTA",           icon: "Navigation", tabKey: "ruta" },
 ];
 
 export default function App() {
@@ -5606,7 +5606,7 @@ export default function App() {
               {tab.icon === "Briefcase" && <Briefcase className="w-5.5 h-5.5 stroke-[2.5px]" />}
               {tab.icon === "Repeat" && <Repeat className="w-5.5 h-5.5 stroke-[2.5px]" />}
               {tab.icon === "Sparkles" && <Sparkles className="w-5.5 h-5.5 stroke-[2.5px] animate-pulse" />}
-              {tab.icon === "Map" && <Map className="w-5.5 h-5.5 stroke-[2.5px]" />}
+              {tab.icon === "Navigation" && <Navigation className="w-5.5 h-5.5 stroke-[2.5px]" />}
               <span className="text-[8px] sm:text-[9.5px] font-black mt-1 uppercase tracking-tighter truncate max-w-full px-0.5 text-center w-full">
                 {t(tab.label as any)}
               </span>
@@ -5658,7 +5658,7 @@ export default function App() {
               {tab.icon === "Briefcase" && <Briefcase className="w-5.5 h-5.5 stroke-[2.5px]" />}
               {tab.icon === "Repeat" && <Repeat className="w-5.5 h-5.5 stroke-[2.5px]" />}
               {tab.icon === "Sparkles" && <Sparkles className="w-5.5 h-5.5 stroke-[2.5px] animate-pulse" />}
-              {tab.icon === "Map" && <Map className="w-5.5 h-5.5 stroke-[2.5px]" />}
+              {tab.icon === "Navigation" && <Navigation className="w-5.5 h-5.5 stroke-[2.5px]" />}
               <span className="text-[8px] sm:text-[9.5px] font-black mt-1 uppercase tracking-tighter truncate max-w-full px-0.5 text-center w-full">
                 {t(tab.label as any)}
               </span>
