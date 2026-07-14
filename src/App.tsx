@@ -1670,6 +1670,23 @@ export default function App() {
     }, 0);
   }, [suscripciones, convertir, effectiveCountry]);
 
+  const totalRecurrentesPeriodo = useMemo(() => {
+    const monedaActiva = effectiveCountry === 'CL' ? 'CLP' : 'COP';
+    const recurrentesActivos = (gastosRecurrentes || []).filter(g =>
+      g.activo && (!g.paisMoneda || g.paisMoneda === monedaActiva)
+    );
+    const montoMensual = recurrentesActivos.reduce((sum, g) => sum + Math.abs(g.monto || 0), 0);
+    // Escalar segun el filtro activo
+    switch (filtroSeleccionado) {
+      case 'Dia': return Math.round(montoMensual / 30);
+      case 'Semana': return Math.round(montoMensual / 4);
+      case 'Mes': return montoMensual;
+      case 'Ano': return montoMensual * 12;
+      case 'Historico': return montoMensual * 12;
+      default: return montoMensual;
+    }
+  }, [gastosRecurrentes, effectiveCountry, filtroSeleccionado]);
+
   const { isSyncing, lastSyncedTime, pushToFirestore, isLocalMode, availableCountries } = useFirestore(
     showSplash,
     userProfile, setUserProfile,
@@ -3169,7 +3186,9 @@ export default function App() {
             style={{ backgroundImage: 'linear-gradient(135deg, #10B981, #059669)' }}
           >
             <div className="flex justify-between items-center w-full">
-              <span className="text-[10px] font-black tracking-widest text-[#D1FAE5] uppercase">ACTIVOS TOTALES</span>
+              <span className="text-[10px] font-black tracking-widest text-[#D1FAE5] uppercase">
+                {selectedLanguage === 'ES' ? 'INGRESOS TOTALES' : 'TOTAL INCOME'}
+              </span>
               <button 
                 onClick={(e) => { e.stopPropagation(); handleTap(); setHideBalances(!hideBalances); }}
                 className="p-1 -mr-1 text-emerald-100 hover:text-white hover:bg-white/15 rounded-lg transition cursor-pointer"
@@ -3197,7 +3216,9 @@ export default function App() {
             style={{ backgroundImage: 'linear-gradient(135deg, #EF4444, #DC2626)' }}
           >
             <div className="flex justify-between items-center w-full">
-              <span className="text-[10px] font-black tracking-widest text-[#FEE2E2] uppercase">PASIVOS TOTALES</span>
+              <span className="text-[10px] font-black tracking-widest text-[#FEE2E2] uppercase">
+                {selectedLanguage === 'ES' ? 'GASTOS TOTALES' : 'TOTAL EXPENSES'}
+              </span>
               <button 
                 onClick={(e) => { e.stopPropagation(); handleTap(); setHideBalances(!hideBalances); }}
                 className="p-1 -mr-1 text-red-100 hover:text-white hover:bg-white/15 rounded-lg transition cursor-pointer"
@@ -3211,8 +3232,19 @@ export default function App() {
                 {hideBalances ? "******" : `$${totalPasivos.toLocaleString('es-ES', { minimumFractionDigits: 0 })}`}
               </span>
               <span className="text-[10px] text-red-100 flex items-center gap-1 mt-1">
-                <TrendingDown className="w-3 h-3" /> egresos calculados
+                <TrendingDown className="w-3 h-3" /> {selectedLanguage === 'ES' ? 'egresos calculados' : 'calculated expenses'}
               </span>
+              {totalRecurrentesPeriodo > 0 && (
+                <div className="mt-1.5 pt-1.5 border-t border-red-400/40">
+                  <span className="text-[9px] text-red-200 flex items-center gap-1">
+                    <Repeat className="w-2.5 h-2.5" />
+                    {selectedLanguage === 'ES' ? 'Recurrentes: ' : 'Recurring: '}
+                    <span className="font-black text-white">
+                      {hideBalances ? "***" : `$${totalRecurrentesPeriodo.toLocaleString('es-ES', { minimumFractionDigits: 0 })}`}
+                    </span>
+                  </span>
+                </div>
+              )}
             </div>
           </motion.div>
         </div>
