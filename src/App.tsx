@@ -848,6 +848,7 @@ export default function App() {
     if (iconManuallySet) return; // icono elegido a mano: no sobrescribir
 
     const petKeywords = ['mascota', 'mascotas', 'perro', 'gato', 'animal', 'pet', 'pets', 'dog', 'cat', 'veterinari', 'veterinario', 'veterinaria', 'peludo', 'fiel'];
+    const healthKeywords = ['salud', 'medicina', 'farmacia', 'doctor', 'clinica', 'hospital', 'dentista'];
     const foodKeywords = ['comida', 'restaurante', 'alimento', 'cena', 'almuerzo', 'desayuno', 'bocadillo', 'cafe', 'comidas', 'food', 'market', 'supermercado', 'fruta', 'verdura', 'domicilio', 'domicilios'];
     const travelKeywords = ['viaje', 'vuelo', 'avion', 'hotel', 'aeropuerto', 'pasaje', 'viajes', 'turismo', 'travel', 'trip', 'escapada'];
     const carKeywords = ['carro', 'transporte', 'auto', 'moto', 'gasolina', 'uber', 'taxi', 'peaje', 'vehiculo', 'gas', 'car', 'mantenimiento', 'taller', 'repuestos', 'coche', 'combustible', 'bencinera', 'nafta', 'estacionamiento', 'parking', 'lyft', 'cabify', 'beat', 'didi', 'bencina'];
@@ -856,7 +857,10 @@ export default function App() {
     const fashionKeywords = ['moda', 'ropa', 'fashion', 'peluqueria', 'tijeras', 'estilo', 'cortar', 'barbero', 'estilista', 'scissors', 'vestido', 'zapatos', 'corte', 'barba'];
     const sparklesKeywords = ['belleza', 'magia', 'limpieza', 'tecnologia', 'gadget', 'computador', 'diversion', 'ocio', 'entretenimiento', 'suscripcion', 'netflix', 'spotify', 'cine', 'luxury', 'brillo'];
 
-    if (petKeywords.some(kw => term.includes(kw))) {
+    if (healthKeywords.some(kw => term.includes(kw))) {
+      setNewCatIcon('Heart');
+      setNewCatColor('#F43F5E');
+    } else if (petKeywords.some(kw => term.includes(kw))) {
       setNewCatIcon('Heart');
       setNewCatColor('#F43F5E'); // Vibrant Rose-Pink
     } else if (foodKeywords.some(kw => term.includes(kw))) {
