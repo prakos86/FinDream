@@ -34,14 +34,14 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [popupCategoria, setPopupCategoria] = useState(initialTransaction?.categoria || (categorias.length > 0 ? categorias[0].nombre : 'Otros'));
   const [popupDescripcion, setPopupDescripcion] = useState(initialTransaction?.descripcion || '');
   // Si el usuario elige la categoria a mano, no la sobrescribimos al escribir el nombre
-  const categoriaManualRef = useRef<boolean>(!!initialTransaction?.categoria);
+  const categoriaManualRef = useRef<boolean>(false);
 
   // Auto-deteccion: al escribir el nombre del gasto, sugerir la categoria que coincida
   useEffect(() => {
     if (categoriaManualRef.current) return;
     const term = popupDescripcion.toLowerCase().trim();
     if (!term || popupTipo !== 'Gasto') return;
-    const healthKeywords = ['farmacia', 'salud', 'medic', 'doctor', 'clinica', 'hospital', 'dentista', 'cita'];
+    const healthKeywords = ['farmacia', 'salud', 'medic', 'doctor', 'clinica', 'hospital', 'dentista'];
     const match = categorias.find(c => c.nombre.length > 2 && term.includes(c.nombre.toLowerCase()))
       || (healthKeywords.some(kw => term.includes(kw))
         ? categorias.find(c => /salud|cuidado|medic|farmac/i.test(c.nombre))
