@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Mic, MicOff, DollarSign } from 'lucide-react';
 import { TipoMovimiento, Categoria, Transaccion } from '../types';
@@ -33,6 +33,21 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [popupMonto, setPopupMonto] = useState(initialTransaction?.monto?.toString() || '');
   const [popupCategoria, setPopupCategoria] = useState(initialTransaction?.categoria || (categorias.length > 0 ? categorias[0].nombre : 'Otros'));
   const [popupDescripcion, setPopupDescripcion] = useState(initialTransaction?.descripcion || '');
+  // Si el usuario elige la categoria a mano, no la sobrescribimos al escribir el nombre
+  const categoriaManualRef = useRef<boolean>(!!initialTransaction?.categoria);
+
+  // Auto-deteccion: al escribir el nombre del gasto, sugerir la categoria que coincida
+  useEffect(() => {
+    if (categoriaManualRef.current) return;
+    const term = popupDescripcion.toLowerCase().trim();
+    if (!term || popupTipo !== 'Gasto') return;
+    const healthKeywords = ['farmacia', 'salud', 'medic', 'doctor', 'clinica', 'hospital', 'dentista', 'cita'];
+    const match = categorias.find(c => c.nombre.length > 2 && term.includes(c.nombre.toLowerCase()))
+      || (healthKeywords.some(kw => term.includes(kw))
+        ? categorias.find(c => /salud|cuidado|medic|farmac/i.test(c.nombre))
+        : undefined);
+    if (match) setPopupCategoria(match.nombre);
+  }, [popupDescripcion, popupTipo, categorias]);
   const [popupFormaPago, setPopupFormaPago] = useState(initialTransaction?.formaPago || 'Efectivo');
   const [popupFecha, setPopupFecha] = useState(() => {
     if (initialTransaction?.fecha) {
@@ -274,6 +289,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               : (selectedLanguage === 'ES' ? 'Ej: Pago de servicios, Nómina...' : 'e.g. Services payment, Payroll...')
             }
             value={popupDescripcion}
+            autoFocus
             onChange={(e) => setPopupDescripcion(e.target.value)}
             className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
           />
@@ -293,7 +309,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               value={popupMonto}
               onChange={(e) => setPopupMonto(e.target.value)}
               className="w-full bg-slate-50 border border-slate-300 rounded-xl py-3 pl-10 pr-12 text-lg font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              autoFocus
             />
 
             <button
@@ -361,7 +376,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                     id={`btn-popup-cat-${c.nombre}`}
                     key={c.nombre}
                     type="button"
-                    onClick={() => { handleTap(); setPopupCategoria(c.nombre); }}
+                    onClick={() => { handleTap(); categoriaManualRef.current = true; setPopupCategoria(c.nombre); }}
                     className={`p-2.5 rounded-xl border-2 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${isSel ? 'border-[#312E81] bg-indigo-200/90 shadow-md ring-1 ring-[#312E81] font-black text-[#2e2a77] scale-102' : 'border-slate-300 bg-white hover:bg-slate-200 text-slate-900 font-black hover:border-slate-400'}`}
                   >
                     {renderCategoriaIcon(c.icon, c.color, "w-5.5 h-5.5 mb-1")}
