@@ -41,7 +41,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     if (categoriaManualRef.current) return;
     const term = popupDescripcion.toLowerCase().trim();
     if (!term || popupTipo !== 'Gasto') return;
-    const healthKeywords = ['farmacia', 'salud', 'medic', 'doctor', 'clinica', 'hospital', 'dentista'];
+    const healthKeywords = ['farmacia', 'salud', 'medic', 'doctor', 'clinica', 'hospital', 'dentista', 'cita'];
     const match = categorias.find(c => c.nombre.length > 2 && term.includes(c.nombre.toLowerCase()))
       || (healthKeywords.some(kw => term.includes(kw))
         ? categorias.find(c => /salud|cuidado|medic|farmac/i.test(c.nombre))
