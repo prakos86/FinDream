@@ -34,7 +34,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [popupCategoria, setPopupCategoria] = useState(initialTransaction?.categoria || (categorias.length > 0 ? categorias[0].nombre : 'Otros'));
   const [popupDescripcion, setPopupDescripcion] = useState(initialTransaction?.descripcion || '');
   // Si el usuario elige la categoria a mano, no la sobrescribimos al escribir el nombre
-  const categoriaManualRef = useRef<boolean>(!!initialTransaction?.categoria);
+  const categoriaManualRef = useRef<boolean>(false);
 
   // Auto-deteccion: al escribir el nombre del gasto, sugerir la categoria que coincida
   useEffect(() => {
