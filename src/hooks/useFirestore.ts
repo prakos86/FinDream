@@ -184,11 +184,15 @@ export const useFirestore = (
       const userDocRef = doc(db, 'users', userRefId);
       const esAdmin = Boolean(userProfileRef.current?.correo?.toLowerCase().trim() === 'prakos@gmail.com' || (user?.email && user.email.toLowerCase().trim() === 'prakos@gmail.com'));
 
+      // Una sola ida y vuelta: lista de paises + documento del usuario en paralelo
+      let prefetchedUserSnap: any = null;
       try {
-        const [coSnap, clSnap] = await Promise.all([
+        const [coSnap, clSnap, userSnap] = await Promise.all([
           getDoc(doc(db, 'users', userRefId, 'paises', 'CO')),
-          getDoc(doc(db, 'users', userRefId, 'paises', 'CL'))
+          getDoc(doc(db, 'users', userRefId, 'paises', 'CL')),
+          getDoc(userDocRef)
         ]);
+        prefetchedUserSnap = userSnap;
         const available: ('CO' | 'CL')[] = [];
         if (coSnap.exists()) available.push('CO');
         if (clSnap.exists()) available.push('CL');
@@ -264,7 +268,7 @@ export const useFirestore = (
 
       // MIGRATION BLOCK: Migrate legacy `users/{userId}` financial data to `users/{userId}/paises/CO` if applicable.
       try {
-         const userDocSnap = await getDoc(userDocRef);
+         const userDocSnap = prefetchedUserSnap ?? await getDoc(userDocRef);
          if (userDocSnap.exists()) {
             const data = userDocSnap.data();
             if (data.transacciones || data.productos || data.paymentMethods) {
@@ -290,7 +294,7 @@ export const useFirestore = (
       if (syncUnsubscribeRef.current) syncUnsubscribeRef.current();
 
       // Cargar userData una sola vez antes de suscribirse para evitar el round-trip bloqueante dentro de onSnapshot (FIX 5)
-      const userSnapInit = await getDoc(userDocRef);
+      const userSnapInit = prefetchedUserSnap ?? await getDoc(userDocRef);
       const userDataRef = { current: userSnapInit.exists() ? userSnapInit.data() : {} };
 
       // Suscribirse al snapshot del pais sin round-trip adicional (FIX 5)
